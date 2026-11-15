@@ -380,6 +380,21 @@ fn lower_expr_ctx(expr : @syntax.Expr, ctx : LowerContext) -> String {
         Var(op_name) => {
           let (is_op, op_sym) = is_binop(op_name)
           if is_op {
+            // Signed comparison against 0 (e.g. `<# x 0#` or `< x 0`).
+            // Under unsigned W32, `x < 0` is always false.
+            // In two's complement, negative numbers have MSB set: `(>> x 31)`
+            if (op_name == "<" || op_name == "<#") && args.length() >= 2 {
+              match args[1] {
+                LitInt(0) => {
+                  let mut res = "(>> " + lower_expr_ctx(args[0], ctx) + " 31)"
+                  for i = 2; i < args.length(); i = i + 1 {
+                    res = "(" + res + " " + lower_expr_ctx(args[i], ctx) + ")"
+                  }
+                  return res
+                }
+                _ => ()
+              }
+            }
             if args.length() == 2 {
               return "(" +
                 op_sym +

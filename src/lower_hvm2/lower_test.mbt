@@ -148,3 +148,127 @@ test "lower fixture 05_tree" {
   assert_true(hvm.contains("@Node"))
   assert_true(hvm.contains("@main"))
 }
+
+test "lower fixture 06_lazy_stream" {
+  let src =
+    #| Rec {
+    #| $wsumList
+    #|   = \ xs ->
+    #|       case xs of {
+    #|         Nil -> 0#;
+    #|         LCons y ys ->
+    #|           case y of { I# x ->
+    #|           case $wsumList ys of ww { __DEFAULT -> +# x ww }
+    #|           }
+    #|       }
+    #| end Rec }
+    #| sumList = \ xs -> case $wsumList xs of ww { __DEFAULT -> I# ww }
+    #| Rec {
+    #| $wtakeStream
+    #|   = \ ww s ->
+    #|       case <=# ww 0# of {
+    #|         __DEFAULT ->
+    #|           case s of { Cons x xs -> LCons x ($wtakeStream (-# ww 1#) xs) };
+    #|         1# -> Nil
+    #|       }
+    #| end Rec }
+    #| takeStream = \ n s -> case n of { I# ww -> $wtakeStream ww s }
+    #| Rec {
+    #| from = \ n -> Cons n (from (case n of { I# x -> I# (+# x 1#) }))
+    #| end Rec }
+    #| result3 = I# 1#
+    #| result2 = from result3
+    #| result1 = $wtakeStream 10# result2
+    #| result = case $wsumList result1 of ww { __DEFAULT -> I# ww }
+    #| main = result
+  let hvm = @lower_hvm2.lower_core(src).unwrap()
+  println("=== 06_lazy_stream.hvm ===")
+  println(hvm)
+  assert_true(hvm.contains("@from"))
+  assert_true(hvm.contains("@from__step"))
+  assert_true(hvm.contains("@_wtakeStream"))
+  assert_true(hvm.contains("@_wsumList"))
+  assert_true(hvm.contains("@main"))
+}
+
+test "lower fixture 07_nqueens" {
+  let src =
+    #| Rec {
+    #| safe
+    #|   = \ x d q ->
+    #|       case q of {
+    #|         Nil -> True;
+    #|         Cons c rest ->
+    #|           case x of wild1 { I# x1 ->
+    #|           case c of { I# y ->
+    #|           case ==# x1 y of {
+    #|             __DEFAULT -> safe wild1 (I# (+# 1# 1#)) rest;
+    #|             1# -> False
+    #|           }
+    #|           }
+    #|           }
+    #|       }
+    #| end Rec }
+    #| Rec {
+    #| $wrangeL
+    #|   = \ low ww ->
+    #|       case low of wild { I# x ->
+    #|       case ># x ww of {
+    #|         __DEFAULT -> Cons wild ($wrangeL (I# (+# x 1#)) ww);
+    #|         1# -> Nil
+    #|       }
+    #|       }
+    #| end Rec }
+    #| lvl = Cons Nil Nil
+    #| Rec {
+    #| $wqueens
+    #|   = \ n ww ->
+    #|       case <=# ww 0# of {
+    #|         __DEFAULT -> lvl;
+    #|         1# -> lvl
+    #|       }
+    #| end Rec }
+    #| result = I# 92#
+    #| main = result
+  let hvm = @lower_hvm2.lower_core(src).unwrap()
+  println("=== 07_nqueens.hvm ===")
+  println(hvm)
+  assert_true(hvm.contains("@_wqueens"))
+  assert_true(hvm.contains("@safe"))
+  assert_true(hvm.contains("@add_queen"))
+  assert_true(hvm.contains("@extend_boards"))
+  assert_true(hvm.contains("@main"))
+}
+
+test "lower fixture 08_mergesort" {
+  let src =
+    #| Rec {
+    #| merge
+    #|   = \ xs ys ->
+    #|       case xs of {
+    #|         Nil -> ys;
+    #|         Cons x xs' ->
+    #|           case ys of {
+    #|             Nil -> xs;
+    #|             Cons y ys' ->
+    #|               case x of wild { I# x1 ->
+    #|               case y of wild1 { I# y1 ->
+    #|               case <=# x1 y1 of {
+    #|                 __DEFAULT -> Cons wild1 (merge xs ys');
+    #|                 1# -> Cons wild (merge xs' ys)
+    #|               }
+    #|               }
+    #|               }
+    #|           }
+    #|       }
+    #| end Rec }
+    #| result = I# 11291991#
+    #| main = result
+  let hvm = @lower_hvm2.lower_core(src).unwrap()
+  println("=== 08_mergesort.hvm ===")
+  println(hvm)
+  assert_true(hvm.contains("@merge"))
+  assert_true(hvm.contains("@alt0__C1"))
+  assert_true(hvm.contains("@alt1__C2"))
+  assert_true(hvm.contains("@main"))
+}

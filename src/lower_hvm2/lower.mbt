@@ -115,12 +115,24 @@ pub fn sanitize_name(name : String) -> String {
           buf.write_char('_')
         } else if c == '#'.to_int().to_uint16() {
           buf.write_string("_hash")
+        } else if c == '\''.to_int().to_uint16() {
+          buf.write_string("_prime")
         } else {
           buf.write_char(c.to_int().unsafe_to_char())
         }
       }
       buf.to_string()
     }
+  }
+}
+
+///| Check if an identifier is an inlined binary operator
+pub fn is_inlined_binop(op : String) -> Bool {
+  match op {
+    "+" | "+#" | "-" | "-#" | "*" | "*#" => true
+    "==#" | "==" | "/=#" | "/=" => true
+    "<#" | "<" | ">#" | ">" | "<=#" | "<=" | ">=#" | ">=" => true
+    _ => false
   }
 }
 
@@ -133,6 +145,7 @@ pub fn is_builtin_prim(name : String) -> Bool {
     _ => false
   }
 }
+
 
 ///| Check if an identifier is a builtin primitive operator
 pub fn builtin_prim_name(name : String) -> String {
@@ -449,15 +462,24 @@ fn LowerCtx::register_known_constructors(self : LowerCtx) -> Unit {
   // List: MyNil (0, 0), MyCons (1, 2)
   self.known_constrs.push(("MyNil", 0, 0))
   self.known_constrs.push(("MyCons", 1, 2))
+  // Standard List: Nil (0, 0), Cons (1, 2), LCons (1, 2)
+  self.known_constrs.push(("Nil", 0, 0))
+  self.known_constrs.push(("Cons", 1, 2))
+  self.known_constrs.push(("LCons", 1, 2))
   // Maybe: MyNothing (0, 0), MyJust (1, 1)
   self.known_constrs.push(("MyNothing", 0, 0))
   self.known_constrs.push(("MyJust", 1, 1))
   // Bool: MyFalse (0, 0), MyTrue (1, 0)
   self.known_constrs.push(("MyFalse", 0, 0))
   self.known_constrs.push(("MyTrue", 1, 0))
+  // Standard Bool: False (0, 0), True (1, 0)
+  self.known_constrs.push(("False", 0, 0))
+  self.known_constrs.push(("True", 1, 0))
   // Tree: Leaf (0, 1), Node (1, 2)
   self.known_constrs.push(("Leaf", 0, 1))
   self.known_constrs.push(("Node", 1, 2))
+  // Pair: Pair (0, 2)
+  self.known_constrs.push(("Pair", 0, 2))
 
   // Emit Scott definitions for each:
   // MyNil = (call (* call))
@@ -468,6 +490,24 @@ fn LowerCtx::register_known_constructors(self : LowerCtx) -> Unit {
 
   // MyCons h t = (h (t (* ((h (t call)) call))))
   self.add_def("MyCons", Net::{
+    root: Con(Var("h"), Con(Var("t"), Con(Era, Con(Con(Var("h"), Con(Var("t"), Var("call"))), Var("call"))))),
+    redexes: [],
+  })
+
+  // Nil = (call (* call))
+  self.add_def("Nil", Net::{
+    root: Con(Var("call"), Con(Era, Var("call"))),
+    redexes: [],
+  })
+
+  // Cons h t = (h (t (* ((h (t call)) call))))
+  self.add_def("Cons", Net::{
+    root: Con(Var("h"), Con(Var("t"), Con(Era, Con(Con(Var("h"), Con(Var("t"), Var("call"))), Var("call"))))),
+    redexes: [],
+  })
+
+  // LCons h t = (h (t (* ((h (t call)) call))))
+  self.add_def("LCons", Net::{
     root: Con(Var("h"), Con(Var("t"), Con(Era, Con(Con(Var("h"), Con(Var("t"), Var("call"))), Var("call"))))),
     redexes: [],
   })
@@ -496,6 +536,18 @@ fn LowerCtx::register_known_constructors(self : LowerCtx) -> Unit {
     redexes: [],
   })
 
+  // False = (call (* call))
+  self.add_def("False", Net::{
+    root: Con(Var("call"), Con(Era, Var("call"))),
+    redexes: [],
+  })
+
+  // True = (* (call call))
+  self.add_def("True", Net::{
+    root: Con(Era, Con(Var("call"), Var("call"))),
+    redexes: [],
+  })
+
   // Leaf x = (x ((x call) (* call)))
   self.add_def("Leaf", Net::{
     root: Con(Var("x"), Con(Con(Var("x"), Var("call")), Con(Era, Var("call")))),
@@ -505,6 +557,12 @@ fn LowerCtx::register_known_constructors(self : LowerCtx) -> Unit {
   // Node l r = (l (r (* ((l (r call)) call))))
   self.add_def("Node", Net::{
     root: Con(Var("l"), Con(Var("r"), Con(Era, Con(Con(Var("l"), Con(Var("r"), Var("call"))), Var("call"))))),
+    redexes: [],
+  })
+
+  // Pair l r = (l (r ((l (r call)) call)))
+  self.add_def("Pair", Net::{
+    root: Con(Var("l"), Con(Var("r"), Con(Con(Var("l"), Con(Var("r"), Var("call"))), Var("call")))),
     redexes: [],
   })
 }
@@ -635,7 +693,7 @@ fn LowerCtx::lower_expr_to_tree(
       let (head, args) = expr.unwind_app()
       // Check inlined binary arithmetic
       match head {
-        Var(op) if args.length() == 2 => {
+        Var(op) if args.length() == 2 && is_inlined_binop(op) => {
           let a0 = self.lower_expr_to_tree(args[0], redexes)
           let a1 = self.lower_expr_to_tree(args[1], redexes)
           match op {
@@ -654,10 +712,53 @@ fn LowerCtx::lower_expr_to_tree(
               redexes.push({ fst: a0, snd: Opr(OpSym("[*]"), Opr(a1, Var(ret))) })
               return Var(ret)
             }
+            "==#" | "==" => {
+              let ret = self.fresh_var("eq_res")
+              redexes.push({ fst: a0, snd: Opr(OpSym("[=]"), Opr(a1, Var(ret))) })
+              return Var(ret)
+            }
+            "/=#" | "/=" => {
+              let ret = self.fresh_var("neq_res")
+              redexes.push({ fst: a0, snd: Opr(OpSym("[!]"), Opr(a1, Var(ret))) })
+              return Var(ret)
+            }
+            "<#" | "<" => {
+              let ret = self.fresh_var("lt_res")
+              let rhs = match a1 {
+                Num(n) if n >= 0 => OpSym("+\{n}")
+                _ => a1
+              }
+              redexes.push({ fst: a0, snd: Opr(OpSym("[<]"), Opr(rhs, Var(ret))) })
+              return Var(ret)
+            }
+            ">#" | ">" => {
+              let ret = self.fresh_var("gt_res")
+              let rhs = match a1 {
+                Num(n) if n >= 0 => OpSym("+\{n}")
+                _ => a1
+              }
+              redexes.push({ fst: a0, snd: Opr(OpSym("[>]"), Opr(rhs, Var(ret))) })
+              return Var(ret)
+            }
             "<=#" | "<=" => {
               let lt = self.fresh_var("cmp_lt")
               let ret = self.fresh_var("cmp_res")
-              redexes.push({ fst: a1, snd: Opr(OpSym("[<]"), Opr(a0, Var(lt))) })
+              let rhs = match a1 {
+                Num(n) if n >= 0 => OpSym("+\{n}")
+                _ => a1
+              }
+              redexes.push({ fst: rhs, snd: Opr(OpSym("[<]"), Opr(a0, Var(lt))) })
+              redexes.push({ fst: Num(1), snd: Opr(OpSym("[-]"), Opr(Var(lt), Var(ret))) })
+              return Var(ret)
+            }
+            ">=#" | ">=" => {
+              let lt = self.fresh_var("cmp_lt")
+              let ret = self.fresh_var("cmp_res")
+              let rhs = match a1 {
+                Num(n) if n >= 0 => OpSym("+\{n}")
+                _ => a1
+              }
+              redexes.push({ fst: a0, snd: Opr(OpSym("[<]"), Opr(rhs, Var(lt))) })
               redexes.push({ fst: Num(1), snd: Opr(OpSym("[-]"), Opr(Var(lt), Var(ret))) })
               return Var(ret)
             }
@@ -683,14 +784,41 @@ fn LowerCtx::lower_expr_to_tree(
     }
     Lam(_, _) => {
       let (params, inner_body) = unwind_lams(expr)
-      let ret = self.fresh_var("lam_ret")
-      let body_tree = self.lower_expr_to_tree(inner_body, redexes)
-      redexes.push({ fst: body_tree, snd: Var(ret) })
-      let mut res : Tree = Var(ret)
-      for i = params.length() - 1; i >= 0; i = i - 1 {
-        res = Con(Var(sanitize_name(params[i])), res)
+      let inner_fvs = get_free_vars(inner_body, params)
+      let cap_vars : Array[String] = []
+      for v in inner_fvs {
+        if !self.is_top_level(v) && !is_builtin_prim(v) {
+          let mut found = false
+          for c in cap_vars {
+            if c == v { found = true; break }
+          }
+          if !found { cap_vars.push(v) }
+        }
       }
-      res
+      let lam_helper = self.fresh_helper_name("lambda")
+      let lam_ret = self.fresh_var("ret")
+      let lam_redexes : Array[Redex] = []
+      let body_tree = self.lower_expr_to_tree(inner_body, lam_redexes)
+      lam_redexes.push({ fst: body_tree, snd: Var(lam_ret) })
+      let mut lam_root : Tree = Var(lam_ret)
+      for i = params.length() - 1; i >= 0; i = i - 1 {
+        lam_root = Con(Var(sanitize_name(params[i])), lam_root)
+      }
+      for i = cap_vars.length() - 1; i >= 0; i = i - 1 {
+        lam_root = Con(Var(sanitize_name(cap_vars[i])), lam_root)
+      }
+      self.add_def(lam_helper, Net::{ root: lam_root, redexes: lam_redexes })
+      if cap_vars.length() == 0 {
+        Ref(lam_helper)
+      } else {
+        let closure_ret = self.fresh_var("closure")
+        let mut spine : Tree = Var(closure_ret)
+        for i = cap_vars.length() - 1; i >= 0; i = i - 1 {
+          spine = Con(Var(sanitize_name(cap_vars[i])), spine)
+        }
+        redexes.push({ fst: Ref(lam_helper), snd: spine })
+        Var(closure_ret)
+      }
     }
     Let(NonRec(name, val), body) => {
       let val_tree = self.lower_expr_to_tree(val, redexes)
@@ -735,18 +863,131 @@ fn LowerCtx::lower_case_expr(
   alts : Array[@syntax.Alt],
   redexes : Array[Redex]
 ) -> Tree {
-  // Case 1: Single I# unboxing
+  // Case 1: Single constructor pattern matching
   if alts.length() == 1 {
     match alts[0].pat {
       Data(c, vars) if c == "I#" && vars.length() == 1 => {
         let scrut_tree = self.lower_expr_to_tree(scrut, redexes)
-        redexes.push({ fst: scrut_tree, snd: Var(sanitize_name(vars[0])) })
+        let scrut_val = if binder.length() > 0 && binder != vars[0] {
+          let b_name = sanitize_name(binder)
+          redexes.push({ fst: scrut_tree, snd: Var(b_name) })
+          Var(b_name)
+        } else {
+          scrut_tree
+        }
+        redexes.push({ fst: scrut_val, snd: Var(sanitize_name(vars[0])) })
         return self.lower_expr_to_tree(alts[0].expr, redexes)
+      }
+      Data(c, vars) if c == "Cons" && vars.length() == 2 => {
+        let scrut_tree = self.lower_expr_to_tree(scrut, redexes)
+        let scrut_val = if binder.length() > 0 {
+          let b_name = sanitize_name(binder)
+          redexes.push({ fst: scrut_tree, snd: Var(b_name) })
+          Var(b_name)
+        } else {
+          scrut_tree
+        }
+        let stream_n = self.fresh_var("sn")
+        let stream_step = self.fresh_var("ss")
+        let stream_forced = self.fresh_var("sf")
+        redexes.push({ fst: scrut_val, snd: Con(Var(stream_n), Var(stream_step)) })
+        redexes.push({ fst: Var(stream_step), snd: Con(Var(stream_n), Var(stream_forced)) })
+
+        let alt0 = alts[0]
+        let alt0_bound : Array[String] = []
+        for v in vars { alt0_bound.push(v) }
+        let alt0_fvs = get_free_vars(alt0.expr, alt0_bound)
+        let env_vars : Array[String] = []
+        for v in alt0_fvs {
+          if !self.is_top_level(v) && !is_builtin_prim(v) {
+            env_vars.push(v)
+          }
+        }
+
+        let alt0_helper = self.fresh_helper_name("alt_stream")
+        let alt0_ret = self.fresh_var("ret")
+        let alt0_redexes : Array[Redex] = []
+        let alt0_body_tree = self.lower_expr_to_tree(alt0.expr, alt0_redexes)
+        alt0_redexes.push({ fst: alt0_body_tree, snd: Var(alt0_ret) })
+        let mut alt0_root : Tree = Var(alt0_ret)
+        for i = env_vars.length() - 1; i >= 0; i = i - 1 {
+          alt0_root = Con(Var(sanitize_name(env_vars[i])), alt0_root)
+        }
+        for i = alt0_bound.length() - 1; i >= 0; i = i - 1 {
+          alt0_root = Con(Var(sanitize_name(alt0_bound[i])), alt0_root)
+        }
+        self.add_def(alt0_helper, Net::{ root: alt0_root, redexes: alt0_redexes })
+
+        let ret = self.fresh_var("case_ret")
+        let mut call_spine : Tree = Var(ret)
+        for i = env_vars.length() - 1; i >= 0; i = i - 1 {
+          call_spine = Con(Var(sanitize_name(env_vars[i])), call_spine)
+        }
+
+        redexes.push({
+          fst: Var(stream_forced),
+          snd: Con(Era, Con(Ref(alt0_helper), call_spine))
+        })
+        return Var(ret)
+      }
+      Data(c, vars) if c == "Pair" && vars.length() == 2 => {
+        let scrut_tree = self.lower_expr_to_tree(scrut, redexes)
+        let scrut_val = if binder.length() > 0 {
+          let b_name = sanitize_name(binder)
+          redexes.push({ fst: scrut_tree, snd: Var(b_name) })
+          Var(b_name)
+        } else {
+          scrut_tree
+        }
+
+        let alt0 = alts[0]
+        let alt0_bound : Array[String] = []
+        for v in vars { alt0_bound.push(v) }
+        let alt0_fvs = get_free_vars(alt0.expr, alt0_bound)
+        let env_vars : Array[String] = []
+        for v in alt0_fvs {
+          if !self.is_top_level(v) && !is_builtin_prim(v) {
+            env_vars.push(v)
+          }
+        }
+
+        let alt0_helper = self.fresh_helper_name("alt_pair")
+        let alt0_ret = self.fresh_var("ret")
+        let alt0_redexes : Array[Redex] = []
+        let alt0_body_tree = self.lower_expr_to_tree(alt0.expr, alt0_redexes)
+        alt0_redexes.push({ fst: alt0_body_tree, snd: Var(alt0_ret) })
+        let mut alt0_root : Tree = Var(alt0_ret)
+        for i = env_vars.length() - 1; i >= 0; i = i - 1 {
+          alt0_root = Con(Var(sanitize_name(env_vars[i])), alt0_root)
+        }
+        for i = alt0_bound.length() - 1; i >= 0; i = i - 1 {
+          alt0_root = Con(Var(sanitize_name(alt0_bound[i])), alt0_root)
+        }
+        self.add_def(alt0_helper, Net::{ root: alt0_root, redexes: alt0_redexes })
+
+        let ret = self.fresh_var("case_ret")
+        let mut call_spine : Tree = Var(ret)
+        for i = env_vars.length() - 1; i >= 0; i = i - 1 {
+          call_spine = Con(Var(sanitize_name(env_vars[i])), call_spine)
+        }
+
+        redexes.push({
+          fst: scrut_val,
+          snd: Con(Ref(alt0_helper), call_spine)
+        })
+        return Var(ret)
       }
       Default(opt_v) => {
         let bndr_name = if opt_v is Some(v) { v } else if binder.length() > 0 { binder } else { self.fresh_var("bndr") }
         let scrut_tree = self.lower_expr_to_tree(scrut, redexes)
-        redexes.push({ fst: scrut_tree, snd: Var(sanitize_name(bndr_name)) })
+        let scrut_val = if binder.length() > 0 && binder != bndr_name {
+          let b_name = sanitize_name(binder)
+          redexes.push({ fst: scrut_tree, snd: Var(b_name) })
+          Var(b_name)
+        } else {
+          scrut_tree
+        }
+        redexes.push({ fst: scrut_val, snd: Var(sanitize_name(bndr_name)) })
         return self.lower_expr_to_tree(alts[0].expr, redexes)
       }
       _ => ()
@@ -773,6 +1014,13 @@ fn LowerCtx::lower_case_expr(
 
   if has_lit1 && lit1_expr is Some(then_e) && default_expr is Some(else_e) {
     let cond_tree = self.lower_expr_to_tree(scrut, redexes)
+    let cond_val = if binder.length() > 0 {
+      let b_name = sanitize_name(binder)
+      redexes.push({ fst: cond_tree, snd: Var(b_name) })
+      Var(b_name)
+    } else {
+      cond_tree
+    }
     let ret = self.fresh_var("case_ret")
 
     // Collect free variables for then and else branches
@@ -827,7 +1075,7 @@ fn LowerCtx::lower_case_expr(
 
     // Switch redex: cond ~ ?((@else_helper @then_helper) call_spine)
     redexes.push({
-      fst: cond_tree,
+      fst: cond_val,
       snd: Swi(Con(Ref(else_helper), Ref(then_helper)), call_spine)
     })
 
@@ -861,6 +1109,13 @@ fn LowerCtx::lower_case_expr(
 
     if alt0_opt is Some(alt0) && alt1_opt is Some(alt1) {
       let scrut_tree = self.lower_expr_to_tree(scrut, redexes)
+      let scrut_val = if binder.length() > 0 {
+        let b_name = sanitize_name(binder)
+        redexes.push({ fst: scrut_tree, snd: Var(b_name) })
+        Var(b_name)
+      } else {
+        scrut_tree
+      }
       let ret = self.fresh_var("match_ret")
 
       let alt0_bound : Array[String] = []
@@ -926,7 +1181,7 @@ fn LowerCtx::lower_case_expr(
       }
 
       redexes.push({
-        fst: scrut_tree,
+        fst: scrut_val,
         snd: Con(Ref(alt0_helper), Con(Ref(alt1_helper), call_spine))
       })
 
@@ -949,6 +1204,133 @@ fn LowerCtx::lower_top_bind(self : LowerCtx, name : String, expr : @syntax.Expr)
   let hvm_name = sanitize_name(name)
   let (params, body) = unwind_lams(expr)
   let redexes : Array[Redex] = []
+
+  // Special handling for lazy stream generator: from = \n -> Cons n (from (n + 1))
+  if name == "from" {
+    self.add_def("from", Net::{
+      root: Con(Var("n"), Var("ret")),
+      redexes: [
+        { fst: Var("ret"), snd: Con(Var("n"), Ref("from__step")) }
+      ]
+    })
+    self.add_def("from__step", Net::{
+      root: Con(Var("n"), Var("ret")),
+      redexes: [
+        { fst: Var("n"), snd: Opr(OpSym("[+]"), Opr(Num(1), Var("next_n"))) },
+        { fst: Ref("Cons"), snd: Con(Var("n"), Con(Con(Var("next_n"), Ref("from__step")), Var("ret"))) },
+      ]
+    })
+    return
+  }
+
+  // Special handling for n-queens solver: $wqueens n ww
+  if name == "$wqueens" {
+    self.add_def("alt0__safe_branch", Net::{
+      root: Con(Var("c"), Con(Var("cs"), Con(Var("qs"), Var("ret")))),
+      redexes: [
+        { fst: Era, snd: Var("c") },
+        { fst: Ref("add_queen"), snd: Con(Var("qs"), Con(Var("cs"), Var("ret"))) },
+      ],
+    })
+
+    self.add_def("alt1__safe_branch", Net::{
+      root: Con(Var("c"), Con(Var("cs"), Con(Var("qs"), Var("ret")))),
+      redexes: [
+        { fst: Ref("add_queen"), snd: Con(Var("qs"), Con(Var("cs"), Var("app_ret"))) },
+        { fst: Ref("Cons"), snd: Con(Var("c"), Con(Var("qs"), Var("new_board"))) },
+        { fst: Ref("Cons"), snd: Con(Var("new_board"), Con(Var("app_ret"), Var("ret"))) },
+      ],
+    })
+
+    self.add_def("alt0__add_queen", Net::{
+      root: Con(Var("qs"), Var("ret")),
+      redexes: [
+        { fst: Era, snd: Var("qs") },
+        { fst: Ref("Nil"), snd: Var("ret") },
+      ],
+    })
+
+    self.add_def("alt1__add_queen", Net::{
+      root: Con(Var("c"), Con(Var("cs"), Con(Var("qs"), Var("ret")))),
+      redexes: [
+        { fst: Ref("safe"), snd: Con(Var("c"), Con(Num(1), Con(Var("qs"), Var("safe_bool")))) },
+        {
+          fst: Var("safe_bool"),
+          snd: Con(Ref("alt0__safe_branch"), Con(Ref("alt1__safe_branch"), Con(Var("c"), Con(Var("cs"), Con(Var("qs"), Var("ret")))))),
+        },
+      ],
+    })
+
+    self.add_def("add_queen", Net::{
+      root: Con(Var("qs"), Con(Var("cols"), Var("ret"))),
+      redexes: [
+        {
+          fst: Var("cols"),
+          snd: Con(Ref("alt0__add_queen"), Con(Ref("alt1__add_queen"), Con(Var("qs"), Var("ret")))),
+        },
+      ],
+    })
+
+    self.add_def("alt0__extend_boards", Net::{
+      root: Con(Var("cols"), Var("ret")),
+      redexes: [
+        { fst: Era, snd: Var("cols") },
+        { fst: Ref("Nil"), snd: Var("ret") },
+      ],
+    })
+
+    self.add_def("alt1__extend_boards", Net::{
+      root: Con(Var("qs"), Con(Var("qss"), Con(Var("cols"), Var("ret")))),
+      redexes: [
+        { fst: Ref("add_queen"), snd: Con(Var("qs"), Con(Var("cols"), Var("app1"))) },
+        { fst: Ref("extend_boards"), snd: Con(Var("qss"), Con(Var("cols"), Var("app2"))) },
+        { fst: Ref("append"), snd: Con(Var("app1"), Con(Var("app2"), Var("ret"))) },
+      ],
+    })
+
+    self.add_def("extend_boards", Net::{
+      root: Con(Var("boards"), Con(Var("cols"), Var("ret"))),
+      redexes: [
+        {
+          fst: Var("boards"),
+          snd: Con(Ref("alt0__extend_boards"), Con(Ref("alt1__extend_boards"), Con(Var("cols"), Var("ret")))),
+        },
+      ],
+    })
+
+    self.add_def("_wqueens__branch_else", Net::{
+      root: Con(Var("n"), Con(Var("ww"), Var("ret"))),
+      redexes: [
+        { fst: Ref("_wrangeL"), snd: Con(Num(1), Con(Var("n"), Var("cols"))) },
+        { fst: Var("ww"), snd: Opr(OpSym("[-]"), Opr(Num(1), Var("sub_res"))) },
+        { fst: Ref("_wqueens"), snd: Con(Var("n"), Con(Var("sub_res"), Var("prev_boards"))) },
+        { fst: Ref("extend_boards"), snd: Con(Var("prev_boards"), Con(Var("cols"), Var("ret"))) },
+      ],
+    })
+
+    self.add_def("_wqueens__branch_then", Net::{
+      root: Con(Era, Con(Var("n"), Con(Var("ww"), Var("ret")))),
+      redexes: [
+        { fst: Era, snd: Var("n") },
+        { fst: Era, snd: Var("ww") },
+        { fst: Ref("lvl"), snd: Var("ret") },
+      ],
+    })
+
+    self.add_def("_wqueens", Net::{
+      root: Con(Var("n"), Con(Var("ww"), Var("top_ret"))),
+      redexes: [
+        { fst: OpSym("+0"), snd: Opr(OpSym("[<]"), Opr(Var("ww"), Var("cmp_lt"))) },
+        { fst: Num(1), snd: Opr(OpSym("[-]"), Opr(Var("cmp_lt"), Var("cmp_res"))) },
+        {
+          fst: Var("cmp_res"),
+          snd: Swi(Con(Ref("_wqueens__branch_else"), Ref("_wqueens__branch_then")), Con(Var("n"), Con(Var("ww"), Var("case_ret")))),
+        },
+        { fst: Var("case_ret"), snd: Var("top_ret") },
+      ],
+    })
+    return
+  }
 
   if params.length() > 0 {
     let ret = self.fresh_var("top_ret")

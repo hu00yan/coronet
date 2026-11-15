@@ -33,7 +33,7 @@ test "lower let expressions" {
       @syntax.Expr::LitInt(5),
     ),
   )
-  assert_eq(@lower_hvm3.lower_expr(e), "((λ&x (+ x 5)) 10)")
+  assert_eq(@lower_hvm3.lower_expr(e), "( ! &x = 10; (+ x 5) )")
 }
 
 test "lower Scott-encoded ADTs and pattern matching" {
@@ -288,5 +288,237 @@ test "lower 06_lazy_stream fixture" {
   )
   assert_true(hvm3_code.contains("@Cons = (λ&a0 (λ&a1 (λ&c0 ((c0 a0) a1))))"))
   assert_true(hvm3_code.contains("@from = (λ&n ((@Cons n)"))
+  assert_true(hvm3_code.contains("@main = @result"))
+}
+
+test "lower 07_nqueens fixture" {
+  let src =
+    #|Rec {
+    #|append
+    #|  = \ xs ys ->
+    #|      case xs of {
+    #|        Nil -> ys;
+    #|        Cons z zs -> Cons z (append zs ys)
+    #|      }
+    #|end Rec }
+    #|Rec {
+    #|concatMapL
+    #|  = \ f xs ->
+    #|      case xs of {
+    #|        Nil -> Nil;
+    #|        Cons y ys -> append (f y) (concatMapL f ys)
+    #|      }
+    #|end Rec }
+    #|Rec {
+    #|$wlengthL
+    #|  = \ xs ->
+    #|      case xs of {
+    #|        Nil -> 0#;
+    #|        Cons ds rest -> case $wlengthL rest of ww { __DEFAULT -> +# 1# ww }
+    #|      }
+    #|end Rec }
+    #|lengthL = \ xs -> case $wlengthL xs of ww { __DEFAULT -> I# ww }
+    #|absInt
+    #|  = \ x ->
+    #|      case x of wild { I# x1 ->
+    #|      case <# x1 0# of {
+    #|        __DEFAULT -> wild;
+    #|        1# -> I# (-# 0# x1)
+    #|      }
+    #|      }
+    #|Rec {
+    #|safe
+    #|  = \ x d q ->
+    #|      case q of {
+    #|        Nil -> True;
+    #|        Cons c rest ->
+    #|          case x of wild1 { I# x1 ->
+    #|          case c of { I# y ->
+    #|          case ==# x1 y of {
+    #|            __DEFAULT ->
+    #|              let { x2 = -# x1 y } in
+    #|              case <# x2 0# of {
+    #|                __DEFAULT ->
+    #|                  case d of { I# y1 ->
+    #|                  case ==# x2 y1 of {
+    #|                    __DEFAULT -> safe wild1 (I# (+# y1 1#)) rest;
+    #|                    1# -> False
+    #|                  }
+    #|                  };
+    #|                1# ->
+    #|                  case d of { I# y1 ->
+    #|                  case ==# (-# 0# x2) y1 of {
+    #|                    __DEFAULT -> safe wild1 (I# (+# y1 1#)) rest;
+    #|                    1# -> False
+    #|                  }
+    #|                  }
+    #|              };
+    #|            1# -> False
+    #|          }
+    #|          }
+    #|          }
+    #|      }
+    #|end Rec }
+    #|Rec {
+    #|$wrangeL
+    #|  = \ low ww ->
+    #|      case low of wild { I# x ->
+    #|      case ># x ww of {
+    #|        __DEFAULT -> Cons wild ($wrangeL (I# (+# x 1#)) ww);
+    #|        1# -> Nil
+    #|      }
+    #|      }
+    #|end Rec }
+    #|rangeL = \ low high -> case high of { I# ww -> $wrangeL low ww }
+    #|lvl = Cons Nil Nil
+    #|lvl1 = I# 1#
+    #|Rec {
+    #|$wqueens
+    #|  = \ n ww ->
+    #|      case <=# ww 0# of {
+    #|        __DEFAULT ->
+    #|          let { lvl2 = case n of { I# ww1 -> $wrangeL lvl1 ww1 } } in
+    #|          concatMapL
+    #|            (\ qs ->
+    #|               concatMapL
+    #|                 (\ c ->
+    #|                    case safe c lvl1 qs of {
+    #|                      False -> Nil;
+    #|                      True -> Cons (Cons c qs) Nil
+    #|                    })
+    #|                 lvl2)
+    #|            ($wqueens n (-# ww 1#));
+    #|        1# -> lvl
+    #|      }
+    #|end Rec }
+    #|queens = \ n k -> case k of { I# ww -> $wqueens n ww }
+    #|result2 = I# 8#
+    #|result1 = $wqueens result2 8#
+    #|result = case $wlengthL result1 of ww { __DEFAULT -> I# ww }
+    #|main = result
+  let prog = @syntax.parse_program(src).unwrap()
+  let hvm3_code = @lower_hvm3.lower(prog)
+
+  assert_true(hvm3_code.contains("@False = (λ&c0 (λ&c1 c0))"))
+  assert_true(hvm3_code.contains("@True = (λ&c0 (λ&c1 c1))"))
+  assert_true(hvm3_code.contains("@Nil = (λ&c0 (λ&c1 c0))"))
+  assert_true(
+    hvm3_code.contains("@Cons = (λ&a0 (λ&a1 (λ&c0 (λ&c1 ((c1 a0) a1)))))"),
+  )
+  assert_true(hvm3_code.contains("@append = (λ&xs (λ&ys ((xs ys)"))
+  assert_true(hvm3_code.contains("@concatMapL = (λ&f (λ&xs ((xs @Nil)"))
+  assert_true(hvm3_code.contains("@absInt = (λ&x"))
+  assert_true(hvm3_code.contains("(>> x1 31)"))
+  assert_true(hvm3_code.contains("(>> x2 31)"))
+  assert_true(hvm3_code.contains("@safe = (λ&x (λ&d (λ&q"))
+  assert_true(hvm3_code.contains("@_wqueens = (λ&n (λ&ww"))
+  assert_true(hvm3_code.contains("@main = @result"))
+}
+
+test "lower 08_mergesort fixture" {
+  let src =
+    #|Rec {
+    #|merge
+    #|  = \ xs ys ->
+    #|      case xs of wild {
+    #|        Nil -> ys;
+    #|        Cons x xs' ->
+    #|          case ys of wild1 {
+    #|            Nil -> wild;
+    #|            Cons y ys' ->
+    #|              case x of wild2 { I# x1 ->
+    #|              case y of wild3 { I# y1 ->
+    #|              case <=# x1 y1 of {
+    #|                __DEFAULT -> Cons wild3 (merge wild ys');
+    #|                1# -> Cons wild2 (merge xs' wild1)
+    #|              }
+    #|              }
+    #|              }
+    #|          }
+    #|      }
+    #|end Rec }
+    #|lvl = Pair Nil Nil
+    #|Rec {
+    #|splitAtL
+    #|  = \ n xs ->
+    #|      case n of { I# x ->
+    #|      case <=# x 0# of {
+    #|        __DEFAULT ->
+    #|          case xs of {
+    #|            Nil -> lvl;
+    #|            Cons y ys ->
+    #|              case splitAtL (I# (-# x 1#)) ys of {
+    #|                Pair l r -> Pair (Cons y l) r
+    #|              }
+    #|          };
+    #|        1# -> Pair Nil xs
+    #|      }
+    #|      }
+    #|end Rec }
+    #|lvl1 = I# 0#
+    #|Rec {
+    #|lengthL
+    #|  = \ xs ->
+    #|      case xs of {
+    #|        Nil -> lvl1;
+    #|        Cons ds rest ->
+    #|          case lengthL rest of { I# y -> I# (+# 1# y) }
+    #|      }
+    #|end Rec }
+    #|Rec {
+    #|checksum
+    #|  = \ xs ->
+    #|      case xs of {
+    #|        Nil -> lvl1;
+    #|        Cons y ys ->
+    #|          case y of { I# x ->
+    #|          case checksum ys of { I# y1 -> I# (+# x (*# 3# y1)) }
+    #|          }
+    #|      }
+    #|end Rec }
+    #|Rec {
+    #|div2
+    #|  = \ n ->
+    #|      case n of { I# x ->
+    #|      case <=# x 1# of {
+    #|        __DEFAULT ->
+    #|          case div2 (I# (-# x 2#)) of { I# y -> I# (+# 1# y) };
+    #|        1# -> lvl1
+    #|      }
+    #|      }
+    #|end Rec }
+    #|Rec {
+    #|mergesort
+    #|  = \ xs ->
+    #|      case xs of wild {
+    #|        Nil -> Nil;
+    #|        Cons x ds ->
+    #|          case ds of {
+    #|            Nil -> wild;
+    #|            Cons ipv ipv1 ->
+    #|              case splitAtL (div2 (lengthL wild)) wild of {
+    #|                Pair left right -> merge (mergesort left) (mergesort right)
+    #|              }
+    #|          }
+    #|      }
+    #|end Rec }
+    #|testList1 = Cons (I# 3#) Nil
+    #|testList = Cons (I# 15#) testList1
+    #|result1 = mergesort testList
+    #|result = checksum result1
+    #|main = result
+  let prog = @syntax.parse_program(src).unwrap()
+  let hvm3_code = @lower_hvm3.lower(prog)
+
+  assert_true(hvm3_code.contains("@Nil = (λ&c0 (λ&c1 c0))"))
+  assert_true(
+    hvm3_code.contains("@Cons = (λ&a0 (λ&a1 (λ&c0 (λ&c1 ((c1 a0) a1)))))"),
+  )
+  assert_true(hvm3_code.contains("@Pair = (λ&a0 (λ&a1 (λ&c0 ((c0 a0) a1))))"))
+  assert_true(hvm3_code.contains("@merge = (λ&xs (λ&ys"))
+  assert_true(hvm3_code.contains("@splitAtL = (λ&n (λ&xs"))
+  assert_true(hvm3_code.contains("@checksum = (λ&xs"))
+  assert_true(hvm3_code.contains("@div2 = (λ&n"))
+  assert_true(hvm3_code.contains("@mergesort = (λ&xs"))
   assert_true(hvm3_code.contains("@main = @result"))
 }
