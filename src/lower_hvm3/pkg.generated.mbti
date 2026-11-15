@@ -6,7 +6,13 @@ import {
 }
 
 // Values
+pub fn lower(@syntax.Program) -> String
+
 pub fn lower_expr(@syntax.Expr) -> String
+
+pub fn lower_program(@syntax.Program) -> String
+
+pub fn sanitize_name(String) -> String
 
 // Errors
 

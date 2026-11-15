@@ -1,0 +1,5 @@
+// 01_arith.hvm - HVM2 Arithmetic
+// Calculates: (10 + 20) * 3 = 90
+@main = res
+  & $([*3] res) ~ temp
+  & $([+10] temp) ~ 20

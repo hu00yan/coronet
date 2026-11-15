@@ -1,1 +1,3 @@
-// syntax package
+import {
+  "moonbitlang/core/debug" @debug,
+}

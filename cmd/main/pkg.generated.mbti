@@ -6,6 +6,7 @@ package "coronet/cmd/main"
 // Errors
 
 // Types and methods
+type CliArgs
 
 // Type aliases
 

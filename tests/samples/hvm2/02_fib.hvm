@@ -1,0 +1,11 @@
+// 02_fib.hvm - HVM2 Recursive Sum 1..10 = 55
+// Demonstrates numbers, switch ?, pairs (), and recursion
+@main = ret
+  & @sum ~ (10 (0 ret))
+
+@sum = (?(((acc acc) @sum_step) call) call)
+
+@sum_step = ({p1 p2} (acc ret))
+  & @sum ~ (p1 (new_acc ret))
+  & $([+] $(acc new_acc)) ~ n
+  & $([+1] n) ~ p2

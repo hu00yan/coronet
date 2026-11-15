@@ -1,0 +1,34 @@
+Rec {
+sumTree
+  = \ t ->
+      case t of {
+        Leaf x -> x;
+        Node l r ->
+          case sumTree l of { I# x ->
+          case sumTree r of { I# y -> I# (+# x y) }
+          }
+      }
+end Rec }
+
+Rec {
+$wbuildTree
+  = \ ww x ->
+      case <=# ww 0# of {
+        __DEFAULT ->
+          Node
+            ($wbuildTree (-# ww 1#) (case x of { I# x1 -> I# (*# x1 2#) }))
+            ($wbuildTree
+               (-# ww 1#) (case x of { I# x1 -> I# (+# (*# x1 2#) 1#) }));
+        1# -> Leaf x
+      }
+end Rec }
+
+buildTree = \ d x -> case d of { I# ww -> $wbuildTree ww x }
+
+myTree1 = I# 1#
+
+myTree = $wbuildTree 3# myTree1
+
+result = sumTree myTree
+
+main = result

@@ -1,0 +1,11 @@
+// 03_adt.hvm - HVM2 Scott-encoded Pair
+// Demonstrates ADT representation in HVM2 via higher-order nets
+@pair = (a (b (k ret)))
+  & k ~ (a (b ret))
+
+@fst = (p ret)
+  & p ~ ((x (* x)) ret)
+
+@main = ret
+  & @fst ~ (pair ret)
+  & @pair ~ (123 (456 pair))

@@ -1,0 +1,39 @@
+safeHead
+  = \ xs ->
+      case xs of {
+        MyNil -> MyNothing;
+        MyCons h ds -> MyJust h
+      }
+
+fromMaybe
+  = \ def m ->
+      case m of {
+        MyNothing -> def;
+        MyJust x -> x
+      }
+
+isNil
+  = \ xs ->
+      case xs of {
+        MyNil -> MyTrue;
+        MyCons ds ds1 -> MyFalse
+      }
+
+process1 = I# 0#
+
+process
+  = \ xs ->
+      case xs of {
+        MyNil -> process1;
+        MyCons ds ds1 -> ds
+      }
+
+result = I# 42#
+
+testList2 = I# 10#
+
+testList1 = MyCons testList2 MyNil
+
+testList = MyCons result testList1
+
+main = result

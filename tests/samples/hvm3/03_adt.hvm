@@ -1,0 +1,10 @@
+// 03_adt.hvm - HVM3 Algebraic Data Types
+// Demonstrates data definitions and constructor pattern matching
+data List { #Nil #Cons{head tail} }
+
+@sum(!xs r) = ~xs !r {
+  #Nil: r
+  #Cons{head tail}: @sum(tail (+ head r))
+}
+
+@main = @sum(#Cons{10 #Cons{20 #Cons{30 #Nil}}} 0)

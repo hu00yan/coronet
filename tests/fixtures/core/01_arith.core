@@ -1,0 +1,17 @@
+mul = *
+
+sub = -
+
+add = +
+
+calc
+  = \ a b c ->
+      case a of { I# x ->
+      case b of { I# y ->
+      case c of { I# y1 -> I# (-# (*# (+# x y) y1) 42#) }
+      }
+      }
+
+result = I# 48#
+
+main = result

@@ -1,0 +1,11 @@
+// 04_higher_order.hvm - HVM2 Higher-order function
+// Demonstrates twice f x = f (f x) with affine duplication {f1 f2}
+@twice = ({f1 f2} (x ret))
+  & f1 ~ (x temp)
+  & f2 ~ (temp ret)
+
+@inc = (x ret)
+  & $([+1] ret) ~ x
+
+@main = ret
+  & @twice ~ (@inc (40 ret))

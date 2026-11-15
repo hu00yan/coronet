@@ -1,0 +1,19 @@
+Rec {
+$wfib
+  = \ ww ->
+      case <=# ww 1# of {
+        __DEFAULT ->
+          case $wfib (-# ww 1#) of ww1 { __DEFAULT ->
+          case $wfib (-# ww 2#) of ww2 { __DEFAULT -> +# ww1 ww2 }
+          };
+        1# -> ww
+      }
+end Rec }
+
+fib
+  = \ n ->
+      case n of { I# ww -> case $wfib ww of ww1 { __DEFAULT -> I# ww1 } }
+
+result = case $wfib 10# of ww { __DEFAULT -> I# ww }
+
+main = result

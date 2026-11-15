@@ -6,11 +6,72 @@ import {
 }
 
 // Values
+pub fn builtin_prim_name(String) -> String
+
+pub fn is_builtin_prim(String) -> Bool
+
+pub fn lower(@syntax.Program) -> String
+
+pub fn lower_core(String) -> Result[String, String]
+
 pub fn lower_expr(@syntax.Expr) -> String
+
+pub fn lower_program(@syntax.Program) -> String
+
+pub fn sanitize_name(String) -> String
 
 // Errors
 
 // Types and methods
+#derive(Eq)
+pub struct Book {
+  defs : Array[(String, Net)]
+}
+pub fn Book::equal(Self, Self) -> Bool
+pub fn Book::not_equal(Self, Self) -> Bool
+pub fn Book::output(Self, &Logger) -> Unit
+pub fn Book::to_string(Self) -> String
+pub impl Show for Book
+
+#derive(Eq)
+pub struct Net {
+  root : Tree
+  redexes : Array[Redex]
+}
+pub fn Net::equal(Self, Self) -> Bool
+pub fn Net::not_equal(Self, Self) -> Bool
+pub fn Net::output(Self, &Logger) -> Unit
+pub fn Net::to_string(Self) -> String
+pub impl Show for Net
+
+#derive(Eq)
+pub struct Redex {
+  fst : Tree
+  snd : Tree
+}
+pub fn Redex::equal(Self, Self) -> Bool
+pub fn Redex::not_equal(Self, Self) -> Bool
+pub fn Redex::output(Self, &Logger) -> Unit
+pub fn Redex::to_string(Self) -> String
+pub impl Show for Redex
+
+#derive(Eq)
+pub enum Tree {
+  Var(String)
+  Ref(String)
+  Era
+  Num(Int32)
+  OpSym(String)
+  Con(Tree, Tree)
+  Dup(Tree, Tree)
+  Opr(Tree, Tree)
+  Swi(Tree, Tree)
+}
+pub fn Tree::equal(Self, Self) -> Bool
+pub fn Tree::not_equal(Self, Self) -> Bool
+pub fn Tree::output(Self, &Logger) -> Unit
+pub fn Tree::to_string(Self) -> String
+pub impl Show for Tree
 
 // Type aliases
 

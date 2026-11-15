@@ -1,19 +1,145 @@
 // Generated using `moon info`, DON'T EDIT IT
 package "coronet/src/syntax"
 
+import {
+  "moonbitlang/core/debug",
+}
+
 // Values
+pub fn is_constructor_name(String) -> Bool
+
+pub fn parse_core(String) -> Result[Program, String]
+
+pub fn parse_expr(String) -> Result[Expr, String]
+
+pub fn parse_program(String) -> Result[Program, String]
 
 // Errors
 
 // Types and methods
-#derive(Eq, Show)
-pub enum Expr {
+#derive(Eq, @debug.Debug)
+pub(all) struct Alt {
+  pat : Pat
+  expr : Expr
+}
+pub fn Alt::data(String, Array[String], Expr) -> Self
+pub fn Alt::default(String?, Expr) -> Self
+pub fn Alt::equal(Self, Self) -> Bool
+pub fn Alt::lit(Int32, Expr) -> Self
+pub fn Alt::new(Pat, Expr) -> Self
+pub fn Alt::not_equal(Self, Self) -> Bool
+pub fn Alt::output(Self, &Logger) -> Unit
+pub fn Alt::to_repr(Self) -> @debug.Repr
+pub fn Alt::to_string(Self) -> String
+pub impl Show for Alt
+
+#derive(Eq, @debug.Debug)
+pub(all) enum Bind {
+  NonRec(String, Expr)
+  Rec(Array[(String, Expr)])
+}
+pub fn Bind::equal(Self, Self) -> Bool
+pub fn Bind::non_rec(String, Expr) -> Self
+pub fn Bind::not_equal(Self, Self) -> Bool
+pub fn Bind::output(Self, &Logger) -> Unit
+pub fn Bind::rec(Array[(String, Expr)]) -> Self
+pub fn Bind::to_repr(Self) -> @debug.Repr
+pub fn Bind::to_string(Self) -> String
+pub impl Show for Bind
+
+#derive(Eq, @debug.Debug)
+pub(all) enum Expr {
   Var(String)
   LitInt(Int32)
+  LitChar(Char)
+  LitString(String)
   App(Expr, Expr)
   Lam(String, Expr)
-  Let(String, Expr, Expr)
+  Let(Bind, Expr)
+  Case(Expr, String, Array[Alt])
+  Constr(String, Array[Expr])
 }
+pub fn Expr::app(Self, Self) -> Self
+pub fn Expr::apps(Self, Array[Self]) -> Self
+pub fn Expr::case_(Self, String, Array[Alt]) -> Self
+pub fn Expr::constr(String, Array[Self]) -> Self
+pub fn Expr::equal(Self, Self) -> Bool
+pub fn Expr::int(Int32) -> Self
+pub fn Expr::lam(String, Self) -> Self
+pub fn Expr::lams(Array[String], Self) -> Self
+pub fn Expr::let_(String, Self, Self) -> Self
+pub fn Expr::let_rec(Array[(String, Self)], Self) -> Self
+pub fn Expr::not_equal(Self, Self) -> Bool
+pub fn Expr::output(Self, &Logger) -> Unit
+pub fn Expr::to_repr(Self) -> @debug.Repr
+pub fn Expr::to_string(Self) -> String
+pub fn Expr::unwind_app(Self) -> (Self, Array[Self])
+pub fn Expr::var_(String) -> Self
+pub fn Expr::variable(String) -> Self
+pub impl Show for Expr
+
+#derive(Eq, @debug.Debug)
+pub(all) enum Pat {
+  Default(String?)
+  Lit(Int32)
+  Data(String, Array[String])
+}
+pub fn Pat::equal(Self, Self) -> Bool
+pub fn Pat::not_equal(Self, Self) -> Bool
+pub fn Pat::output(Self, &Logger) -> Unit
+pub fn Pat::to_repr(Self) -> @debug.Repr
+pub fn Pat::to_string(Self) -> String
+pub impl Show for Pat
+
+#derive(Eq, @debug.Debug)
+pub(all) struct Program {
+  binds : Array[Bind]
+}
+pub fn Program::all_bindings(Self) -> Array[(String, Expr)]
+pub fn Program::equal(Self, Self) -> Bool
+pub fn Program::lookup(Self, String) -> Expr?
+pub fn Program::new(Array[Bind]) -> Self
+pub fn Program::not_equal(Self, Self) -> Bool
+pub fn Program::output(Self, &Logger) -> Unit
+pub fn Program::to_repr(Self) -> @debug.Repr
+pub fn Program::to_string(Self) -> String
+pub impl Show for Program
+
+#derive(Eq)
+pub enum Token {
+  Ident(String)
+  IntLit(Int32)
+  CharLit(Char)
+  StringLit(String)
+  TypeVar(String)
+  KwLet
+  KwIn
+  KwCase
+  KwOf
+  KwRec
+  KwEnd
+  KwDefault
+  Equal
+  Backslash
+  Arrow
+  LParen
+  RParen
+  LBrace
+  RBrace
+  LBracket
+  RBracket
+  Semicolon
+  Colon
+  DoubleColon
+  Comma
+  Underscore
+  EOF
+}
+pub fn Token::equal(Self, Self) -> Bool
+pub fn Token::not_equal(Self, Self) -> Bool
+pub fn Token::output(Self, &Logger) -> Unit
+pub fn Token::to_string(Self) -> String
+pub impl Show for Token
 
 // Type aliases
 

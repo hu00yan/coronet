@@ -1,0 +1,45 @@
+Rec {
+myMap
+  = \ f xs ->
+      case xs of {
+        MyNil -> MyNil;
+        MyCons y ys -> MyCons (f y) (myMap f ys)
+      }
+end Rec }
+
+Rec {
+myFold
+  = \ f acc xs ->
+      case xs of {
+        MyNil -> acc;
+        MyCons y ys -> myFold f (f acc y) ys
+      }
+end Rec }
+
+testList7 = I# 1#
+
+testList6 = I# 2#
+
+testList5 = I# 3#
+
+testList4 = I# 4#
+
+testList3 = MyCons testList4 MyNil
+
+testList2 = MyCons testList5 testList3
+
+testList1 = MyCons testList6 testList2
+
+testList = MyCons testList7 testList1
+
+double = \ x -> + x x
+
+result3 = I# 0#
+
+result2 = \ x -> case x of { I# x1 -> I# (+# (*# 2# x1) 1#) }
+
+result1 = myMap result2 testList
+
+result = myFold + result3 result1
+
+main = result

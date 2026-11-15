@@ -1,7 +1,17 @@
+options(
+  "allow-experimental-packages": [
+    "moonbitlang/core/async",
+    "moonbitlang/core/async/fs",
+  ],
+)
+
 import {
   "coronet/src/syntax" @syntax,
   "coronet/src/lower_hvm2" @lower_hvm2,
   "coronet/src/lower_hvm3" @lower_hvm3,
+  "moonbitlang/core/async",
+  "moonbitlang/core/async/fs" @fs,
+  "moonbitlang/core/env" @env,
 }
 
 pkgtype(kind: "executable")

@@ -1,0 +1,20 @@
+// 04_higher_order.hvm - HVM3 Higher-Order Functions
+// Demonstrates lambda (λ), application, map, and list reduction
+data List { #Nil #Cons{head tail} }
+
+@map(f xs) = ~xs !f {
+  #Nil: #Nil
+  #Cons{h t}:
+    !&0{f1 f2} = f
+    #Cons{(f1 h) @map(f2 t)}
+}
+
+@sum(!xs r) = ~xs !r {
+  #Nil: r
+  #Cons{h t}: @sum(t (+ h r))
+}
+
+@main =
+  !list = #Cons{1 #Cons{2 #Cons{3 #Nil}}}
+  !doubled = @map(λx (* x 2) list)
+  @sum(doubled 0)

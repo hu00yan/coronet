@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# scripts/run_hvm2.sh - Helper script to run HVM2 programs
+# Usage:
+#   ./scripts/run_hvm2.sh <file.hvm> [options...]
+#   ./scripts/run_hvm2.sh <mode> <file.hvm> [options...]
+# Modes: run (default, Rust interpreter), run-c (C runtime), run-cu (CUDA runtime), gen-c, gen-cu
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+HVM2_BIN="${HVM2_BIN:-$REPO_ROOT/vendor/HVM2/target/release/hvm}"
+
+if [[ ! -x "$HVM2_BIN" ]]; then
+  echo "Error: HVM2 binary not found or not executable at: $HVM2_BIN" >&2
+  echo "Please check vendor/HVM2/target/release/hvm or build HVM2 with cargo build --release." >&2
+  exit 1
+fi
+
+if [[ $# -eq 0 ]]; then
+  echo "Usage: $0 [mode] <file.hvm> [args...]" >&2
+  echo "Modes: run (default), run-c, run-cu, gen-c, gen-cu" >&2
+  exit 1
+fi
+
+MODE="run"
+case "$1" in
+  run|run-c|run-cu|gen-c|gen-cu)
+    MODE="$1"
+    shift
+    ;;
+esac
+
+exec "$HVM2_BIN" "$MODE" "$@"
