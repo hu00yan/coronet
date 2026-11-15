@@ -1,0 +1,7 @@
+import {
+  "coronet/src/syntax" @syntax,
+  "coronet/src/lower_hvm2" @lower_hvm2,
+  "coronet/src/lower_hvm3" @lower_hvm3,
+}
+
+pkgtype(kind: "executable")

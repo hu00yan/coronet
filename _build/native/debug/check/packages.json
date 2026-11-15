@@ -1,0 +1,547 @@
+{
+  "source_dir": "/Users/huyan00/mycode/coronet",
+  "name": "coronet",
+  "packages": [
+    {
+      "is-main": true,
+      "is-third-party": false,
+      "root-path": "/Users/huyan00/mycode/coronet/cmd/main",
+      "root": "coronet",
+      "rel": "cmd/main",
+      "files": {
+        "/Users/huyan00/mycode/coronet/cmd/main/main.mbt": {
+          "backend": [
+            "Wasm",
+            "WasmGC",
+            "Js",
+            "Native",
+            "LLVM"
+          ],
+          "optlevel": [
+            "Release",
+            "Debug"
+          ]
+        }
+      },
+      "wbtest-files": {},
+      "test-files": {},
+      "mbt-md-files": {},
+      "deps": [
+        {
+          "path": "coronet/src/lower_hvm2",
+          "alias": "lower_hvm2",
+          "fspath": "/Users/huyan00/mycode/coronet/src/lower_hvm2"
+        },
+        {
+          "path": "coronet/src/lower_hvm3",
+          "alias": "lower_hvm3",
+          "fspath": "/Users/huyan00/mycode/coronet/src/lower_hvm3"
+        },
+        {
+          "path": "coronet/src/syntax",
+          "alias": "syntax",
+          "fspath": "/Users/huyan00/mycode/coronet/src/syntax"
+        },
+        {
+          "path": "moonbitlang/core/builtin",
+          "alias": "moonbitlang/core/builtin",
+          "fspath": "/Users/huyan00/.moon/lib/core/builtin"
+        },
+        {
+          "path": "moonbitlang/core/prelude",
+          "alias": "prelude",
+          "fspath": "/Users/huyan00/.moon/lib/core/prelude"
+        }
+      ],
+      "wbtest-deps": [
+        {
+          "path": "moonbitlang/core/builtin",
+          "alias": "moonbitlang/core/builtin",
+          "fspath": "/Users/huyan00/.moon/lib/core/builtin"
+        },
+        {
+          "path": "moonbitlang/core/prelude",
+          "alias": "prelude",
+          "fspath": "/Users/huyan00/.moon/lib/core/prelude"
+        }
+      ],
+      "test-deps": [
+        {
+          "path": "moonbitlang/core/builtin",
+          "alias": "moonbitlang/core/builtin",
+          "fspath": "/Users/huyan00/.moon/lib/core/builtin"
+        },
+        {
+          "path": "moonbitlang/core/prelude",
+          "alias": "prelude",
+          "fspath": "/Users/huyan00/.moon/lib/core/prelude"
+        }
+      ],
+      "artifact": "/Users/huyan00/mycode/coronet/_build/native/debug/check/cmd/main/main.mi",
+      "check-command": [
+        "check",
+        "-error-format",
+        "json",
+        "/Users/huyan00/mycode/coronet/cmd/main/main.mbt",
+        "-o",
+        "/Users/huyan00/mycode/coronet/_build/native/debug/check/cmd/main/main.mi",
+        "-pkg",
+        "coronet/cmd/main",
+        "-pkg-type",
+        "executable",
+        "-i",
+        "/Users/huyan00/mycode/coronet/_build/native/debug/check/src/lower_hvm2/lower_hvm2.mi:lower_hvm2",
+        "-i",
+        "/Users/huyan00/mycode/coronet/_build/native/debug/check/src/lower_hvm3/lower_hvm3.mi:lower_hvm3",
+        "-i",
+        "/Users/huyan00/.moon/lib/core/_build/native/release/bundle/builtin/builtin.mi:moonbitlang/core/builtin",
+        "-i",
+        "/Users/huyan00/.moon/lib/core/_build/native/release/bundle/prelude/prelude.mi:prelude",
+        "-i",
+        "/Users/huyan00/mycode/coronet/_build/native/debug/check/src/syntax/syntax.mi:syntax",
+        "-pkg-sources",
+        "coronet/cmd/main:/Users/huyan00/mycode/coronet/cmd/main",
+        "-target",
+        "native",
+        "-workspace-path",
+        "/Users/huyan00/mycode/coronet",
+        "-all-pkgs",
+        "/Users/huyan00/mycode/coronet/_build/native/debug/check/all_pkgs.json"
+      ],
+      "wbtest-check-command": null,
+      "test-check-command": [
+        "check",
+        "-error-format",
+        "json",
+        "-doctest-only",
+        "/Users/huyan00/mycode/coronet/cmd/main/main.mbt",
+        "-include-doctests",
+        "-o",
+        "/Users/huyan00/mycode/coronet/_build/native/debug/check/cmd/main/main.blackbox_test.mi",
+        "-pkg",
+        "coronet/cmd/main_blackbox_test",
+        "-pkg-type",
+        "library",
+        "-i",
+        "/Users/huyan00/mycode/coronet/_build/native/debug/check/src/lower_hvm2/lower_hvm2.mi:lower_hvm2",
+        "-i",
+        "/Users/huyan00/mycode/coronet/_build/native/debug/check/src/lower_hvm3/lower_hvm3.mi:lower_hvm3",
+        "-i",
+        "/Users/huyan00/mycode/coronet/_build/native/debug/check/cmd/main/main.mi:main",
+        "-i",
+        "/Users/huyan00/.moon/lib/core/_build/native/release/bundle/builtin/builtin.mi:moonbitlang/core/builtin",
+        "-i",
+        "/Users/huyan00/.moon/lib/core/_build/native/release/bundle/prelude/prelude.mi:prelude",
+        "-i",
+        "/Users/huyan00/mycode/coronet/_build/native/debug/check/src/syntax/syntax.mi:syntax",
+        "-pkg-sources",
+        "coronet/cmd/main_blackbox_test:/Users/huyan00/mycode/coronet/cmd/main",
+        "-target",
+        "native",
+        "-blackbox-test",
+        "-workspace-path",
+        "/Users/huyan00/mycode/coronet",
+        "-all-pkgs",
+        "/Users/huyan00/mycode/coronet/_build/native/debug/check/all_pkgs.json"
+      ],
+      "supported-targets": [
+        "Wasm",
+        "WasmGC",
+        "Js",
+        "Native",
+        "LLVM"
+      ]
+    },
+    {
+      "is-main": false,
+      "is-third-party": false,
+      "root-path": "/Users/huyan00/mycode/coronet/src/lower_hvm2",
+      "root": "coronet",
+      "rel": "src/lower_hvm2",
+      "files": {
+        "/Users/huyan00/mycode/coronet/src/lower_hvm2/lower.mbt": {
+          "backend": [
+            "Wasm",
+            "WasmGC",
+            "Js",
+            "Native",
+            "LLVM"
+          ],
+          "optlevel": [
+            "Release",
+            "Debug"
+          ]
+        }
+      },
+      "wbtest-files": {},
+      "test-files": {},
+      "mbt-md-files": {},
+      "deps": [
+        {
+          "path": "coronet/src/syntax",
+          "alias": "syntax",
+          "fspath": "/Users/huyan00/mycode/coronet/src/syntax"
+        },
+        {
+          "path": "moonbitlang/core/builtin",
+          "alias": "moonbitlang/core/builtin",
+          "fspath": "/Users/huyan00/.moon/lib/core/builtin"
+        },
+        {
+          "path": "moonbitlang/core/prelude",
+          "alias": "prelude",
+          "fspath": "/Users/huyan00/.moon/lib/core/prelude"
+        }
+      ],
+      "wbtest-deps": [
+        {
+          "path": "moonbitlang/core/builtin",
+          "alias": "moonbitlang/core/builtin",
+          "fspath": "/Users/huyan00/.moon/lib/core/builtin"
+        },
+        {
+          "path": "moonbitlang/core/prelude",
+          "alias": "prelude",
+          "fspath": "/Users/huyan00/.moon/lib/core/prelude"
+        }
+      ],
+      "test-deps": [
+        {
+          "path": "moonbitlang/core/builtin",
+          "alias": "moonbitlang/core/builtin",
+          "fspath": "/Users/huyan00/.moon/lib/core/builtin"
+        },
+        {
+          "path": "moonbitlang/core/prelude",
+          "alias": "prelude",
+          "fspath": "/Users/huyan00/.moon/lib/core/prelude"
+        }
+      ],
+      "artifact": "/Users/huyan00/mycode/coronet/_build/native/debug/check/src/lower_hvm2/lower_hvm2.mi",
+      "check-command": [
+        "check",
+        "-error-format",
+        "json",
+        "/Users/huyan00/mycode/coronet/src/lower_hvm2/lower.mbt",
+        "-o",
+        "/Users/huyan00/mycode/coronet/_build/native/debug/check/src/lower_hvm2/lower_hvm2.mi",
+        "-pkg",
+        "coronet/src/lower_hvm2",
+        "-pkg-type",
+        "library",
+        "-i",
+        "/Users/huyan00/.moon/lib/core/_build/native/release/bundle/builtin/builtin.mi:moonbitlang/core/builtin",
+        "-i",
+        "/Users/huyan00/.moon/lib/core/_build/native/release/bundle/prelude/prelude.mi:prelude",
+        "-i",
+        "/Users/huyan00/mycode/coronet/_build/native/debug/check/src/syntax/syntax.mi:syntax",
+        "-pkg-sources",
+        "coronet/src/lower_hvm2:/Users/huyan00/mycode/coronet/src/lower_hvm2",
+        "-target",
+        "native",
+        "-workspace-path",
+        "/Users/huyan00/mycode/coronet",
+        "-all-pkgs",
+        "/Users/huyan00/mycode/coronet/_build/native/debug/check/all_pkgs.json"
+      ],
+      "wbtest-check-command": null,
+      "test-check-command": [
+        "check",
+        "-error-format",
+        "json",
+        "-doctest-only",
+        "/Users/huyan00/mycode/coronet/src/lower_hvm2/lower.mbt",
+        "-include-doctests",
+        "-o",
+        "/Users/huyan00/mycode/coronet/_build/native/debug/check/src/lower_hvm2/lower_hvm2.blackbox_test.mi",
+        "-pkg",
+        "coronet/src/lower_hvm2_blackbox_test",
+        "-pkg-type",
+        "library",
+        "-i",
+        "/Users/huyan00/mycode/coronet/_build/native/debug/check/src/lower_hvm2/lower_hvm2.mi:lower_hvm2",
+        "-i",
+        "/Users/huyan00/.moon/lib/core/_build/native/release/bundle/builtin/builtin.mi:moonbitlang/core/builtin",
+        "-i",
+        "/Users/huyan00/.moon/lib/core/_build/native/release/bundle/prelude/prelude.mi:prelude",
+        "-i",
+        "/Users/huyan00/mycode/coronet/_build/native/debug/check/src/syntax/syntax.mi:syntax",
+        "-pkg-sources",
+        "coronet/src/lower_hvm2_blackbox_test:/Users/huyan00/mycode/coronet/src/lower_hvm2",
+        "-target",
+        "native",
+        "-blackbox-test",
+        "-workspace-path",
+        "/Users/huyan00/mycode/coronet",
+        "-all-pkgs",
+        "/Users/huyan00/mycode/coronet/_build/native/debug/check/all_pkgs.json"
+      ],
+      "supported-targets": [
+        "Wasm",
+        "WasmGC",
+        "Js",
+        "Native",
+        "LLVM"
+      ]
+    },
+    {
+      "is-main": false,
+      "is-third-party": false,
+      "root-path": "/Users/huyan00/mycode/coronet/src/lower_hvm3",
+      "root": "coronet",
+      "rel": "src/lower_hvm3",
+      "files": {
+        "/Users/huyan00/mycode/coronet/src/lower_hvm3/lower.mbt": {
+          "backend": [
+            "Wasm",
+            "WasmGC",
+            "Js",
+            "Native",
+            "LLVM"
+          ],
+          "optlevel": [
+            "Release",
+            "Debug"
+          ]
+        }
+      },
+      "wbtest-files": {},
+      "test-files": {},
+      "mbt-md-files": {},
+      "deps": [
+        {
+          "path": "coronet/src/syntax",
+          "alias": "syntax",
+          "fspath": "/Users/huyan00/mycode/coronet/src/syntax"
+        },
+        {
+          "path": "moonbitlang/core/builtin",
+          "alias": "moonbitlang/core/builtin",
+          "fspath": "/Users/huyan00/.moon/lib/core/builtin"
+        },
+        {
+          "path": "moonbitlang/core/prelude",
+          "alias": "prelude",
+          "fspath": "/Users/huyan00/.moon/lib/core/prelude"
+        }
+      ],
+      "wbtest-deps": [
+        {
+          "path": "moonbitlang/core/builtin",
+          "alias": "moonbitlang/core/builtin",
+          "fspath": "/Users/huyan00/.moon/lib/core/builtin"
+        },
+        {
+          "path": "moonbitlang/core/prelude",
+          "alias": "prelude",
+          "fspath": "/Users/huyan00/.moon/lib/core/prelude"
+        }
+      ],
+      "test-deps": [
+        {
+          "path": "moonbitlang/core/builtin",
+          "alias": "moonbitlang/core/builtin",
+          "fspath": "/Users/huyan00/.moon/lib/core/builtin"
+        },
+        {
+          "path": "moonbitlang/core/prelude",
+          "alias": "prelude",
+          "fspath": "/Users/huyan00/.moon/lib/core/prelude"
+        }
+      ],
+      "artifact": "/Users/huyan00/mycode/coronet/_build/native/debug/check/src/lower_hvm3/lower_hvm3.mi",
+      "check-command": [
+        "check",
+        "-error-format",
+        "json",
+        "/Users/huyan00/mycode/coronet/src/lower_hvm3/lower.mbt",
+        "-o",
+        "/Users/huyan00/mycode/coronet/_build/native/debug/check/src/lower_hvm3/lower_hvm3.mi",
+        "-pkg",
+        "coronet/src/lower_hvm3",
+        "-pkg-type",
+        "library",
+        "-i",
+        "/Users/huyan00/.moon/lib/core/_build/native/release/bundle/builtin/builtin.mi:moonbitlang/core/builtin",
+        "-i",
+        "/Users/huyan00/.moon/lib/core/_build/native/release/bundle/prelude/prelude.mi:prelude",
+        "-i",
+        "/Users/huyan00/mycode/coronet/_build/native/debug/check/src/syntax/syntax.mi:syntax",
+        "-pkg-sources",
+        "coronet/src/lower_hvm3:/Users/huyan00/mycode/coronet/src/lower_hvm3",
+        "-target",
+        "native",
+        "-workspace-path",
+        "/Users/huyan00/mycode/coronet",
+        "-all-pkgs",
+        "/Users/huyan00/mycode/coronet/_build/native/debug/check/all_pkgs.json"
+      ],
+      "wbtest-check-command": null,
+      "test-check-command": [
+        "check",
+        "-error-format",
+        "json",
+        "-doctest-only",
+        "/Users/huyan00/mycode/coronet/src/lower_hvm3/lower.mbt",
+        "-include-doctests",
+        "-o",
+        "/Users/huyan00/mycode/coronet/_build/native/debug/check/src/lower_hvm3/lower_hvm3.blackbox_test.mi",
+        "-pkg",
+        "coronet/src/lower_hvm3_blackbox_test",
+        "-pkg-type",
+        "library",
+        "-i",
+        "/Users/huyan00/mycode/coronet/_build/native/debug/check/src/lower_hvm3/lower_hvm3.mi:lower_hvm3",
+        "-i",
+        "/Users/huyan00/.moon/lib/core/_build/native/release/bundle/builtin/builtin.mi:moonbitlang/core/builtin",
+        "-i",
+        "/Users/huyan00/.moon/lib/core/_build/native/release/bundle/prelude/prelude.mi:prelude",
+        "-i",
+        "/Users/huyan00/mycode/coronet/_build/native/debug/check/src/syntax/syntax.mi:syntax",
+        "-pkg-sources",
+        "coronet/src/lower_hvm3_blackbox_test:/Users/huyan00/mycode/coronet/src/lower_hvm3",
+        "-target",
+        "native",
+        "-blackbox-test",
+        "-workspace-path",
+        "/Users/huyan00/mycode/coronet",
+        "-all-pkgs",
+        "/Users/huyan00/mycode/coronet/_build/native/debug/check/all_pkgs.json"
+      ],
+      "supported-targets": [
+        "Wasm",
+        "WasmGC",
+        "Js",
+        "Native",
+        "LLVM"
+      ]
+    },
+    {
+      "is-main": false,
+      "is-third-party": false,
+      "root-path": "/Users/huyan00/mycode/coronet/src/syntax",
+      "root": "coronet",
+      "rel": "src/syntax",
+      "files": {
+        "/Users/huyan00/mycode/coronet/src/syntax/ast.mbt": {
+          "backend": [
+            "Wasm",
+            "WasmGC",
+            "Js",
+            "Native",
+            "LLVM"
+          ],
+          "optlevel": [
+            "Release",
+            "Debug"
+          ]
+        }
+      },
+      "wbtest-files": {},
+      "test-files": {},
+      "mbt-md-files": {},
+      "deps": [
+        {
+          "path": "moonbitlang/core/builtin",
+          "alias": "moonbitlang/core/builtin",
+          "fspath": "/Users/huyan00/.moon/lib/core/builtin"
+        },
+        {
+          "path": "moonbitlang/core/prelude",
+          "alias": "prelude",
+          "fspath": "/Users/huyan00/.moon/lib/core/prelude"
+        }
+      ],
+      "wbtest-deps": [
+        {
+          "path": "moonbitlang/core/builtin",
+          "alias": "moonbitlang/core/builtin",
+          "fspath": "/Users/huyan00/.moon/lib/core/builtin"
+        },
+        {
+          "path": "moonbitlang/core/prelude",
+          "alias": "prelude",
+          "fspath": "/Users/huyan00/.moon/lib/core/prelude"
+        }
+      ],
+      "test-deps": [
+        {
+          "path": "moonbitlang/core/builtin",
+          "alias": "moonbitlang/core/builtin",
+          "fspath": "/Users/huyan00/.moon/lib/core/builtin"
+        },
+        {
+          "path": "moonbitlang/core/prelude",
+          "alias": "prelude",
+          "fspath": "/Users/huyan00/.moon/lib/core/prelude"
+        }
+      ],
+      "artifact": "/Users/huyan00/mycode/coronet/_build/native/debug/check/src/syntax/syntax.mi",
+      "check-command": [
+        "check",
+        "-error-format",
+        "json",
+        "/Users/huyan00/mycode/coronet/src/syntax/ast.mbt",
+        "-o",
+        "/Users/huyan00/mycode/coronet/_build/native/debug/check/src/syntax/syntax.mi",
+        "-pkg",
+        "coronet/src/syntax",
+        "-pkg-type",
+        "library",
+        "-i",
+        "/Users/huyan00/.moon/lib/core/_build/native/release/bundle/builtin/builtin.mi:moonbitlang/core/builtin",
+        "-i",
+        "/Users/huyan00/.moon/lib/core/_build/native/release/bundle/prelude/prelude.mi:prelude",
+        "-pkg-sources",
+        "coronet/src/syntax:/Users/huyan00/mycode/coronet/src/syntax",
+        "-target",
+        "native",
+        "-workspace-path",
+        "/Users/huyan00/mycode/coronet",
+        "-all-pkgs",
+        "/Users/huyan00/mycode/coronet/_build/native/debug/check/all_pkgs.json"
+      ],
+      "wbtest-check-command": null,
+      "test-check-command": [
+        "check",
+        "-error-format",
+        "json",
+        "-doctest-only",
+        "/Users/huyan00/mycode/coronet/src/syntax/ast.mbt",
+        "-include-doctests",
+        "-o",
+        "/Users/huyan00/mycode/coronet/_build/native/debug/check/src/syntax/syntax.blackbox_test.mi",
+        "-pkg",
+        "coronet/src/syntax_blackbox_test",
+        "-pkg-type",
+        "library",
+        "-i",
+        "/Users/huyan00/.moon/lib/core/_build/native/release/bundle/builtin/builtin.mi:moonbitlang/core/builtin",
+        "-i",
+        "/Users/huyan00/.moon/lib/core/_build/native/release/bundle/prelude/prelude.mi:prelude",
+        "-i",
+        "/Users/huyan00/mycode/coronet/_build/native/debug/check/src/syntax/syntax.mi:syntax",
+        "-pkg-sources",
+        "coronet/src/syntax_blackbox_test:/Users/huyan00/mycode/coronet/src/syntax",
+        "-target",
+        "native",
+        "-blackbox-test",
+        "-workspace-path",
+        "/Users/huyan00/mycode/coronet",
+        "-all-pkgs",
+        "/Users/huyan00/mycode/coronet/_build/native/debug/check/all_pkgs.json"
+      ],
+      "supported-targets": [
+        "Wasm",
+        "WasmGC",
+        "Js",
+        "Native",
+        "LLVM"
+      ]
+    }
+  ],
+  "deps": [],
+  "backend": "native",
+  "opt_level": "debug",
+  "source": null
+}

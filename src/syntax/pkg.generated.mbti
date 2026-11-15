@@ -1,0 +1,20 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "coronet/src/syntax"
+
+// Values
+
+// Errors
+
+// Types and methods
+#derive(Eq, Show)
+pub enum Expr {
+  Var(String)
+  LitInt(Int32)
+  App(Expr, Expr)
+  Lam(String, Expr)
+  Let(String, Expr, Expr)
+}
+
+// Type aliases
+
+// Traits
