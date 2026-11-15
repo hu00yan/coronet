@@ -1,0 +1,160 @@
+testList31 = I# 15#
+
+testList30 = I# 3#
+
+testList29 = I# 9#
+
+testList28 = I# 1#
+
+testList27 = I# 24#
+
+testList26 = I# 18#
+
+testList25 = I# 7#
+
+testList24 = I# 12#
+
+testList23 = I# 5#
+
+testList22 = I# 20#
+
+testList21 = I# 2#
+
+testList20 = I# 14#
+
+testList19 = I# 8#
+
+testList18 = I# 11#
+
+testList17 = I# 4#
+
+testList16 = I# 16#
+
+testList15 = Cons testList16 Nil
+
+testList14 = Cons testList17 testList15
+
+testList13 = Cons testList18 testList14
+
+testList12 = Cons testList19 testList13
+
+testList11 = Cons testList20 testList12
+
+testList10 = Cons testList21 testList11
+
+testList9 = Cons testList22 testList10
+
+testList8 = Cons testList23 testList9
+
+testList7 = Cons testList24 testList8
+
+testList6 = Cons testList25 testList7
+
+testList5 = Cons testList26 testList6
+
+testList4 = Cons testList27 testList5
+
+testList3 = Cons testList28 testList4
+
+testList2 = Cons testList29 testList3
+
+testList1 = Cons testList30 testList2
+
+testList = Cons testList31 testList1
+
+Rec {
+merge
+  = \ xs ys ->
+      case xs of wild {
+        Nil -> ys;
+        Cons x xs' ->
+          case ys of wild1 {
+            Nil -> wild;
+            Cons y ys' ->
+              case x of wild2 { I# x1 ->
+              case y of wild3 { I# y1 ->
+              case <=# x1 y1 of {
+                __DEFAULT -> Cons wild3 (merge wild ys');
+                1# -> Cons wild2 (merge xs' wild1)
+              }
+              }
+              }
+          }
+      }
+end Rec }
+
+lvl =  Pair Nil Nil
+
+Rec {
+splitAtL
+  = \ n xs ->
+      case n of { I# x ->
+      case <=# x 0# of {
+        __DEFAULT ->
+          case xs of {
+            Nil -> lvl;
+            Cons y ys ->
+              case splitAtL (I# (-# x 1#)) ys of { Pair l r ->
+              Pair (Cons y l) r
+              }
+          };
+        1# -> Pair Nil xs
+      }
+      }
+end Rec }
+
+lvl1 = I# 0#
+
+Rec {
+lengthL
+  = \ xs ->
+      case xs of {
+        Nil -> lvl1;
+        Cons ds rest -> case lengthL rest of { I# y -> I# (+# 1# y) }
+      }
+end Rec }
+
+Rec {
+checksum
+  = \ xs ->
+      case xs of {
+        Nil -> lvl1;
+        Cons y ys ->
+          case y of { I# x ->
+          case checksum ys of { I# y1 -> I# (+# x (*# 3# y1)) }
+          }
+      }
+end Rec }
+
+Rec {
+div2
+  = \ n ->
+      case n of { I# x ->
+      case <=# x 1# of {
+        __DEFAULT -> case div2 (I# (-# x 2#)) of { I# y -> I# (+# 1# y) };
+        1# -> lvl1
+      }
+      }
+end Rec }
+
+Rec {
+mergesort
+  = \ xs ->
+      case xs of wild {
+        Nil -> Nil;
+        Cons x ds ->
+          case ds of {
+            Nil -> wild;
+            Cons ipv ipv1 ->
+              case splitAtL (div2 (lengthL wild)) wild of { Pair left right ->
+              merge (mergesort left) (mergesort right)
+              }
+          }
+      }
+end Rec }
+
+result1 = mergesort testList
+
+result = checksum result1
+
+main = result

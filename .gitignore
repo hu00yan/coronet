@@ -3,3 +3,7 @@ _build
 .mooncram
 .build/
 .mooncakes/
+*.o
+*.hi
+*.dyn_o
+*.dyn_hi

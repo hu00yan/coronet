@@ -1,0 +1,39 @@
+Rec {
+$wsumList
+  = \ xs ->
+      case xs of {
+        Nil -> 0#;
+        LCons y ys ->
+          case y of { I# x ->
+          case $wsumList ys of ww { __DEFAULT -> +# x ww }
+          }
+      }
+end Rec }
+
+sumList = \ xs -> case $wsumList xs of ww { __DEFAULT -> I# ww }
+
+Rec {
+$wtakeStream
+  = \ ww s ->
+      case <=# ww 0# of {
+        __DEFAULT ->
+          case s of { Cons x xs -> LCons x ($wtakeStream (-# ww 1#) xs) };
+        1# -> Nil
+      }
+end Rec }
+
+takeStream = \ n s -> case n of { I# ww -> $wtakeStream ww s }
+
+Rec {
+from = \ n -> Cons n (from (case n of { I# x -> I# (+# x 1#) }))
+end Rec }
+
+result3 = I# 1#
+
+result2 = from result3
+
+result1 = $wtakeStream 10# result2
+
+result = case $wsumList result1 of ww { __DEFAULT -> I# ww }
+
+main = result
