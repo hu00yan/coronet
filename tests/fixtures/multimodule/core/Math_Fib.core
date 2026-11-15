@@ -1,23 +1,23 @@
 Rec {
 Math_Fib_$wfib
-  = \ ww ->
-      case <=# ww 1# of lwild {
-        __DEFAULT -> case $wfib (-# ww 1#) of ww {
-        __DEFAULT -> case $wfib (-# ww 2#) of ww {
-        __DEFAULT -> +# ww ww
+  = \ ww_sWd ->
+      case <=# ww_sWd 1# of lwild_sW8 {
+        __DEFAULT -> case $wfib (-# ww_sWd 1#) of ww_sWi {
+        __DEFAULT -> case $wfib (-# ww_sWd 2#) of ww_X1 {
+        __DEFAULT -> +# ww_sWi ww_X1
       }
       };
-        1# -> ww
+        1# -> ww_sWd
       };
 end Rec }
 
 $wfib = Math_Fib_$wfib
 
 Math_Fib_fib
-  = \ n ->
-      case n of {
-        I# ww -> case $wfib ww of ww {
-        __DEFAULT -> I# ww
+  = \ n_sWb ->
+      case n_sWb of {
+        I# ww_sWd -> case $wfib ww_sWd of ww_sWi {
+        __DEFAULT -> I# ww_sWi
       }
       }
 

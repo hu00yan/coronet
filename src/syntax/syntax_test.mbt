@@ -638,3 +638,204 @@ test "parse fixture 08_mergesort" {
   assert_true(prog.lookup("mergesort") is Some(_))
   assert_true(prog.lookup("main") is Some(_))
 }
+
+test "multi-module linker simple merge" {
+  let p1 = @syntax.parse_program("fib = \\ n -> n").unwrap()
+  let p2 = @syntax.parse_program("add = \\ a b -> + a b").unwrap()
+  let linked = @syntax.link_programs([p1, p2])
+  assert_eq(linked.binds.length(), 2)
+  assert_true(linked.lookup("fib") is Some(_))
+  assert_true(linked.lookup("add") is Some(_))
+}
+
+test "multi-module linker cross-module symbol resolution" {
+  let s_math =
+    #|Rec {
+    #|$wfib = \ ww -> ww
+    #|end Rec }
+    #|fib = \ n -> $wfib n
+  let math_fib = @syntax.parse_program(s_math).unwrap()
+
+  let s_list =
+    #|myMap = \ f xs -> xs
+    #|mySum = \ xs -> 42#
+  let list_ops = @syntax.parse_program(s_list).unwrap()
+
+  let s_main =
+    #|result = Math_Fib_fib (Data_ListOps_mySum Nil)
+    #|main = result
+  let main_mod = @syntax.parse_program(s_main).unwrap()
+
+  let linked = @syntax.link_programs([math_fib, list_ops, main_mod])
+
+  // Original definitions present
+  assert_true(linked.lookup("fib") is Some(_))
+  assert_true(linked.lookup("mySum") is Some(_))
+  assert_true(linked.lookup("result") is Some(_))
+  assert_true(linked.lookup("main") is Some(_))
+
+  // Cross-module aliases resolved
+  assert_eq(linked.lookup("Math_Fib_fib"), Some(@syntax.Expr::Var("fib")))
+  assert_eq(linked.lookup("Data_ListOps_mySum"), Some(@syntax.Expr::Var("mySum")))
+}
+
+test "multi-module linker reverse qualified resolution and auto main" {
+  let callee = @syntax.parse_program("Math_calc = \\ x -> + x 1#").unwrap()
+  let caller = @syntax.parse_program("result = calc 10#").unwrap()
+  let linked = @syntax.link_programs([callee, caller])
+
+  assert_true(linked.lookup("Math_calc") is Some(_))
+  assert_eq(linked.lookup("calc"), Some(@syntax.Expr::Var("Math_calc")))
+  // Auto-linked main = result
+  assert_eq(linked.lookup("main"), Some(@syntax.Expr::Var("result")))
+}
+
+test "multi-module link_core_sources" {
+  let s1 = "val1 = 10#"
+  let s2 = "val2 = 20#"
+  let linked = @syntax.link_core_sources([s1, s2]).unwrap()
+  assert_eq(linked.binds.length(), 2)
+  assert_true(linked.lookup("val1") is Some(_))
+  assert_true(linked.lookup("val2") is Some(_))
+}
+
+test "parse and link multimodule fixtures (Math_Fib, Data_ListOps, Main)" {
+  let math_fib_src =
+    #|Rec {
+    #|Math_Fib_$wfib
+    #|  = \ ww ->
+    #|      case <=# ww 1# of lwild {
+    #|        __DEFAULT -> case $wfib (-# ww 1#) of ww {
+    #|        __DEFAULT -> case $wfib (-# ww 2#) of ww {
+    #|        __DEFAULT -> +# ww ww
+    #|      }
+    #|      };
+    #|        1# -> ww
+    #|      };
+    #|end Rec }
+    #|
+    #|$wfib = Math_Fib_$wfib
+    #|
+    #|Math_Fib_fib
+    #|  = \ n ->
+    #|      case n of {
+    #|        I# ww -> case $wfib ww of ww {
+    #|        __DEFAULT -> I# ww
+    #|      }
+    #|      }
+    #|
+    #|fib = Math_Fib_fib
+
+  let data_list_ops_src =
+    #|Rec {
+    #|Data_ListOps_myMap
+    #|  = \ f xs ->
+    #|      case xs of {
+    #|        Nil -> Nil;
+    #|        Cons y ys -> Cons (f y) (myMap f ys)
+    #|      };
+    #|end Rec }
+    #|
+    #|myMap = Data_ListOps_myMap
+    #|
+    #|Rec {
+    #|Data_ListOps_$wmySum
+    #|  = \ xs ->
+    #|      case xs of {
+    #|        Nil -> 0#;
+    #|        Cons y ys -> case y of {
+    #|        I# x -> case $wmySum ys of ww {
+    #|        __DEFAULT -> +# x ww
+    #|      }
+    #|      }
+    #|      };
+    #|end Rec }
+    #|
+    #|$wmySum = Data_ListOps_$wmySum
+    #|
+    #|Data_ListOps_mySum
+    #|  = \ xs ->
+    #|      case $wmySum xs of ww {
+    #|        __DEFAULT -> I# ww
+    #|      }
+    #|
+    #|mySum = Data_ListOps_mySum
+
+  let main_src =
+    #|testList
+    #|  = I# 1#
+    #|
+    #|testList
+    #|  = I# 2#
+    #|
+    #|testList
+    #|  = I# 3#
+    #|
+    #|testList
+    #|  = I# 4#
+    #|
+    #|testList
+    #|  = I# 5#
+    #|
+    #|testList
+    #|  = Cons testList Nil
+    #|
+    #|testList
+    #|  = Cons testList testList
+    #|
+    #|testList
+    #|  = Cons testList testList
+    #|
+    #|testList
+    #|  = Cons testList testList
+    #|
+    #|testList
+    #|  = Cons testList testList
+    #|
+    #|lvl
+    #|  = Data_ListOps_myMap Math_Fib_fib testList
+    #|
+    #|result
+    #|  = case Data_ListOps_$wmySum lvl of ww {
+    #|        __DEFAULT -> I# ww
+    #|      }
+    #|
+    #|lvl
+    #|  = case result of {
+    #|        I# n -> itos n []
+    #|      }
+    #|
+    #|main = result
+
+  let p_math = @syntax.parse_program(math_fib_src).unwrap()
+  let p_list = @syntax.parse_program(data_list_ops_src).unwrap()
+  let p_main = @syntax.parse_program(main_src).unwrap()
+
+  let linked = @syntax.link_programs([p_math, p_list, p_main])
+
+  // Verify Math.Fib bindings
+  assert_true(linked.lookup("Math_Fib_$wfib") is Some(_))
+  assert_true(linked.lookup("Math_Fib_fib") is Some(_))
+  assert_true(linked.lookup("fib") is Some(_))
+  assert_true(linked.lookup("$wfib") is Some(_))
+
+  // Verify Data.ListOps bindings
+  assert_true(linked.lookup("Data_ListOps_myMap") is Some(_))
+  assert_true(linked.lookup("myMap") is Some(_))
+  assert_true(linked.lookup("Data_ListOps_$wmySum") is Some(_))
+  assert_true(linked.lookup("$wmySum") is Some(_))
+  assert_true(linked.lookup("Data_ListOps_mySum") is Some(_))
+  assert_true(linked.lookup("mySum") is Some(_))
+
+  // Verify Main bindings
+  assert_true(linked.lookup("testList") is Some(_))
+  assert_true(linked.lookup("result") is Some(_))
+  assert_true(linked.lookup("main") is Some(_))
+
+  // Test link_core_sources
+  let linked_from_sources = @syntax.link_core_sources([math_fib_src, data_list_ops_src, main_src]).unwrap()
+  assert_true(linked_from_sources.lookup("main") is Some(_))
+  assert_true(linked_from_sources.lookup("Math_Fib_fib") is Some(_))
+  assert_true(linked_from_sources.lookup("Data_ListOps_myMap") is Some(_))
+}
+

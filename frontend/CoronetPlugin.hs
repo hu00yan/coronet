@@ -107,13 +107,35 @@ hasResultBind (NonRec b _) = bndrName b == "result"
 hasResultBind (Rec pairs)  = any (\(b, _) -> bndrName b == "result") pairs
 
 isIoMainBind :: CoreBind -> Bool
-isIoMainBind (NonRec b _) =
-  let n = bndrName b in n == "main" || "main" `isPrefixOf` n
+isIoMainBind (NonRec b expr) =
+  let n = bndrName b in n == "main" || "main" `isPrefixOf` n || mentionsIo expr
 isIoMainBind (Rec pairs)  =
-  any (\(b, _) -> "main" `isPrefixOf` bndrName b) pairs
+  any (\(b, expr) -> "main" `isPrefixOf` bndrName b || mentionsIo expr) pairs
+
+mentionsIo :: CoreExpr -> Bool
+mentionsIo expr = case expr of
+  Var v ->
+    let occ = occNameString (getOccName v)
+    in occ `elem` ["itos", "$witos", "hPutStr2", "stdout", "runMainIO1", "putStrLn"]
+  App f a -> mentionsIo f || mentionsIo a
+  Lam _ body -> mentionsIo body
+  Let bind body ->
+    (case bind of
+       NonRec _ e -> mentionsIo e
+       Rec ps -> any (mentionsIo . snd) ps) || mentionsIo body
+  Case scrut _ _ alts ->
+    mentionsIo scrut || any (\(Alt _ _ e) -> mentionsIo e) alts
+  Cast e _ -> mentionsIo e
+  Tick _ e -> mentionsIo e
+  _ -> False
 
 bndrName :: CoreBndr -> String
-bndrName b = occNameString (getOccName b)
+bndrName b =
+  let name = varName b
+      occ = occNameString (getOccName b)
+  in if isExternalName name || occ == "main" || occ == "result" || "$" `isPrefixOf` occ
+     then occ
+     else showSDocUnsafe (ppr b)
 
 qualifyTopBinder :: Module -> CoreBndr -> String
 qualifyTopBinder currentMod b =

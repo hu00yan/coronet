@@ -1,9 +1,9 @@
 Rec {
 Data_ListOps_myMap
-  = \ f xs ->
-      case xs of {
+  = \ f_aXP xs_aXQ ->
+      case xs_aXQ of {
         Nil -> Nil;
-        Cons y ys -> Cons (f y) (myMap f ys)
+        Cons y_aXR ys_aXS -> Cons (f_aXP y_aXR) (myMap f_aXP ys_aXS)
       };
 end Rec }
 
@@ -11,12 +11,12 @@ myMap = Data_ListOps_myMap
 
 Rec {
 Data_ListOps_$wmySum
-  = \ xs ->
-      case xs of {
+  = \ xs_s104 ->
+      case xs_s104 of {
         Nil -> 0#;
-        Cons y ys -> case y of {
-        I# x -> case $wmySum ys of ww {
-        __DEFAULT -> +# x ww
+        Cons y_aXU ys_aXV -> case y_aXU of {
+        I# x_aVK -> case $wmySum ys_aXV of ww_s108 {
+        __DEFAULT -> +# x_aVK ww_s108
       }
       }
       };
@@ -25,9 +25,9 @@ end Rec }
 $wmySum = Data_ListOps_$wmySum
 
 Data_ListOps_mySum
-  = \ xs ->
-      case $wmySum xs of ww {
-        __DEFAULT -> I# ww
+  = \ xs_s104 ->
+      case $wmySum xs_s104 of ww_s108 {
+        __DEFAULT -> I# ww_s108
       }
 
 mySum = Data_ListOps_mySum

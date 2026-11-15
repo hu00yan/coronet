@@ -67,18 +67,42 @@ pub impl Show for Token with output(self, logger) {
 
 pub extend Token with Show::{to_string, output}
 
+///| Extract the unqualified base name from a qualified symbol (e.g. Math_Fib_fib -> fib).
+pub fn get_unqualified_name(name : String) -> String {
+  let mut last_idx = -1
+  for i in 0..<name.length() {
+    let c = name[i].to_int().unsafe_to_char()
+    if c == '.' || c == '_' {
+      last_idx = i
+    }
+  }
+  if last_idx >= 0 && last_idx + 1 < name.length() {
+    name[last_idx + 1 : name.length()].to_owned()
+  } else {
+    name
+  }
+}
+
 ///| Check if an identifier is a constructor name.
 pub fn is_constructor_name(name : String) -> Bool {
   if name.length() == 0 {
     return false
   }
-  let first = name[0].to_int().unsafe_to_char()
-  if (first >= 'A' && first <= 'Z') || first == ':' || first == '(' || first == '[' {
-    return true
+  let first_char = name[0].to_int().unsafe_to_char()
+  if (first_char >= 'a' && first_char <= 'z') || first_char == '$' || first_char == '_' {
+    return false
   }
-  if first == '\'' && name.length() > 1 {
-    let second = name[1].to_int().unsafe_to_char()
-    return second >= 'A' && second <= 'Z'
+  let unqual = get_unqualified_name(name)
+  if unqual.length() > 0 {
+    let first = unqual[0].to_int().unsafe_to_char()
+    if (first >= 'A' && first <= 'Z') || first == ':' || first == '(' || first == '[' {
+      return true
+    }
+    if first == '\'' && unqual.length() > 1 {
+      let second = unqual[1].to_int().unsafe_to_char()
+      return second >= 'A' && second <= 'Z'
+    }
+    return false
   }
   false
 }

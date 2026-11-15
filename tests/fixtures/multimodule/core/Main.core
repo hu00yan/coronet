@@ -1,44 +1,39 @@
-testList
+testList_s1mD
   = I# 1#
 
-testList
+testList_s1mE
   = I# 2#
 
-testList
+testList_s1mF
   = I# 3#
 
-testList
+testList_s1mG
   = I# 4#
 
-testList
+testList_s1mH
   = I# 5#
 
-testList
-  = Cons testList Nil
+testList_s1mI
+  = Cons testList_s1mH Nil
+
+testList_s1mJ
+  = Cons testList_s1mG testList_s1mI
+
+testList_s1mK
+  = Cons testList_s1mF testList_s1mJ
+
+testList_s1mL
+  = Cons testList_s1mE testList_s1mK
 
 testList
-  = Cons testList testList
+  = Cons testList_s1mD testList_s1mL
 
-testList
-  = Cons testList testList
-
-testList
-  = Cons testList testList
-
-testList
-  = Cons testList testList
-
-lvl
+lvl_s2fD
   = Data_ListOps_myMap Math_Fib_fib testList
 
 result
-  = case Data_ListOps_$wmySum lvl of ww {
-        __DEFAULT -> I# ww
-      }
-
-lvl
-  = case result of {
-        I# n -> itos n []
+  = case Data_ListOps_$wmySum lvl_s2fD of ww_a2fy {
+        __DEFAULT -> I# ww_a2fy
       }
 
 main = result

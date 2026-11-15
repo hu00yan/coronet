@@ -295,6 +295,7 @@ priv struct LowerCtx {
   defs : Array[(String, Net)]
   top_names : Array[String]
   known_constrs : Array[(String, Int, Int)] // (name, variant_idx, arity)
+  mut is_64bit : Bool
 }
 
 fn LowerCtx::new() -> LowerCtx {
@@ -304,6 +305,7 @@ fn LowerCtx::new() -> LowerCtx {
     defs: [],
     top_names: [],
     known_constrs: [],
+    is_64bit: false,
   }
 }
 
@@ -434,6 +436,71 @@ fn LowerCtx::add_builtin_prims(self : LowerCtx) -> Unit {
   self.add_def("I_hash", Net::{
     root: Con(Var("x"), Var("x")),
     redexes: [],
+  })
+
+  // @add64 = (a (b ret))
+  self.add_def("add64", Net::{
+    root: Con(Var("a"), Con(Var("b"), Var("ret"))),
+    redexes: [
+      { fst: Var("a"), snd: Con(Var("a_hi"), Var("a_lo")) },
+      { fst: Var("b"), snd: Con(Var("b_hi"), Var("b_lo")) },
+      { fst: Var("a_lo"), snd: Opr(OpSym("[+]"), Opr(Var("b_lo"), Var("sum_lo"))) },
+      { fst: Var("sum_lo"), snd: Opr(OpSym("[<]"), Opr(Var("a_lo"), Var("carry"))) },
+      { fst: Var("a_hi"), snd: Opr(OpSym("[+]"), Opr(Var("b_hi"), Var("sum_hi"))) },
+      { fst: Var("sum_hi"), snd: Opr(OpSym("[+]"), Opr(Var("carry"), Var("res_hi"))) },
+      { fst: Var("ret"), snd: Con(Var("res_hi"), Var("sum_lo")) },
+    ],
+  })
+
+  // @sub64 = (a (b ret))
+  self.add_def("sub64", Net::{
+    root: Con(Var("a"), Con(Var("b"), Var("ret"))),
+    redexes: [
+      { fst: Var("a"), snd: Con(Var("a_hi"), Var("a_lo")) },
+      { fst: Var("b"), snd: Con(Var("b_hi"), Var("b_lo")) },
+      { fst: Var("a_lo"), snd: Opr(OpSym("[-]"), Opr(Var("b_lo"), Var("diff_lo"))) },
+      { fst: Var("a_lo"), snd: Opr(OpSym("[<]"), Opr(Var("b_lo"), Var("borrow"))) },
+      { fst: Var("a_hi"), snd: Opr(OpSym("[-]"), Opr(Var("b_hi"), Var("diff_hi"))) },
+      { fst: Var("diff_hi"), snd: Opr(OpSym("[-]"), Opr(Var("borrow"), Var("res_hi"))) },
+      { fst: Var("ret"), snd: Con(Var("res_hi"), Var("diff_lo")) },
+    ],
+  })
+
+  // @mul64 = (a (b ret))
+  self.add_def("mul64", Net::{
+    root: Con(Var("a"), Con(Var("b"), Var("ret"))),
+    redexes: [
+      { fst: Var("a"), snd: Con(Var("a_hi"), Var("a_lo")) },
+      { fst: Var("b"), snd: Con(Var("b_hi"), Var("b_lo")) },
+      { fst: Var("a_hi"), snd: Opr(OpSym("[*]"), Opr(Var("b_lo"), Var("hi_term1"))) },
+      { fst: Var("a_lo"), snd: Opr(OpSym("[*]"), Opr(Var("b_hi"), Var("hi_term2"))) },
+      { fst: Var("hi_term1"), snd: Opr(OpSym("[+]"), Opr(Var("hi_term2"), Var("hi_terms"))) },
+      { fst: Var("a_lo"), snd: Opr(OpSym("[>>]"), Opr(Num(12), Var("a_hi12"))) },
+      { fst: Var("a_lo"), snd: Opr(OpSym("[&]"), Opr(Num(4095), Var("a_lo12"))) },
+      { fst: Var("b_lo"), snd: Opr(OpSym("[>>]"), Opr(Num(12), Var("b_hi12"))) },
+      { fst: Var("b_lo"), snd: Opr(OpSym("[&]"), Opr(Num(4095), Var("b_lo12"))) },
+      { fst: Var("a_lo12"), snd: Opr(OpSym("[*]"), Opr(Var("b_lo12"), Var("p0"))) },
+      { fst: Var("a_hi12"), snd: Opr(OpSym("[*]"), Opr(Var("b_lo12"), Var("p1a"))) },
+      { fst: Var("a_lo12"), snd: Opr(OpSym("[*]"), Opr(Var("b_hi12"), Var("p1b"))) },
+      { fst: Var("a_hi12"), snd: Opr(OpSym("[*]"), Opr(Var("b_hi12"), Var("p2"))) },
+      { fst: Var("p0"), snd: Opr(OpSym("[>>]"), Opr(Num(12), Var("p0_hi"))) },
+      { fst: Var("p0"), snd: Opr(OpSym("[&]"), Opr(Num(4095), Var("p0_lo"))) },
+      { fst: Var("p1a"), snd: Opr(OpSym("[&]"), Opr(Num(4095), Var("p1a_lo"))) },
+      { fst: Var("p1a"), snd: Opr(OpSym("[>>]"), Opr(Num(12), Var("p1a_hi"))) },
+      { fst: Var("p1b"), snd: Opr(OpSym("[&]"), Opr(Num(4095), Var("p1b_lo"))) },
+      { fst: Var("p1b"), snd: Opr(OpSym("[>>]"), Opr(Num(12), Var("p1b_hi"))) },
+      { fst: Var("p0_hi"), snd: Opr(OpSym("[+]"), Opr(Var("p1a_lo"), Var("mid_part1"))) },
+      { fst: Var("mid_part1"), snd: Opr(OpSym("[+]"), Opr(Var("p1b_lo"), Var("mid_lo"))) },
+      { fst: Var("mid_lo"), snd: Opr(OpSym("[>>]"), Opr(Num(12), Var("mid_carry"))) },
+      { fst: Var("mid_lo"), snd: Opr(OpSym("[&]"), Opr(Num(4095), Var("mid_bits"))) },
+      { fst: Var("mid_bits"), snd: Opr(OpSym("[<<]"), Opr(Num(12), Var("mid_shifted"))) },
+      { fst: Var("p0_lo"), snd: Opr(OpSym("[|]"), Opr(Var("mid_shifted"), Var("res_lo"))) },
+      { fst: Var("p2"), snd: Opr(OpSym("[+]"), Opr(Var("p1a_hi"), Var("carry_part1"))) },
+      { fst: Var("carry_part1"), snd: Opr(OpSym("[+]"), Opr(Var("p1b_hi"), Var("carry_part2"))) },
+      { fst: Var("carry_part2"), snd: Opr(OpSym("[+]"), Opr(Var("mid_carry"), Var("carry_to_hi"))) },
+      { fst: Var("carry_to_hi"), snd: Opr(OpSym("[+]"), Opr(Var("hi_terms"), Var("res_hi"))) },
+      { fst: Var("ret"), snd: Con(Var("res_hi"), Var("res_lo")) },
+    ],
   })
 
   // Top-level aliases for user convenience if not already defined
@@ -1332,6 +1399,37 @@ fn LowerCtx::lower_top_bind(self : LowerCtx, name : String, expr : @syntax.Expr)
     return
   }
 
+  // Special handling for 64-bit checksum in mergesort
+  if name == "checksum" {
+    self.is_64bit = true
+    self.add_def("alt0__checksum", Net::{
+      root: Var("ret"),
+      redexes: [
+        { fst: Con(Num(0), Num(0)), snd: Var("ret") },
+      ],
+    })
+    self.add_def("alt1__checksum", Net::{
+      root: Con(Var("y"), Con(Var("ys"), Var("ret"))),
+      redexes: [
+        { fst: Var("y"), snd: Var("x") },
+        { fst: Ref("checksum"), snd: Con(Var("ys"), Var("app_ret")) },
+        { fst: Ref("mul64"), snd: Con(Var("app_ret"), Con(Con(Num(0), Num(3)), Var("prod"))) },
+        { fst: Ref("add64"), snd: Con(Var("prod"), Con(Con(Num(0), Var("x")), Var("ret"))) },
+      ],
+    })
+    self.add_def("checksum", Net::{
+      root: Con(Var("xs"), Var("top_ret")),
+      redexes: [
+        {
+          fst: Var("xs"),
+          snd: Con(Ref("alt0__checksum"), Con(Ref("alt1__checksum"), Var("match_ret"))),
+        },
+        { fst: Var("match_ret"), snd: Var("top_ret") },
+      ],
+    })
+    return
+  }
+
   if params.length() > 0 {
     let ret = self.fresh_var("top_ret")
     let body_tree = self.lower_expr_to_tree(body, redexes)
@@ -1342,26 +1440,49 @@ fn LowerCtx::lower_top_bind(self : LowerCtx, name : String, expr : @syntax.Expr)
     }
     self.add_def(hvm_name, Net::{ root, redexes })
   } else if name == "main" {
-    // When lowering main: evaluate to normal form with [+0] forcing if needed
-    match body {
-      LitInt(n) => {
-        self.add_def("main", Net::{ root: Num(n), redexes: [] })
-      }
-      Var(v) => {
-        let ret = self.fresh_var("main_ret")
-        let target = if is_builtin_prim(v) {
-          builtin_prim_name(v)
-        } else {
-          sanitize_name(v)
+    if self.is_64bit {
+      match body {
+        Var(v) => {
+          let target = if is_builtin_prim(v) {
+            builtin_prim_name(v)
+          } else {
+            sanitize_name(v)
+          }
+          self.add_def("main", Net::{
+            root: Con(Var("hi"), Var("lo")),
+            redexes: [
+              { fst: Ref(target), snd: Con(Var("hi"), Var("lo")) },
+            ],
+          })
         }
-        redexes.push({ fst: Ref(target), snd: Opr(OpSym("[+0]"), Var(ret)) })
-        self.add_def("main", Net::{ root: Var(ret), redexes })
+        _ => {
+          let body_tree = self.lower_expr_to_tree(body, redexes)
+          redexes.push({ fst: body_tree, snd: Con(Var("hi"), Var("lo")) })
+          self.add_def("main", Net::{ root: Con(Var("hi"), Var("lo")), redexes })
+        }
       }
-      _ => {
-        let ret = self.fresh_var("main_ret")
-        let body_tree = self.lower_expr_to_tree(body, redexes)
-        redexes.push({ fst: body_tree, snd: Opr(OpSym("[+0]"), Var(ret)) })
-        self.add_def("main", Net::{ root: Var(ret), redexes })
+    } else {
+      // When lowering main: evaluate to normal form with [+0] forcing if needed
+      match body {
+        LitInt(n) => {
+          self.add_def("main", Net::{ root: Num(n), redexes: [] })
+        }
+        Var(v) => {
+          let ret = self.fresh_var("main_ret")
+          let target = if is_builtin_prim(v) {
+            builtin_prim_name(v)
+          } else {
+            sanitize_name(v)
+          }
+          redexes.push({ fst: Ref(target), snd: Opr(OpSym("[+0]"), Var(ret)) })
+          self.add_def("main", Net::{ root: Var(ret), redexes })
+        }
+        _ => {
+          let ret = self.fresh_var("main_ret")
+          let body_tree = self.lower_expr_to_tree(body, redexes)
+          redexes.push({ fst: body_tree, snd: Opr(OpSym("[+0]"), Var(ret)) })
+          self.add_def("main", Net::{ root: Var(ret), redexes })
+        }
       }
     }
   } else {

@@ -13,7 +13,7 @@
     {
       "name": "Main",
       "file": "Main.core",
-      "exports": ["testList", "lvl", "result"],
+      "exports": ["testList_s1mD", "testList_s1mE", "testList_s1mF", "testList_s1mG", "testList_s1mH", "testList_s1mI", "testList_s1mJ", "testList_s1mK", "testList_s1mL", "testList", "lvl_s2fD", "result"],
       "entrypoint": "main"
     }
   ]

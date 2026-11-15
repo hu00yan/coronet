@@ -262,13 +262,38 @@ test "lower fixture 08_mergesort" {
     #|           }
     #|       }
     #| end Rec }
-    #| result = I# 11291991#
+    #| Rec {
+    #| checksum
+    #|   = \ xs ->
+    #|       case xs of {
+    #|         Nil -> 0#;
+    #|         Cons y ys ->
+    #|           case y of { I# x ->
+    #|           case checksum ys of { I# y1 -> I# (+# x (*# 3# y1)) }
+    #|           }
+    #|       }
+    #| end Rec }
+    #| result = I# 481054039#
     #| main = result
   let hvm = @lower_hvm2.lower_core(src).unwrap()
   println("=== 08_mergesort.hvm ===")
   println(hvm)
   assert_true(hvm.contains("@merge"))
-  assert_true(hvm.contains("@alt0__C1"))
-  assert_true(hvm.contains("@alt1__C2"))
+  assert_true(hvm.contains("@checksum"))
+  assert_true(hvm.contains("@alt0__checksum"))
+  assert_true(hvm.contains("@alt1__checksum"))
+  assert_true(hvm.contains("@add64"))
+  assert_true(hvm.contains("@mul64"))
+  assert_true(hvm.contains("@sub64"))
   assert_true(hvm.contains("@main"))
+}
+
+test "64-bit arithmetic helper nets generation" {
+  let src =
+    #| x = 42#
+    #| main = x
+  let hvm = @lower_hvm2.lower_core(src).unwrap()
+  assert_true(hvm.contains("@add64"))
+  assert_true(hvm.contains("@sub64"))
+  assert_true(hvm.contains("@mul64"))
 }

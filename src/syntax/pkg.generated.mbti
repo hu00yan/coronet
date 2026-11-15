@@ -6,7 +6,13 @@ import {
 }
 
 // Values
+pub fn get_unqualified_name(String) -> String
+
 pub fn is_constructor_name(String) -> Bool
+
+pub fn link_core_sources(Array[String]) -> Result[Program, String]
+
+pub fn link_programs(Array[Program]) -> Program
 
 pub fn parse_core(String) -> Result[Program, String]
 
@@ -98,6 +104,7 @@ pub(all) struct Program {
 pub fn Program::all_bindings(Self) -> Array[(String, Expr)]
 pub fn Program::equal(Self, Self) -> Bool
 pub fn Program::lookup(Self, String) -> Expr?
+pub fn Program::merge(Self, Self) -> Self
 pub fn Program::new(Array[Bind]) -> Self
 pub fn Program::not_equal(Self, Self) -> Bool
 pub fn Program::output(Self, &Logger) -> Unit

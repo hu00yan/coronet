@@ -2,7 +2,7 @@
 
 ///|
 struct CliArgs {
-  input_file : String
+  input_files : Array[String]
   target : String
   output_file : String?
 }
@@ -12,11 +12,11 @@ fn print_usage() -> Unit {
   let usage = (
     #|Coronet: GHC Core -> HVM2/3/GPU Parallel Compiler
     #|
-    #|Usage: coronet <input.core> --target <hvm2|hvm3|gpu> [-o <output_file>]
-    #|       coronet <input.core> --gpu [-o <output_file>]
+    #|Usage: coronet <input.core ...> --target <hvm2|hvm3|gpu> [-o <output_file>]
+    #|       coronet <input.core ...> --gpu [-o <output_file>]
     #|
     #|Arguments:
-    #|  <input.core>                 Input CoreLite source file
+    #|  <input.core ...>             One or more input CoreLite source files to compile and link
     #|
     #|Options:
     #|  --target <hvm2|hvm3|gpu>     Target backend:
@@ -32,7 +32,7 @@ fn print_usage() -> Unit {
 
 ///|
 fn parse_cli_args(args : Array[String]) -> CliArgs {
-  let mut input_file : String? = None
+  let input_files : Array[String] = []
   let mut target : String? = None
   let mut output_file : String? = None
   let mut i = 1
@@ -70,25 +70,15 @@ fn parse_cli_args(args : Array[String]) -> CliArgs {
       print_usage()
       @env.exit(1)
     } else {
-      match input_file {
-        None => input_file = Some(arg)
-        Some(_) => {
-          println("Error: Unexpected extra argument '\{arg}'")
-          print_usage()
-          @env.exit(1)
-        }
-      }
+      input_files.push(arg)
     }
     i = i + 1
   }
 
-  let in_file = match input_file {
-    Some(f) => f
-    None => {
-      println("Error: Missing input .core file")
-      print_usage()
-      @env.exit(1)
-    }
+  if input_files.is_empty() {
+    println("Error: Missing input .core file")
+    print_usage()
+    @env.exit(1)
   }
 
   let tgt = match target {
@@ -107,7 +97,7 @@ fn parse_cli_args(args : Array[String]) -> CliArgs {
     }
   }
 
-  { input_file: in_file, target: tgt, output_file }
+  { input_files, target: tgt, output_file }
 }
 
 ///|
@@ -175,19 +165,24 @@ async fn main {
   let args = @env.args()
   let cli = parse_cli_args(args)
 
-  if !(@fs.exists(cli.input_file)) {
-    println("Error: Input file '\{cli.input_file}' not found.")
-    @env.exit(1)
-  }
-
-  let content = @fs.read_text(cli.input_file)
-  let program = match @syntax.parse_core(content) {
-    Ok(prog) => prog
-    Err(err) => {
-      println("Parse error in '\{cli.input_file}': \{err}")
+  let programs : Array[@syntax.Program] = []
+  for input_file in cli.input_files {
+    if !(@fs.exists(input_file)) {
+      println("Error: Input file '\{input_file}' not found.")
       @env.exit(1)
     }
+
+    let content = @fs.read_text(input_file)
+    match @syntax.parse_core(content) {
+      Ok(prog) => programs.push(prog)
+      Err(err) => {
+        println("Parse error in '\{input_file}': \{err}")
+        @env.exit(1)
+      }
+    }
   }
+
+  let program = @syntax.link_programs(programs)
 
   if cli.target == "gpu" {
     handle_gpu_target(program, cli.output_file)

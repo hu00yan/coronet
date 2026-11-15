@@ -31,4 +31,15 @@ case "$1" in
     ;;
 esac
 
-exec "$HVM2_BIN" "$MODE" "$@"
+"$HVM2_BIN" "$MODE" "$@" | python3 -c '
+import sys, re
+for line in sys.stdin:
+    m = re.match(r"^Result: \((\d+) (\d+)\)$", line)
+    if m:
+        hi = int(m.group(1))
+        lo = int(m.group(2))
+        val = (hi << 24) + lo
+        print(f"Result: {val}")
+    else:
+        sys.stdout.write(line)
+'
