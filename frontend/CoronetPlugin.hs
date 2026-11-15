@@ -219,7 +219,7 @@ renderExpr currentMod expr = case expr of
   Let bind body ->
     "let " ++ renderInlineBind currentMod bind ++ " in " ++ renderExpr currentMod body
   Case scrut bndr _ alts ->
-    let bndrStr = let n = bndrName bndr in if isWild n then "" else " " ++ n
+    let bndrStr = let n = bndrName bndr in if n == "_" then "" else " " ++ n
     in "case " ++ renderExpr currentMod scrut ++ " of" ++ bndrStr ++ " {\n" ++
        intercalate ";\n" (map (renderAlt currentMod) alts) ++ "\n      }"
 
@@ -227,9 +227,6 @@ isTypeOrCoercion :: CoreExpr -> Bool
 isTypeOrCoercion (Type _)     = True
 isTypeOrCoercion (Coercion _) = True
 isTypeOrCoercion _            = False
-
-isWild :: String -> Bool
-isWild n = "wild" `isPrefixOf` n || "ds" `isPrefixOf` n || n == "_"
 
 renderInlineBind :: Module -> CoreBind -> String
 renderInlineBind currentMod (NonRec b e) =
