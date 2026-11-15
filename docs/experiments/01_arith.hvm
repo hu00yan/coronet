@@ -1,0 +1,89 @@
+@prim_add = (a (b ret))
+  & a ~ $([+] $(b ret))
+
+@prim_sub = (a (b ret))
+  & a ~ $([-] $(b ret))
+
+@prim_mul = (a (b ret))
+  & a ~ $([*] $(b ret))
+
+@prim_div = (a (b ret))
+  & a ~ $([/] $(b ret))
+
+@prim_rem = (a (b ret))
+  & a ~ $([%] $(b ret))
+
+@prim_eq = (a (b ret))
+  & a ~ $([=] $(b ret))
+
+@prim_neq = (a (b ret))
+  & a ~ $([!] $(b ret))
+
+@prim_lt = (a (b ret))
+  & a ~ $([<] $(b ret))
+
+@prim_gt = (a (b ret))
+  & a ~ $([>] $(b ret))
+
+@prim_lte = (a (b ret))
+  & b ~ $([<] $(a lt))
+  & 1 ~ $([-] $(lt ret))
+
+@prim_gte = (a (b ret))
+  & a ~ $([<] $(b lt))
+  & 1 ~ $([-] $(lt ret))
+
+@I_hash = (x x)
+
+@div = @prim_div
+
+@rem = @prim_rem
+
+@eq = @prim_eq
+
+@neq = @prim_neq
+
+@lt = @prim_lt
+
+@gt = @prim_gt
+
+@lte = @prim_lte
+
+@gte = @prim_gte
+
+@MyNil = (call (* call))
+
+@MyCons = (h (t (* ((h (t call)) call))))
+
+@MyNothing = (call (* call))
+
+@MyJust = (x (* ((x call) call)))
+
+@MyFalse = (call (* call))
+
+@MyTrue = (* (call call))
+
+@Leaf = (x ((x call) (* call)))
+
+@Node = (l (r (* ((l (r call)) call))))
+
+@mul = @prim_mul
+
+@sub = @prim_sub
+
+@add = @prim_add
+
+@calc = (a (b (c top_ret_1)))
+  & a ~ x
+  & b ~ y
+  & c ~ y1
+  & x ~ $([+] $(y add_res_2))
+  & add_res_2 ~ $([*] $(y1 mul_res_3))
+  & mul_res_3 ~ $([-] $(42 sub_res_4))
+  & sub_res_4 ~ top_ret_1
+
+@result = top_ret_5
+  & 48 ~ top_ret_5
+
+@main = main_ret_6
+  & @result ~ $([+0] main_ret_6)

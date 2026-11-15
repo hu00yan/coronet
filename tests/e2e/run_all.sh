@@ -26,6 +26,9 @@ fi
 if [[ -f "$REPO_ROOT/scripts/run_hvm3.sh" ]]; then
     chmod +x "$REPO_ROOT/scripts/run_hvm3.sh" 2>/dev/null || true
 fi
+if [[ -f "$REPO_ROOT/scripts/run_colab_gpu.sh" ]]; then
+    chmod +x "$REPO_ROOT/scripts/run_colab_gpu.sh" 2>/dev/null || true
+fi
 
 # Run python harness
 python3 "$SCRIPT_DIR/verify.py" "$@"

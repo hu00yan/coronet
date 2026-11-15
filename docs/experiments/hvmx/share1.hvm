@@ -1,0 +1,3 @@
+@main = r
+  & @dup ~ (r r)
+@dup = ({a b} (a b))

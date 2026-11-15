@@ -1,0 +1,4 @@
+@I_hash = (val ((val ret) ret))
+
+@main = my_int
+  & @I_hash ~ (48 my_int)

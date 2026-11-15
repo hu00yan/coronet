@@ -1,0 +1,2 @@
+@main = a & ?((10 @succ) a) ~ 5
+@succ = (x y) & $([*2] y) ~ x

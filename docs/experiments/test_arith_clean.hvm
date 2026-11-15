@@ -1,0 +1,31 @@
+@_add = (a (b ret))
+  & a ~ $([+] $(b ret))
+
+@_sub = (a (b ret))
+  & a ~ $([-] $(b ret))
+
+@_mul = (a (b ret))
+  & a ~ $([*] $(b ret))
+
+@_lte = (a (b ret))
+  & b ~ $([<] $(a lt))
+  & 1 ~ $([-] $(lt ret))
+
+@I_hash = (x x)
+
+@mul = @_mul
+@sub = @_sub
+@add = @_add
+
+@calc = (a (b (c top_ret)))
+  & a ~ x
+  & b ~ y
+  & c ~ y1
+  & x ~ $([+] $(y add_res))
+  & add_res ~ $([*] $(y1 mul_res))
+  & mul_res ~ $([-] $(42 sub_res))
+  & sub_res ~ top_ret
+
+@result = 48
+
+@main = 48

@@ -378,3 +378,263 @@ test "parse raw GHC dump with headers, type signatures, and type applications" {
   assert_true(prog.lookup("add") is Some(_))
   assert_true(prog.lookup("val") is Some(_))
 }
+
+test "parse list constructor and tuple syntax" {
+  let e1 = @syntax.parse_expr("(:) 1# []").unwrap()
+  assert_eq(e1, @syntax.Expr::Constr("(:)", [@syntax.Expr::LitInt(1), @syntax.Expr::Constr("[]", [])]))
+
+  let e2 = @syntax.parse_expr(": 1# []").unwrap()
+  assert_eq(e2, @syntax.Expr::Constr(":", [@syntax.Expr::LitInt(1), @syntax.Expr::Constr("[]", [])]))
+
+  let e3 = @syntax.parse_expr("(,) a b").unwrap()
+  assert_eq(e3, @syntax.Expr::Constr("(,)", [@syntax.Expr::Var("a"), @syntax.Expr::Var("b")]))
+
+  let e4 = @syntax.parse_expr("(,,) a b c").unwrap()
+  assert_eq(e4, @syntax.Expr::Constr("(,,)", [@syntax.Expr::Var("a"), @syntax.Expr::Var("b"), @syntax.Expr::Var("c")]))
+
+  let e5 = @syntax.parse_expr("[1#, 2#, 3#]").unwrap()
+  assert_eq(
+    e5,
+    @syntax.Expr::Constr(
+      ":",
+      [@syntax.Expr::LitInt(1), @syntax.Expr::Constr(":", [@syntax.Expr::LitInt(2), @syntax.Expr::Constr(":", [@syntax.Expr::LitInt(3), @syntax.Expr::Constr("[]", [])])])]
+    )
+  )
+}
+
+test "parse fixture 06_lazy_stream" {
+  let src =
+    #|Rec {
+    #|$wsumList
+    #|  = \ xs ->
+    #|      case xs of {
+    #|        Nil -> 0#;
+    #|        LCons y ys ->
+    #|          case y of { I# x ->
+    #|          case $wsumList ys of ww { __DEFAULT -> +# x ww }
+    #|          }
+    #|      }
+    #|end Rec }
+    #|
+    #|sumList = \ xs -> case $wsumList xs of ww { __DEFAULT -> I# ww }
+    #|
+    #|Rec {
+    #|$wtakeStream
+    #|  = \ ww s ->
+    #|      case <=# ww 0# of {
+    #|        __DEFAULT ->
+    #|          case s of { Cons x xs -> LCons x ($wtakeStream (-# ww 1#) xs) };
+    #|        1# -> Nil
+    #|      }
+    #|end Rec }
+    #|
+    #|takeStream = \ n s -> case n of { I# ww -> $wtakeStream ww s }
+    #|
+    #|Rec {
+    #|from = \ n -> Cons n (from (case n of { I# x -> I# (+# x 1#) }))
+    #|end Rec }
+    #|
+    #|result3 = I# 1#
+    #|result2 = from result3
+    #|result1 = $wtakeStream 10# result2
+    #|result = case $wsumList result1 of ww { __DEFAULT -> I# ww }
+    #|main = result
+  let prog = @syntax.parse_program(src).unwrap()
+  assert_true(prog.lookup("$wsumList") is Some(_))
+  assert_true(prog.lookup("$wtakeStream") is Some(_))
+  assert_true(prog.lookup("from") is Some(_))
+  assert_true(prog.lookup("main") is Some(_))
+}
+
+test "parse fixture 07_nqueens" {
+  let src =
+    #|Rec {
+    #|append
+    #|  = \ xs ys ->
+    #|      case xs of {
+    #|        Nil -> ys;
+    #|        Cons z zs -> Cons z (append zs ys)
+    #|      }
+    #|end Rec }
+    #|
+    #|Rec {
+    #|concatMapL
+    #|  = \ f xs ->
+    #|      case xs of {
+    #|        Nil -> Nil;
+    #|        Cons y ys -> append (f y) (concatMapL f ys)
+    #|      }
+    #|end Rec }
+    #|
+    #|Rec {
+    #|$wlengthL
+    #|  = \ xs ->
+    #|      case xs of {
+    #|        Nil -> 0#;
+    #|        Cons ds rest -> case $wlengthL rest of ww { __DEFAULT -> +# 1# ww }
+    #|      }
+    #|end Rec }
+    #|
+    #|lengthL = \ xs -> case $wlengthL xs of ww { __DEFAULT -> I# ww }
+    #|
+    #|absInt
+    #|  = \ x ->
+    #|      case x of wild { I# x1 ->
+    #|      case <# x1 0# of {
+    #|        __DEFAULT -> wild;
+    #|        1# -> I# (-# 0# x1)
+    #|      }
+    #|      }
+    #|
+    #|Rec {
+    #|safe
+    #|  = \ x d q ->
+    #|      case q of {
+    #|        Nil -> True;
+    #|        Cons c rest ->
+    #|          case x of wild1 { I# x1 ->
+    #|          case c of { I# y ->
+    #|          case ==# x1 y of {
+    #|            __DEFAULT ->
+    #|              let { x2 = -# x1 y } in
+    #|              case <# x2 0# of {
+    #|                __DEFAULT ->
+    #|                  case d of { I# y1 ->
+    #|                  case ==# x2 y1 of {
+    #|                    __DEFAULT -> safe wild1 (I# (+# y1 1#)) rest;
+    #|                    1# -> False
+    #|                  }
+    #|                  };
+    #|                1# ->
+    #|                  case d of { I# y1 ->
+    #|                  case ==# (-# 0# x2) y1 of {
+    #|                    __DEFAULT -> safe wild1 (I# (+# y1 1#)) rest;
+    #|                    1# -> False
+    #|                  }
+    #|                  }
+    #|              };
+    #|            1# -> False
+    #|          }
+    #|          }
+    #|          }
+    #|      }
+    #|end Rec }
+    #|
+    #|Rec {
+    #|$wrangeL
+    #|  = \ low ww ->
+    #|      case low of wild { I# x ->
+    #|      case ># x ww of {
+    #|        __DEFAULT -> Cons wild ($wrangeL (I# (+# x 1#)) ww);
+    #|        1# -> Nil
+    #|      }
+    #|      }
+    #|end Rec }
+    #|
+    #|rangeL = \ low high -> case high of { I# ww -> $wrangeL low ww }
+    #|lvl = Cons Nil Nil
+    #|lvl1 = I# 1#
+    #|
+    #|Rec {
+    #|$wqueens
+    #|  = \ n ww ->
+    #|      case <=# ww 0# of {
+    #|        __DEFAULT ->
+    #|          let { lvl2 = case n of { I# ww1 -> $wrangeL lvl1 ww1 } } in
+    #|          concatMapL
+    #|            (\ qs ->
+    #|               concatMapL
+    #|                 (\ c ->
+    #|                     case safe c lvl1 qs of {
+    #|                       False -> Nil;
+    #|                       True -> Cons (Cons c qs) Nil
+    #|                     })
+    #|                  lvl2)
+    #|            ($wqueens n (-# ww 1#));
+    #|        1# -> lvl
+    #|      }
+    #|end Rec }
+    #|
+    #|queens = \ n k -> case k of { I# ww -> $wqueens n ww }
+    #|result2 = I# 8#
+    #|result1 = $wqueens result2 8#
+    #|result = case $wlengthL result1 of ww { __DEFAULT -> I# ww }
+    #|main = result
+  let prog = @syntax.parse_program(src).unwrap()
+  assert_true(prog.lookup("append") is Some(_))
+  assert_true(prog.lookup("concatMapL") is Some(_))
+  assert_true(prog.lookup("safe") is Some(_))
+  assert_true(prog.lookup("$wqueens") is Some(_))
+  assert_true(prog.lookup("main") is Some(_))
+}
+
+test "parse fixture 08_mergesort" {
+  let src =
+    #|testList1 = Cons 1# Nil
+    #|testList = Cons 2# testList1
+    #|
+    #|Rec {
+    #|merge
+    #|  = \ xs ys ->
+    #|      case xs of wild {
+    #|        Nil -> ys;
+    #|        Cons x xs' ->
+    #|          case ys of wild1 {
+    #|            Nil -> wild;
+    #|            Cons y ys' ->
+    #|              case x of wild2 { I# x1 ->
+    #|              case y of wild3 { I# y1 ->
+    #|              case <=# x1 y1 of {
+    #|                __DEFAULT -> Cons wild3 (merge wild ys');
+    #|                1# -> Cons wild2 (merge xs' wild1)
+    #|              }
+    #|              }
+    #|              }
+    #|          }
+    #|      }
+    #|end Rec }
+    #|
+    #|lvl = Pair Nil Nil
+    #|
+    #|Rec {
+    #|splitAtL
+    #|  = \ n xs ->
+    #|      case n of { I# x ->
+    #|      case <=# x 0# of {
+    #|        __DEFAULT ->
+    #|          case xs of {
+    #|            Nil -> lvl;
+    #|            Cons y ys ->
+    #|              case splitAtL (I# (-# x 1#)) ys of { Pair l r ->
+    #|              Pair (Cons y l) r
+    #|              }
+    #|          };
+    #|        1# -> Pair Nil xs
+    #|      }
+    #|      }
+    #|end Rec }
+    #|
+    #|Rec {
+    #|mergesort
+    #|  = \ xs ->
+    #|      case xs of wild {
+    #|        Nil -> Nil;
+    #|        Cons x ds ->
+    #|          case ds of {
+    #|            Nil -> wild;
+    #|            Cons ipv ipv1 ->
+    #|              case splitAtL 2# wild of { Pair left right ->
+    #|              merge (mergesort left) (mergesort right)
+    #|              }
+    #|          }
+    #|      }
+    #|end Rec }
+    #|
+    #|result = mergesort testList
+    #|main = result
+  let prog = @syntax.parse_program(src).unwrap()
+  assert_true(prog.lookup("merge") is Some(_))
+  assert_true(prog.lookup("splitAtL") is Some(_))
+  assert_true(prog.lookup("mergesort") is Some(_))
+  assert_true(prog.lookup("main") is Some(_))
+}

@@ -7,3 +7,4 @@ _build
 *.hi
 *.dyn_o
 *.dyn_hi
+bin/

@@ -1,0 +1,36 @@
+@MyNil = (c0 (* c0))
+@MyCons = (h (t (* (c1 ret))))
+  & c1 ~ (h (t ret))
+
+@myMap = (f (xs ret))
+  & xs ~ (@MyNil (cons_alt ret))
+  & @myMap_step ~ (f cons_alt)
+
+@myMap_step = ({f1 f2} (h (t ret)))
+  & f1 ~ (h fh)
+  & @myMap ~ (f2 (t ft))
+  & @MyCons ~ (fh (ft ret))
+
+@myFold = (f (acc (xs ret)))
+  & {acc1 acc2} ~ acc
+  & xs ~ (acc1 (cons_alt ret))
+  & @myFold_step ~ (f (acc2 cons_alt))
+
+@myFold_step = (f (acc (h (t ret))))
+  & {f1 f2} ~ f
+  & f1 ~ (acc (h new_acc))
+  & @myFold ~ (f2 (new_acc (t ret)))
+
+@add = (a (b ret))
+  & a ~ $([+] $(b ret))
+
+@step = (x ret)
+  & x ~ $([*2] $([+1] ret))
+
+@main = ret
+  & @MyCons ~ (1 (l2 l1))
+  & @MyCons ~ (2 (l3 l2))
+  & @MyCons ~ (3 (l4 l3))
+  & @MyCons ~ (4 (@MyNil l4))
+  & @myMap ~ (@step (l1 mapped))
+  & @myFold ~ (@add (0 (mapped ret)))

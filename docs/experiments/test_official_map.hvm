@@ -1,0 +1,25 @@
+@List/Cons = (a (b ((@List/Cons/tag (a (b c))) c)))
+@List/Cons/tag = 1
+
+@List/Nil = ((@List/Nil/tag a) a)
+@List/Nil/tag = 0
+
+@id = (a a)
+
+@map = (a ((@map__C1 (a b)) b))
+
+@map__C0 = (* (a (d ({(a b) c} f))))
+  & @List/Cons ~ (b (e f))
+  & @map ~ (c (d e))
+
+@map__C1 = (?(((* @List/Nil) @map__C0) a) a)
+
+@step = (x ret)
+  & x ~ $([*2] $([+1] ret))
+
+@main = mapped
+  & @List/Cons ~ (1 (l2 l1))
+  & @List/Cons ~ (2 (l3 l2))
+  & @List/Cons ~ (3 (l4 l3))
+  & @List/Cons ~ (4 (@List/Nil l4))
+  & @map ~ (@step (l1 mapped))

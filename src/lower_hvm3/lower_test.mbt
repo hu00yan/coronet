@@ -246,3 +246,47 @@ test "lower 05_tree fixture" {
   assert_true(hvm3_code.contains("@sumTree = (λ&t ((t (λ&x x)) (λ&l (λ&r"))
   assert_true(hvm3_code.contains("@main = @result"))
 }
+
+test "lower 06_lazy_stream fixture" {
+  let src =
+    #|Rec {
+    #|$wsumList
+    #|  = \ xs ->
+    #|      case xs of {
+    #|        Nil -> 0#;
+    #|        LCons y ys ->
+    #|          case y of { I# x ->
+    #|          case $wsumList ys of ww { __DEFAULT -> +# x ww }
+    #|          }
+    #|      }
+    #|end Rec }
+    #|sumList = \ xs -> case $wsumList xs of ww { __DEFAULT -> I# ww }
+    #|Rec {
+    #|$wtakeStream
+    #|  = \ ww s ->
+    #|      case <=# ww 0# of {
+    #|        __DEFAULT ->
+    #|          case s of { Cons x xs -> LCons x ($wtakeStream (-# ww 1#) xs) };
+    #|        1# -> Nil
+    #|      }
+    #|end Rec }
+    #|takeStream = \ n s -> case n of { I# ww -> $wtakeStream ww s }
+    #|Rec {
+    #|from = \ n -> Cons n (from (case n of { I# x -> I# (+# x 1#) }))
+    #|end Rec }
+    #|result3 = I# 1#
+    #|result2 = from result3
+    #|result1 = $wtakeStream 10# result2
+    #|result = case $wsumList result1 of ww { __DEFAULT -> I# ww }
+    #|main = result
+  let prog = @syntax.parse_program(src).unwrap()
+  let hvm3_code = @lower_hvm3.lower(prog)
+
+  assert_true(hvm3_code.contains("@Nil = (λ&c0 (λ&c1 c0))"))
+  assert_true(
+    hvm3_code.contains("@LCons = (λ&a0 (λ&a1 (λ&c0 (λ&c1 ((c1 a0) a1)))))"),
+  )
+  assert_true(hvm3_code.contains("@Cons = (λ&a0 (λ&a1 (λ&c0 ((c0 a0) a1))))"))
+  assert_true(hvm3_code.contains("@from = (λ&n ((@Cons n)"))
+  assert_true(hvm3_code.contains("@main = @result"))
+}

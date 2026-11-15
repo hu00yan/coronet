@@ -1,0 +1,6 @@
+@List/Cons = (a (b ((@List/Cons/tag (a (b c))) c)))
+@List/Cons/tag = 1
+@List/Nil = ((@List/Nil/tag a) a)
+@List/Nil/tag = 0
+@main = r
+  & @List/Cons ~ (5 (6 r))

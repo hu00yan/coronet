@@ -129,7 +129,6 @@ pub enum Token {
   LBracket
   RBracket
   Semicolon
-  Colon
   DoubleColon
   Comma
   Underscore

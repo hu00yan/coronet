@@ -1,0 +1,34 @@
+
+@Nil = λ&c0 λ&c1 c0
+@LCons = λ&a0 λ&a1 λ&c0 λ&c1 ((c1 a0) a1)
+@Cons = λ&a0 λ&a1 λ&c0 ((c0 a0) a1)
+
+@_wsumList = λ&xs
+  ((xs 0) (λ&y λ&ys
+    ((λ&x
+      ! &ww = (@_wsumList ys)
+      (+ x ww)) y)))
+
+@sumList = λ&xs
+  ! &ww = (@_wsumList xs)
+  ww
+
+@_wtakeStream = λ&ww λ&s
+  ~ (<= ww 0) {
+    0:
+      (s (λ&x λ&xs (@LCons x (@_wtakeStream (- ww 1) xs))))
+    1+p:
+      @Nil
+  }
+
+@takeStream = λ&n λ&s
+  ((λ&ww (@_wtakeStream ww s)) n)
+
+@from = λ&n
+  (@Cons n (@from ((λ&x (+ x 1)) n)))
+
+@result3 = 1
+@result2 = (@from @result3)
+@result1 = (@_wtakeStream 10 @result2)
+@result = ! &ww = (@_wsumList @result1) ww
+@main = @result

@@ -1,0 +1,7 @@
+@MyNil = (call (* call))
+
+@MyCons = (h (t (* ((h (t call)) call))))
+
+@main = ret
+  & @MyCons ~ (10 (@MyNil (nil (cons ret))))
+  & cons ~ (head (tail 42))

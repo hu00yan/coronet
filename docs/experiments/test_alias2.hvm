@@ -1,0 +1,3 @@
+@add = ret & @prim_add ~ ret
+@prim_add = (a (b ret)) & a ~ $([+] $(b ret))
+@main = ret & @add ~ (10 (20 ret))

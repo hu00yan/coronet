@@ -1,0 +1,15 @@
+
+@Nil = λ&c0 λ&c1 c0
+@Cons = λ&h λ&t λ&c0 λ&c1 ((c1 h) t)
+
+@from = λ&n (@Cons n (@from (+ n 1)))
+
+@take = λ&n λ&xs
+  ~ n {
+    0: @Nil
+    1+p: ((xs @Nil) (λ&h λ&t (@Cons h (@take p t))))
+  }
+
+@sum = λ&xs ((xs 0) (λ&h λ&t (+ h (@sum t))))
+
+@main = (@sum (@take 5 (@from 1)))

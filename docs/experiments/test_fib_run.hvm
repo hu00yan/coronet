@@ -1,0 +1,26 @@
+@branch_else__C1 = (ww ret_5)
+  & {w1 w2} ~ ww
+  & w1 ~ $([-] $(1 sub_res_6))
+  & @_wfib ~ (sub_res_6 app_ret_7)
+  & app_ret_7 ~ ww1
+  & w2 ~ $([-] $(2 sub_res_8))
+  & @_wfib ~ (sub_res_8 app_ret_9)
+  & app_ret_9 ~ ww2
+  & ww1 ~ $([+] $(ww2 add_res_10))
+  & add_res_10 ~ ret_5
+
+@branch_then__C2 = (* (ww ret_11))
+  & ww ~ ret_11
+
+@_wfib = (ww top_ret_1)
+  & {w_cond w_val} ~ ww
+  & 1 ~ $([<] $(w_cond cmp_lt_2))
+  & 1 ~ $([-] $(cmp_lt_2 cmp_res_3))
+  & cmp_res_3 ~ ?((@branch_then__C2 @branch_else__C1) (w_val case_ret_4))
+  & case_ret_4 ~ top_ret_1
+
+@result = top_ret_14
+  & @_wfib ~ (10 top_ret_14)
+
+@main = ret
+  & @result ~ $([+0] ret)

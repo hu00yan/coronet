@@ -1,0 +1,17 @@
+// Scott List constructors:
+// MyNil = (nil (* nil))
+// MyCons h t = (nil (cons (* ((h (t cons)) cons))))  -- wait, let's check standard Scott
+
+// Standard Scott:
+// Nil: \nil \cons -> nil
+// Cons: \h \t -> \nil \cons -> cons h t
+// In HVM2:
+// Nil = (nil (* nil))   -- takes nil, cons, returns nil (cons is erased *)
+// Cons = (h (t (* (cons (cons h t))))) -- wait:
+// Let's trace calling (Cons h t) on (nil cons):
+// & @Cons ~ (h (t (nil (cons ret))))
+// We want: ret = (cons h t), nil erased (*).
+
+@MyNil = (* (cons nil))
+  & nil ~ ret
+

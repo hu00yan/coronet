@@ -1,0 +1,17 @@
+// Can a thunk be:
+// (demand (env ret)) ?
+// When forced with @force:
+// & @force ~ (thunk ret)
+// @force = ((demand (env ret)) res)
+//   & demand ~ (env res)
+
+@thunk_from = (env ret)
+  & $([+1] next_n) ~ env
+  & @from ~ (next_n ret)
+
+@make_thunk = (env (demand thunk))
+  & thunk ~ ((demand (env ret)) ret)
+
+@main = 42
+  & @make_thunk ~ (1 (@thunk_from thunk))
+  & thunk ~ *

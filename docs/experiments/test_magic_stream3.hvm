@@ -1,0 +1,50 @@
+// Scott List:
+// Nil = (call (* call))
+// Cons h t = (h (t (* ((h (t call)) call))))
+
+@MyNil = (call (* call))
+@MyCons = (h (t (* ((h (t call)) call))))
+
+// from n = Cons n (@from_tail n)
+@from = (n (* ((n ((@from_tail n) call)) call)))
+
+// from_tail n ret = from (n + 1) ret
+@from_tail = (n (nil (cons ret)))
+  & $([+1] next_n) ~ n
+  & @from ~ (next_n (nil (cons ret)))
+
+// take n xs
+@take_zero = (xs ret)
+  & xs ~ *
+  & @MyNil ~ ret
+
+@take_succ = (* (p (xs ret)))
+  & xs ~ (@take_nil (@take_cons (p ret)))
+
+@take_nil = (p ret)
+  & p ~ *
+  & @MyNil ~ ret
+
+@take_cons = (h (t (p ret)))
+  & @take ~ (p (t rest))
+  & @MyCons ~ (h (rest ret))
+
+@take = (n (xs ret))
+  & n ~ ?((@take_zero @take_succ) (xs ret))
+
+// sumList xs
+@sum_nil = (* (acc ret))
+  & acc ~ ret
+
+@sum_cons = (h (t (acc ret)))
+  & $([+] $(h new_acc)) ~ acc
+  & @sum ~ (t (new_acc ret))
+
+@sum = (xs (acc ret))
+  & xs ~ (@sum_nil (@sum_cons (acc ret)))
+
+// main: sum (take 5 (from 1)) = 1 + 2 + 3 + 4 + 5 = 15
+@main = ret
+  & @from ~ (1 stream)
+  & @take ~ (5 (stream taken))
+  & @sum ~ (taken (0 ret))

@@ -1,0 +1,6 @@
+@add = (a (b ret))
+  & a ~ $([+] $(b ret))
+
+@main = 42
+  & @add ~ (10 partial)
+  & partial ~ *

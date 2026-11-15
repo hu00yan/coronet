@@ -1,0 +1,11 @@
+@calc = (a (b (c top_ret)))
+  & a ~ x
+  & b ~ y
+  & c ~ y1
+  & x ~ $([+] $(y add_res))
+  & add_res ~ $([*] $(y1 mul_res))
+  & mul_res ~ $([-] $(42 sub_res))
+  & sub_res ~ top_ret
+
+@main = ret
+  & @calc ~ (10 (20 (3 ret)))

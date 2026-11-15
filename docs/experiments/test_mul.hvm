@@ -1,0 +1,4 @@
+@mul = (a (b ret))
+  & a ~ $([*] $(b ret))
+
+@main = r & @mul ~ (6 (7 r))

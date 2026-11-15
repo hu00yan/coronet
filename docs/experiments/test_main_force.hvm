@@ -1,0 +1,2 @@
+@result = 48
+@main = ret & @result ~ $([+0] ret)

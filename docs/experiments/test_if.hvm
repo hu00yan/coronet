@@ -1,0 +1,6 @@
+@if = (cond (then_val (else_val ret)))
+  & cond ~ ?((else_val (* then_val)) ret)
+
+@main = (r0 (r1 *))
+  & @if ~ (0 (100 (200 r0)))
+  & @if ~ (1 (100 (200 r1)))

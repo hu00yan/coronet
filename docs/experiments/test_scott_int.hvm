@@ -1,0 +1,8 @@
+@I_hash = (val ((val ret) ret))
+
+@unbox = (int ret)
+  & int ~ ((val val) ret)
+
+@main = r
+  & @unbox ~ (my_int r)
+  & @I_hash ~ (48 my_int)

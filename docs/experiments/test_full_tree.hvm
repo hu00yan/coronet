@@ -1,0 +1,40 @@
+// Tree constructors
+@Leaf = (x (c0 (* ret)))
+  & c0 ~ (x ret)
+
+@Node = (l (r (* (c1 ret))))
+  & c1 ~ (l (r ret))
+
+// sumTree
+@sumTree = (t ret)
+  & t ~ ((x x) (@sumTree_node ret))
+
+@sumTree_node = (l (r ret))
+  & @sumTree ~ (l l_sum)
+  & @sumTree ~ (r r_sum)
+  & l_sum ~ $([+] $(r_sum ret))
+
+// buildTree ww x
+// cond = 0 < ww
+@wbuildTree = (ww (x ret))
+  & {w_cond w_arg} ~ ww
+  & 0 ~ $([<] $(w_cond cond))
+  & cond ~ ?((@build_base @build_rec) (w_arg (x ret)))
+
+@build_base = (* (x ret))
+  & @Leaf ~ (x ret)
+
+@build_rec = (* (ww (x ret)))
+  & {w1 w2} ~ ww
+  & {x1 x2} ~ x
+  & w1 ~ $([-] $(1 w1_sub))
+  & w2 ~ $([-] $(1 w2_sub))
+  & x1 ~ $([*2] x1_mul)
+  & x2 ~ $([*2] $([+1] x2_mul))
+  & @wbuildTree ~ (w1_sub (x1_mul left))
+  & @wbuildTree ~ (w2_sub (x2_mul right))
+  & @Node ~ (left (right ret))
+
+@main = ret
+  & @wbuildTree ~ (3 (1 tree))
+  & @sumTree ~ (tree ret)

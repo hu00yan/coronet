@@ -1,0 +1,21 @@
+@False = (λ&c0 (λ&c1 c0))
+@True = (λ&c0 (λ&c1 c1))
+@Nil = (λ&c0 (λ&c1 c0))
+@Cons = (λ&a0 (λ&a1 (λ&c0 (λ&c1 ((c1 a0) a1)))))
+
+@append = (λ&xs (λ&ys ((xs ys) (λ&z (λ&zs ((@Cons z) ((@append zs) ys)))))))
+@concatMapL = (λ&f (λ&xs ((xs @Nil) (λ&y (λ&ys ((@append (f y)) ((@concatMapL f) ys)))))))
+@_wlengthL = (λ&xs ((xs 0) (λ&ds (λ&rest ( ! &ww = (@_wlengthL rest); (+ 1 ww) )))))
+@lengthL = (λ&xs ( ! &ww = (@_wlengthL xs); ww ))
+@absInt = (λ&x ( ! &x1 = x; ( ! &wild = x1; (~ (< x1 0) { 0: wild 1+p: (- 0 x1) }) ) ))
+@safe = (λ&x (λ&d (λ&q ((q @True) (λ&c (λ&rest ( ! &x1 = x; ( ! &wild1 = x1; ( ! &y = c; (~ (== x1 y) { 0: ( ! &x2 = (- x1 y); (~ (< x2 0) { 0: ( ! &y1 = d; (~ (== x2 y1) { 0: (((@safe wild1) (+ y1 1)) rest) 1+p: @False }) ) 1+p: ( ! &y1 = d; (~ (== (- 0 x2) y1) { 0: (((@safe wild1) (+ y1 1)) rest) 1+p: @False }) ) }) ) 1+p: @False }) ) ) )))))))
+@_wrangeL = (λ&low (λ&ww ( ! &x = low; ( ! &wild = x; (~ (> x ww) { 0: ((@Cons wild) ((@_wrangeL (+ x 1)) ww)) 1+p: @Nil }) ) )))
+@rangeL = (λ&low (λ&high ( ! &ww = high; ((@_wrangeL low) ww) )))
+@lvl = ((@Cons @Nil) @Nil)
+@lvl1 = 1
+@_wqueens = (λ&n (λ&ww (~ (<= ww 0) { 0: ( ! &lvl2 = ( ! &ww1 = n; ((@_wrangeL @lvl1) ww1) ); ((@concatMapL (λ&qs ((@concatMapL (λ&c (((((@safe c) @lvl1) qs) @Nil) ((@Cons ((@Cons c) qs)) @Nil)))) lvl2))) ((@_wqueens n) (- ww 1))) ) 1+p: @lvl })))
+@queens = (λ&n (λ&k ( ! &ww = k; ((@_wqueens n) ww) )))
+@result2 = 8
+@result1 = ((@_wqueens @result2) 8)
+@result = ( ! &ww = (@_wlengthL @result1); ww )
+@main = @result

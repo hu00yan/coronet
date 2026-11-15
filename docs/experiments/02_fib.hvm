@@ -1,0 +1,109 @@
+@prim_add = (a (b ret))
+  & a ~ $([+] $(b ret))
+
+@prim_sub = (a (b ret))
+  & a ~ $([-] $(b ret))
+
+@prim_mul = (a (b ret))
+  & a ~ $([*] $(b ret))
+
+@prim_div = (a (b ret))
+  & a ~ $([/] $(b ret))
+
+@prim_rem = (a (b ret))
+  & a ~ $([%] $(b ret))
+
+@prim_eq = (a (b ret))
+  & a ~ $([=] $(b ret))
+
+@prim_neq = (a (b ret))
+  & a ~ $([!] $(b ret))
+
+@prim_lt = (a (b ret))
+  & a ~ $([<] $(b ret))
+
+@prim_gt = (a (b ret))
+  & a ~ $([>] $(b ret))
+
+@prim_lte = (a (b ret))
+  & b ~ $([<] $(a lt))
+  & 1 ~ $([-] $(lt ret))
+
+@prim_gte = (a (b ret))
+  & a ~ $([<] $(b lt))
+  & 1 ~ $([-] $(lt ret))
+
+@I_hash = (x x)
+
+@add = @prim_add
+
+@sub = @prim_sub
+
+@mul = @prim_mul
+
+@div = @prim_div
+
+@rem = @prim_rem
+
+@eq = @prim_eq
+
+@neq = @prim_neq
+
+@lt = @prim_lt
+
+@gt = @prim_gt
+
+@lte = @prim_lte
+
+@gte = @prim_gte
+
+@MyNil = (call (* call))
+
+@MyCons = (h (t (* ((h (t call)) call))))
+
+@MyNothing = (call (* call))
+
+@MyJust = (x (* ((x call) call)))
+
+@MyFalse = (call (* call))
+
+@MyTrue = (* (call call))
+
+@Leaf = (x ((x call) (* call)))
+
+@Node = (l (r (* ((l (r call)) call))))
+
+@branch_else__C1 = (ww ret_5)
+  & ww_d1 ~ $([-] $(1 sub_res_6))
+  & @_wfib ~ (sub_res_6 app_ret_7)
+  & app_ret_7 ~ ww1
+  & ww_d2 ~ $([-] $(2 sub_res_8))
+  & @_wfib ~ (sub_res_8 app_ret_9)
+  & app_ret_9 ~ ww2
+  & ww1 ~ $([+] $(ww2 add_res_10))
+  & add_res_10 ~ ret_5
+  & {ww_d1 ww_d2} ~ ww
+
+@branch_then__C2 = (* (ww ret_11))
+  & ww ~ ret_11
+
+@_wfib = (ww top_ret_1)
+  & 1 ~ $([<] $(ww_d1 cmp_lt_2))
+  & 1 ~ $([-] $(cmp_lt_2 cmp_res_3))
+  & cmp_res_3 ~ ?((@branch_else__C1 @branch_then__C2) (ww_d2 case_ret_4))
+  & case_ret_4 ~ top_ret_1
+  & {ww_d1 ww_d2} ~ ww
+
+@fib = (n top_ret_12)
+  & n ~ ww
+  & @_wfib ~ (ww app_ret_13)
+  & app_ret_13 ~ ww1
+  & ww1 ~ top_ret_12
+
+@result = top_ret_14
+  & @_wfib ~ (10 app_ret_15)
+  & app_ret_15 ~ ww
+  & ww ~ top_ret_14
+
+@main = main_ret_16
+  & @result ~ $([+0] main_ret_16)

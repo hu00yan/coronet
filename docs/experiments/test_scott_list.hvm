@@ -1,0 +1,26 @@
+// MyNil = (nil (* nil))
+@MyNil = (nil (* nil))
+
+// MyCons h t = (h (t (* (cons ret)))) & cons ~ (h (t ret))
+@MyCons = (h (t (* (cons ret))))
+  & cons ~ (h (t ret))
+
+// safeHead xs = xs MyNothing (\h \t -> MyJust h)
+@safeHead = (xs ret)
+  & xs ~ (@MyNothing (@safeHead_cons ret))
+
+@safeHead_cons = (h (* ret))
+  & @MyJust ~ (h ret)
+
+@MyNothing = (n (* n))
+@MyJust = (x (* (j ret)))
+  & j ~ (x ret)
+
+// fromMaybe def m = m def (\x -> x)
+@fromMaybe = (def (m ret))
+  & m ~ (def ((x x) ret))
+
+@main = ret
+  & @safeHead ~ (list head)
+  & @fromMaybe ~ (999 (head ret))
+  & @MyCons ~ (42 (@MyNil list))

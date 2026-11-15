@@ -1,0 +1,15 @@
+@wfib = (ww ret)
+  & {w_cond {w_then w_else}} ~ ww
+  & 1 ~ $([<] $(w_cond cond))
+  & cond ~ ?((w_then (* (@wfib_rec w_else))) ret)
+
+@wfib_rec = (w_else ret)
+  & {w1 w2} ~ w_else
+  & w1 ~ $([-] $(1 w1_sub))
+  & w2 ~ $([-] $(2 w2_sub))
+  & @wfib ~ (w1_sub r1)
+  & @wfib ~ (w2_sub r2)
+  & r1 ~ $([+] $(r2 ret))
+
+@main = ret
+  & @wfib ~ (10 ret)

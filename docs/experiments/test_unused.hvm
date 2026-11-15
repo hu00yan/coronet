@@ -1,0 +1,4 @@
+@const42 = (* 42)
+
+@main = ret
+  & @const42 ~ (999 ret)

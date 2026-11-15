@@ -1,0 +1,17 @@
+@from = (n ret)
+  & @make_thunk ~ (n (@thunk_from ret))
+
+@thunk_from = (env ret)
+  & $([+1] next_n) ~ env
+  & @from ~ (next_n ret)
+
+@make_thunk = (env (demand thunk))
+  & thunk ~ ((demand (env ret)) ret)
+
+@force = (((demand (env ret)) ret) res)
+  & demand ~ (env res)
+
+// Main: force once
+@main = res
+  & @from ~ (1 thunk1)
+  & @force ~ (thunk1 res)

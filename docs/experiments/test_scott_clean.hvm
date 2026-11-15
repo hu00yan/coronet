@@ -1,0 +1,16 @@
+// MyNil = (nil (* nil))
+@MyNil = (nil (* nil))
+
+// MyCons y ys = (y (ys (* (c ret)))) & c ~ (y (ys ret))
+@MyCons = (y (ys (* (c ret))))
+  & c ~ (y (ys ret))
+
+// test matching:
+// headDef def xs = xs def (\y \ys -> y)
+@headDef = (def (xs ret))
+  & xs ~ (def ((y (* y)) ret))
+
+@main = (r1 (r2 *))
+  & @headDef ~ (999 (@MyNil r1))
+  & @headDef ~ (999 (l r2))
+  & @MyCons ~ (42 (@MyNil l))

@@ -1,0 +1,21 @@
+@MyNil = (call (* call))
+@MyCons = (h (t (* ((h (t call)) call))))
+
+@fold = (f (acc (xs ret)))
+  & xs ~ (@fold_nil (@fold_step (f (acc ret))))
+
+@fold_nil = (* (acc acc))
+
+@fold_step = (h (t (f (acc ret))))
+  & {f1 f2} ~ f
+  & f1 ~ (acc (h new_acc))
+  & @fold ~ (f2 (new_acc (t ret)))
+
+@add = (a (b ret))
+  & a ~ $([+] $(b ret))
+
+@main = ret
+  & @MyCons ~ (10 (l2 l1))
+  & @MyCons ~ (20 (l3 l2))
+  & @MyCons ~ (12 (@MyNil l3))
+  & @fold ~ (@add (0 (l1 ret)))

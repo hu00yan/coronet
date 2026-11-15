@@ -1,0 +1,4 @@
+// switch on number n: if n==0 then 10 else n*2
+@main = a & ?((@zero @succ) a) ~ 5
+@zero = (* (10 x)) x
+@succ = (p (k (($([*2] p) k))))

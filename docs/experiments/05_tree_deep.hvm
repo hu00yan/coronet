@@ -1,0 +1,97 @@
+@prim_add = (a (b ret))
+  & a ~ $([+] $(b ret))
+
+@prim_sub = (a (b ret))
+  & a ~ $([-] $(b ret))
+
+@prim_mul = (a (b ret))
+  & a ~ $([*] $(b ret))
+
+@prim_div = (a (b ret))
+  & a ~ $([/] $(b ret))
+
+@prim_rem = (a (b ret))
+  & a ~ $([%] $(b ret))
+
+@prim_eq = (a (b ret))
+  & a ~ $([=] $(b ret))
+
+@prim_neq = (a (b ret))
+  & a ~ $([!] $(b ret))
+
+@prim_lt = (a (b ret))
+  & a ~ $([<] $(b ret))
+
+@prim_gt = (a (b ret))
+  & a ~ $([>] $(b ret))
+
+@prim_lte = (a (b ret))
+  & b ~ $([<] $(a lt))
+  & 1 ~ $([-] $(lt ret))
+
+@prim_gte = (a (b ret))
+  & a ~ $([<] $(b lt))
+  & 1 ~ $([-] $(lt ret))
+
+@I_hash = (x x)
+
+@add = @prim_add
+
+@sub = @prim_sub
+
+@mul = @prim_mul
+
+@div = @prim_div
+
+@rem = @prim_rem
+
+@eq = @prim_eq
+
+@neq = @prim_neq
+
+@lt = @prim_lt
+
+@gt = @prim_gt
+
+@lte = @prim_lte
+
+@gte = @prim_gte
+
+@MyNil = (call (* call))
+
+@MyCons = (h (t (* ((h (t call)) call))))
+
+@MyNothing = (call (* call))
+
+@MyJust = (x (* ((x call) call)))
+
+@MyFalse = (call (* call))
+
+@MyTrue = (* (call call))
+
+@Leaf = (x ((x call) (* call)))
+
+@Node = (l (r (* ((l (r call)) call))))
+
+@alt0__C1 = (x ret_3)
+  & x ~ ret_3
+
+@alt1__C2 = (l (r ret_4))
+  & @sumTree ~ (l app_ret_5)
+  & app_ret_5 ~ x
+  & @sumTree ~ (r app_ret_6)
+  & app_ret_6 ~ y
+  & x ~ $([+] $(y add_res_7))
+  & add_res_7 ~ ret_4
+
+@sumTree = (t top_ret_1)
+  & t ~ (@alt0__C1 (@alt1__C2 match_ret_2))
+  & match_ret_2 ~ top_ret_1
+
+@result = top_ret_8
+  & 92 ~ top_ret_8
+
+@leaf1 = ret & @Leaf ~ (40 ret)
+@leaf2 = ret & @Leaf ~ (52 ret)
+@tree = ret & @Node ~ (@leaf1 (@leaf2 ret))
+@main = ret & @sumTree ~ (@tree ret)

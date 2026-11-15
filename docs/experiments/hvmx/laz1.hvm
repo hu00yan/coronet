@@ -1,0 +1,4 @@
+@konst = (a (b a))
+@loop = ((@loop a) a)
+@main = r
+  & @konst ~ (1 (@loop r))

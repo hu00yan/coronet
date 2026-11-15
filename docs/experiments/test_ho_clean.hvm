@@ -1,0 +1,43 @@
+// MyNil = (nil (* nil))
+@MyNil = (nil (* nil))
+
+// MyCons y ys = (y (ys (* (c ret)))) & c ~ (y (ys ret))
+@MyCons = (y (ys (* (c ret))))
+  & c ~ (y (ys ret))
+
+// myMap f xs:
+// xs @MyNil (\y \ys -> MyCons (f1 y) (myMap f2 ys))
+@myMap = ({f1 f2} (xs ret))
+  & xs ~ (@MyNil (@myMap_cons (f1 (f2 ret))))
+
+@myMap_cons = (f1 (f2 (ret (y (ys ret2)))))
+  & f1 ~ (y fy)
+  & @myMap ~ (f2 (ys new_ys))
+  & @MyCons ~ (fy (new_ys ret))
+  & ret ~ ret2
+
+// myFold f acc xs:
+// xs acc (\y \ys -> myFold f2 (f1 acc y) ys)
+@myFold = ({f1 f2} (acc (xs ret)))
+  & xs ~ (acc (@myFold_cons (f1 (f2 (acc ret)))))
+
+@myFold_cons = (f1 (f2 (acc (ret (y (ys ret2))))))
+  & f1 ~ (acc (y new_acc))
+  & @myFold ~ (f2 (new_acc (ys ret)))
+  & ret ~ ret2
+
+// add function:
+@add = (a (b ret))
+  & a ~ $([+] $(b ret))
+
+// step: \x -> 2 * x + 1
+@step = (x ret)
+  & x ~ $([*2] $([+1] ret))
+
+@main = ret
+  & @MyCons ~ (1 (l2 l1))
+  & @MyCons ~ (2 (l3 l2))
+  & @MyCons ~ (3 (l4 l3))
+  & @MyCons ~ (4 (@MyNil l4))
+  & @myMap ~ (@step (l1 mapped))
+  & @myFold ~ (@add (0 (mapped ret)))

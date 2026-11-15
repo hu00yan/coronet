@@ -1,0 +1,4 @@
+@add = (a (b ret))
+  & a ~ $([+] $(b ret))
+
+@main = r & @add ~ (40 (2 r))

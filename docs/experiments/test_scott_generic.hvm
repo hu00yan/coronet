@@ -1,0 +1,22 @@
+// Leaf x: variant 0 of 2
+@Leaf = (x (((x call) call) *))
+
+// Node l r: variant 1 of 2
+@Node = (l (r (* ((l (r call)) call))))
+
+// sumTree
+@sumTree = (t ret)
+  & t ~ ((x x) (@sumTree_node ret))
+
+@sumTree_node = (l (r ret))
+  & @sumTree ~ (l l_sum)
+  & @sumTree ~ (r r_sum)
+  & l_sum ~ $([+] $(r_sum ret))
+
+@main = (r1 (r2 *))
+  & @Leaf ~ (42 l1)
+  & @sumTree ~ (l1 r1)
+  & @Node ~ (t1 (t2 n1))
+  & @Leaf ~ (10 t1)
+  & @Leaf ~ (20 t2)
+  & @sumTree ~ (n1 r2)

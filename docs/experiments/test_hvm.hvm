@@ -1,0 +1,7 @@
+
+@MyNil = λ&c0 λ&c1 c0
+@MyCons = λ&h λ&t λ&c0 λ&c1 ((c1 h) t)
+
+@test = λ&xs ((xs 99) (λ&_ λ&_ 42))
+
+@main = (+ (@test @MyNil) (@test ((@MyCons 1) @MyNil)))

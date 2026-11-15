@@ -1,0 +1,7 @@
+@calc = (a (b (c ret)))
+  & a ~ $([+] $(b ab))
+  & ab ~ $([*] $(c abc))
+  & abc ~ $([-] $(42 ret))
+
+@main = ret
+  & @calc ~ (10 (20 (3 ret)))

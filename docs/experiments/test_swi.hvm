@@ -1,0 +1,8 @@
+@zero = (arg ret)
+  & 0 ~ ret
+
+@succ = (* (p (arg ret)))
+  & p ~ ret
+
+@main = ret
+  & 5 ~ ?((@zero @succ) (99 ret))

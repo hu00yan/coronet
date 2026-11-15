@@ -1,0 +1,15 @@
+// fib ww
+// if ww <= 1 then ww else fib(ww-1) + fib(ww-2)
+// ww <= 1 is: 1 - (1 < ww)
+@fib = (ww ret)
+  & 1 ~ $([<] $(ww cond))
+  & cond ~ ?((ww @fib_rec) (ww ret))
+
+@fib_rec = (* (ww ret))
+  & {w1 w2} ~ ww
+  & w1 ~ $([-] $(1 w1_sub))
+  & w2 ~ $([-] $(2 w2_sub))
+  & @fib ~ (w1_sub r1)
+  & @fib ~ (w2_sub $([+] $(r1 ret)))
+
+@main = r & @fib ~ (10 r)

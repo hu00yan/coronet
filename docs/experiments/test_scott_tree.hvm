@@ -1,0 +1,23 @@
+// Leaf x = (x (leaf (* ret))) & leaf ~ (x ret)
+@Leaf = (x (leaf (* ret)))
+  & leaf ~ (x ret)
+
+// Node l r = (l (r (* (node ret)))) & node ~ (l (r ret))
+@Node = (l (r (* (node ret))))
+  & node ~ (l (r ret))
+
+// sumTree t:
+// t (\x -> x) (\l \r -> sumTree l + sumTree r)
+@sumTree = (t ret)
+  & t ~ ((x x) (@sumTree_node ret))
+
+@sumTree_node = (l (r ret))
+  & @sumTree ~ (l l_sum)
+  & @sumTree ~ (r r_sum)
+  & l_sum ~ $([+] $(r_sum ret))
+
+@main = ret
+  & @sumTree ~ (tree ret)
+  & @Node ~ (t1 (t2 tree))
+  & @Leaf ~ (40 t1)
+  & @Leaf ~ (2 t2)

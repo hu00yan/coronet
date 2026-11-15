@@ -44,6 +44,22 @@ The HVM2 executable is located at `vendor/HVM2/target/release/hvm`.
 ./scripts/run_hvm2.sh run-c <file.hvm>    # Runs via C runtime
 ```
 
+#### Remote Colab GPU Execution Bridge: `scripts/run_colab_gpu.sh`
+
+For systems without local NVIDIA GPUs (e.g. macOS Apple Silicon), Coronet provides an automated Google Colab GPU bridge using the local `colab` CLI (`/Users/huyan00/.local/bin/colab`):
+
+```bash
+# Compiles and executes on remote Google Colab GPU (Tesla T4)
+./scripts/run_colab_gpu.sh <file.hvm|file.cu> [--gpu T4|L4|A100] [--timeout 300] [--json]
+```
+
+How it works:
+1. Translates `.hvm` to standalone `.cu` code via `hvm gen-cu`.
+2. Automatically adapts shared memory buffers (`L_NODE_LEN = 0x1000` / 48 KB) to fit Tesla T4's 64 KB shared memory budget.
+3. Provisions a Colab GPU instance via `colab run --gpu T4`.
+4. Compiles remotely with `nvcc -O3 -w` and executes on the GPU.
+5. Streams `Result`, `ITRS`, `TIME`, and `MIPS` back to local stdout.
+
 #### Output Format
 HVM2 outputs statistics and the normal form of the `@main` net root:
 ```text

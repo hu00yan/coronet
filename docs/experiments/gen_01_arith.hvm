@@ -1,0 +1,65 @@
+@add = (a (b ret))
+  & a ~ $([+] $(b ret))
+
+@sub = (a (b ret))
+  & a ~ $([-] $(b ret))
+
+@mul = (a (b ret))
+  & a ~ $([*] $(b ret))
+
+@div = (a (b ret))
+  & a ~ $([/] $(b ret))
+
+@rem = (a (b ret))
+  & a ~ $([%] $(b ret))
+
+@eq = (a (b ret))
+  & a ~ $([=] $(b ret))
+
+@neq = (a (b ret))
+  & a ~ $([!] $(b ret))
+
+@lt = (a (b ret))
+  & a ~ $([<] $(b ret))
+
+@gt = (a (b ret))
+  & a ~ $([>] $(b ret))
+
+@lte = (a (b ret))
+  & b ~ $([<] $(a lt))
+  & 1 ~ $([-] $(lt ret))
+
+@gte = (a (b ret))
+  & a ~ $([<] $(b lt))
+  & 1 ~ $([-] $(lt ret))
+
+@I_hash = (x x)
+
+@MyNil = (call (* call))
+
+@MyCons = (h (t (* ((h (t call)) call))))
+
+@MyNothing = (call (* call))
+
+@MyJust = (x (* ((x call) call)))
+
+@MyFalse = (call (* call))
+
+@MyTrue = (* (call call))
+
+@Leaf = (x ((x call) (* call)))
+
+@Node = (l (r (* ((l (r call)) call))))
+
+@calc = (a (b (c top_ret_4)))
+  & a ~ x
+  & b ~ y
+  & c ~ y1
+  & x ~ $([+] $(y add_res_5))
+  & add_res_5 ~ $([*] $(y1 mul_res_6))
+  & mul_res_6 ~ $([-] $(42 sub_res_7))
+  & sub_res_7 ~ top_ret_4
+
+@result = 48
+
+@main = @result

@@ -1,0 +1,21 @@
+@MyNil = (c0 (* c0))
+@MyCons = (h (t (* (c1 ret))))
+  & c1 ~ (h (t ret))
+
+@myMap = (f (xs ret))
+  & xs ~ (@MyNil ((@myMap_step f) ret))
+
+@myMap_step = ({f1 f2} (h (t ret)))
+  & f1 ~ (h fh)
+  & @myMap ~ (f2 (t ft))
+  & @MyCons ~ (fh (ft ret))
+
+@step = (x ret)
+  & x ~ $([*2] $([+1] ret))
+
+@main = mapped
+  & @MyCons ~ (1 (l2 l1))
+  & @MyCons ~ (2 (l3 l2))
+  & @MyCons ~ (3 (l4 l3))
+  & @MyCons ~ (4 (@MyNil l4))
+  & @myMap ~ (@step (l1 mapped))

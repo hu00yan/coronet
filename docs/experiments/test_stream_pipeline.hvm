@@ -1,0 +1,60 @@
+// Thunk combinators
+@make_thunk = (env (demand thunk))
+  & thunk ~ ((demand (env ret)) ret)
+
+@force = (((demand (env ret)) ret) res)
+  & demand ~ (env res)
+
+// Constructors:
+// Stream Cons: 1 constructor
+@Cons = (x (xs (alt0 ret)))
+  & alt0 ~ (x (xs ret))
+
+// List Nil (0) and LCons (1)
+@Nil = (call (* call))
+@LCons = (x (xs (* ((x (xs call)) call))))
+
+// from n = Cons n (thunk for from (n + 1))
+@thunk_from = (n ret)
+  & @from ~ (n ret)
+
+@from = (n ret)
+  & $([+1] next_n) ~ n
+  & @make_thunk ~ (next_n (@thunk_from tail_thunk))
+  & @Cons ~ (n (tail_thunk ret))
+
+// $wtakeStream ww s
+// If ww <= 0: Nil, erase s
+// If ww > 0: force s, match Cons x xs -> LCons x ($wtakeStream (ww - 1) xs)
+
+@take_zero = (s ret)
+  & s ~ *
+  & @Nil ~ ret
+
+@take_succ = (p (s ret))
+  & @force ~ (s forced_s)
+  & forced_s ~ (@take_cons (p ret))
+
+@take_cons = (x (xs (p ret)))
+  & @takeStream ~ (p (xs rest))
+  & @LCons ~ (x (rest ret))
+
+@takeStream = (n (s ret))
+  & n ~ ?((@take_zero @take_succ) (s ret))
+
+// sumList xs
+@sum_nil = (acc ret)
+  & acc ~ ret
+
+@sum_cons = (x (xs (acc ret)))
+  & $([+] $(x new_acc)) ~ acc
+  & @sumList ~ (xs (new_acc ret))
+
+@sumList = (xs (acc ret))
+  & xs ~ (@sum_nil (@sum_cons (acc ret)))
+
+// main: sumList (takeStream 10 (from 1)) = 55!
+@main = ret
+  & @from ~ (1 s)
+  & @takeStream ~ (10 (s taken))
+  & @sumList ~ (taken (0 ret))

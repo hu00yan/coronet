@@ -1,0 +1,47 @@
+@Nil = (λ&c0 (λ&c1 c0))
+@Cons = (λ&a0 (λ&a1 (λ&c0 (λ&c1 ((c1 a0) a1)))))
+@Pair = (λ&a0 (λ&a1 (λ&c0 ((c0 a0) a1))))
+
+@testList31 = 15
+@testList30 = 3
+@testList29 = 9
+@testList28 = 1
+@testList27 = 24
+@testList26 = 18
+@testList25 = 7
+@testList24 = 12
+@testList23 = 5
+@testList22 = 20
+@testList21 = 2
+@testList20 = 14
+@testList19 = 8
+@testList18 = 11
+@testList17 = 4
+@testList16 = 16
+@testList15 = ((@Cons @testList16) @Nil)
+@testList14 = ((@Cons @testList17) @testList15)
+@testList13 = ((@Cons @testList18) @testList14)
+@testList12 = ((@Cons @testList19) @testList13)
+@testList11 = ((@Cons @testList20) @testList12)
+@testList10 = ((@Cons @testList21) @testList11)
+@testList9 = ((@Cons @testList22) @testList10)
+@testList8 = ((@Cons @testList23) @testList9)
+@testList7 = ((@Cons @testList24) @testList8)
+@testList6 = ((@Cons @testList25) @testList7)
+@testList5 = ((@Cons @testList26) @testList6)
+@testList4 = ((@Cons @testList27) @testList5)
+@testList3 = ((@Cons @testList28) @testList4)
+@testList2 = ((@Cons @testList29) @testList3)
+@testList1 = ((@Cons @testList30) @testList2)
+@testList = ((@Cons @testList31) @testList1)
+@merge = (λ&xs (λ&ys ( ! &wild = xs; ((wild ys) (λ&x (λ&xs_ ( ! &wild1 = ys; ((wild1 wild) (λ&y (λ&ys_ ( ! &x1 = x; ( ! &wild2 = x1; ( ! &y1 = y; ( ! &wild3 = y1; (~ (<= x1 y1) { 0: ((@Cons wild3) ((@merge wild) ys_)) 1+p: ((@Cons wild2) ((@merge xs_) wild1)) }) ) ) ) )))) )))) )))
+@lvl = ((@Pair @Nil) @Nil)
+@splitAtL = (λ&n (λ&xs ( ! &x = n; (~ (<= x 0) { 0: ((xs @lvl) (λ&y (λ&ys (((@splitAtL (- x 1)) ys) (λ&l (λ&r ((@Pair ((@Cons y) l)) r))))))) 1+p: ((@Pair @Nil) xs) }) )))
+@lvl1 = 0
+@lengthL = (λ&xs ((xs @lvl1) (λ&ds (λ&rest ( ! &y = (@lengthL rest); (+ 1 y) )))))
+@checksum = (λ&xs ((xs @lvl1) (λ&y (λ&ys ( ! &x = y; ( ! &y1 = (@checksum ys); (+ x (* 3 y1)) ) )))))
+@div2 = (λ&n ( ! &x = n; (~ (<= x 1) { 0: ( ! &y = (@div2 (- x 2)); (+ 1 y) ) 1+p: @lvl1 }) ))
+@mergesort = (λ&xs ( ! &wild = xs; ((wild @Nil) (λ&x (λ&ds ((ds wild) (λ&ipv (λ&ipv1 (((@splitAtL (@div2 (@lengthL wild))) wild) (λ&left (λ&right ((@merge (@mergesort left)) (@mergesort right))))))))))) ))
+@result1 = (@mergesort @testList)
+@result = (@checksum @result1)
+@main = @result

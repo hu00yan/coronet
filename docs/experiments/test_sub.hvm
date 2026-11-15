@@ -1,0 +1,4 @@
+@sub = (a (b ret))
+  & a ~ $([-] $(b ret))
+
+@main = r & @sub ~ (40 (2 r))

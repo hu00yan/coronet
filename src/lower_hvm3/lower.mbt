@@ -2,7 +2,7 @@
 ///|
 ///| Lowers CoreLite AST to HVM3 format (@fun = term).
 ///| Supports functions, curried lambdas, applications, integer operations,
-///| Scott-encoded ADTs/pattern matching, and let bindings.
+///| Scott-encoded ADTs/pattern matching, and LAZY mode let bindings.
 
 ///| Representation of a data constructor in an ADT family
 priv struct CtorDef {
@@ -63,7 +63,7 @@ pub fn sanitize_name(name : String) -> String {
     _ => {
       let buf = StringBuilder()
       for ch in name {
-        if ch == '$' || ch == '#' {
+        if ch == '$' || ch == '#' || ch == '\'' {
           buf.write_string("_")
         } else if ch == '+' ||
           ch == '-' ||
@@ -117,7 +117,7 @@ fn init_default_families() -> Array[AdtFamily] {
     },
     {
       _family_name: "Bool_Std",
-      ctors: [{ name: "True", arity: 0 }, { name: "False", arity: 0 }],
+      ctors: [{ name: "False", arity: 0 }, { name: "True", arity: 0 }],
     },
     {
       _family_name: "Maybe_Custom",
@@ -130,10 +130,6 @@ fn init_default_families() -> Array[AdtFamily] {
     {
       _family_name: "List_Custom",
       ctors: [{ name: "MyNil", arity: 0 }, { name: "MyCons", arity: 2 }],
-    },
-    {
-      _family_name: "List_Std",
-      ctors: [{ name: "Nil", arity: 0 }, { name: "Cons", arity: 2 }],
     },
     {
       _family_name: "Tree",
@@ -189,16 +185,36 @@ fn collect_adts_from_expr(
           _ => ()
         }
       }
-      // If case matches data constructors, check if known family exists or register new
       if case_ctors.length() > 0 {
-        let first_name = case_ctors[0].0
-        match find_family(families, first_name) {
+        // Check if an existing family contains all of these constructors
+        let mut matched_fam : AdtFamily? = None
+        for fam in families {
+          let mut all_match = true
+          for c in case_ctors {
+            let mut found = false
+            for fc in fam.ctors {
+              if fc.name == c.0 {
+                found = true
+                break
+              }
+            }
+            if !found {
+              all_match = false
+              break
+            }
+          }
+          if all_match {
+            matched_fam = Some(fam)
+            break
+          }
+        }
+
+        match matched_fam {
           Some(fam) =>
-            // Update arities if any constructor had arity 0 recorded
             for c in case_ctors {
-              for fam_ctor in fam.ctors {
-                if fam_ctor.name == c.0 && fam_ctor.arity == 0 && c.1 > 0 {
-                  fam_ctor.arity = c.1
+              for fc in fam.ctors {
+                if fc.name == c.0 && fc.arity == 0 && c.1 > 0 {
+                  fc.arity = c.1
                 }
               }
             }
@@ -208,7 +224,7 @@ fn collect_adts_from_expr(
               new_ctors.push({ name: c.0, arity: c.1 })
             }
             families.push({
-              _family_name: "Adt_" + first_name,
+              _family_name: "Adt_" + case_ctors[0].0,
               ctors: new_ctors,
             })
           }
@@ -250,7 +266,6 @@ fn generate_scott_constructors(ctx : LowerContext) -> Array[String] {
   }
 
   for fam in ctx.families {
-    // Check if any constructor of this family was used
     let mut family_used = false
     for ctor in fam.ctors {
       if array_contains(ctx.used_ctors, ctor.name) {
@@ -419,24 +434,24 @@ fn lower_expr_ctx(expr : @syntax.Expr, ctx : LowerContext) -> String {
     Let(bind, body) =>
       match bind {
         NonRec(name, val) =>
-          "((λ&" +
+          "( ! &" +
           sanitize_name(name) +
-          " " +
-          lower_expr_ctx(body, ctx) +
-          ") " +
+          " = " +
           lower_expr_ctx(val, ctx) +
-          ")"
+          "; " +
+          lower_expr_ctx(body, ctx) +
+          " )"
         Rec(pairs) => {
           let mut res = lower_expr_ctx(body, ctx)
           for i = pairs.length() - 1; i >= 0; i = i - 1 {
             let (name, val) = pairs[i]
-            res = "((λ&" +
+            res = "( ! &" +
               sanitize_name(name) +
-              " " +
-              res +
-              ") " +
+              " = " +
               lower_expr_ctx(val, ctx) +
-              ")"
+              "; " +
+              res +
+              " )"
           }
           res
         }
@@ -460,13 +475,25 @@ fn lower_case(
       Data("I#", binders) =>
         if binders.length() == 1 {
           let var_name = sanitize_name(binders[0])
-          return "((λ&" +
+          let inner_body = if binder != "" {
+            let bnd_name = sanitize_name(binder)
+            "( ! &" +
+            bnd_name +
+            " = " +
             var_name +
-            " " +
+            "; " +
             lower_expr_ctx(alts[0].expr, ctx) +
-            ") " +
+            " )"
+          } else {
+            lower_expr_ctx(alts[0].expr, ctx)
+          }
+          return "( ! &" +
+            var_name +
+            " = " +
             lower_expr_ctx(scrutinee, ctx) +
-            ")"
+            "; " +
+            inner_body +
+            " )"
         }
       Default(opt_bndr) => {
         let bnd = match opt_bndr {
@@ -474,13 +501,25 @@ fn lower_case(
           None => if binder != "" { binder } else { "_" }
         }
         let var_name = sanitize_name(bnd)
-        return "((λ&" +
+        let inner_body = if binder != "" && binder != bnd {
+          let bnd_name = sanitize_name(binder)
+          "( ! &" +
+          bnd_name +
+          " = " +
           var_name +
-          " " +
+          "; " +
           lower_expr_ctx(alts[0].expr, ctx) +
-          ") " +
+          " )"
+        } else {
+          lower_expr_ctx(alts[0].expr, ctx)
+        }
+        return "( ! &" +
+          var_name +
+          " = " +
           lower_expr_ctx(scrutinee, ctx) +
-          ")"
+          "; " +
+          inner_body +
+          " )"
       }
       _ => ()
     }
@@ -513,37 +552,70 @@ fn lower_case(
     if lit1_alt is Some(l1) && def_alt is Some(d) {
       let true_str = lower_expr_ctx(l1.expr, ctx)
       let false_str = lower_expr_ctx(d.expr, ctx)
-      return "(~ " +
+      let swi = "(~ " +
         scrut_str +
         " { 0: " +
         false_str +
         " 1+p: " +
         true_str +
         " })"
+      if binder != "" {
+        let bnd = sanitize_name(binder)
+        return "( ! &" +
+          bnd +
+          " = " +
+          scrut_str +
+          "; " +
+          swi +
+          " )"
+      }
+      return swi
     }
     // Inverted boolean switch: 0# -> false_case, __DEFAULT -> true_case
     if lit0_alt is Some(l0) && def_alt is Some(d) {
       let false_str = lower_expr_ctx(l0.expr, ctx)
       let true_str = lower_expr_ctx(d.expr, ctx)
-      return "(~ " +
+      let swi = "(~ " +
         scrut_str +
         " { 0: " +
         false_str +
         " 1+p: " +
         true_str +
         " })"
+      if binder != "" {
+        let bnd = sanitize_name(binder)
+        return "( ! &" +
+          bnd +
+          " = " +
+          scrut_str +
+          "; " +
+          swi +
+          " )"
+      }
+      return swi
     }
     // Both 0# and 1# present
     if lit0_alt is Some(l0) && lit1_alt is Some(l1) {
       let false_str = lower_expr_ctx(l0.expr, ctx)
       let true_str = lower_expr_ctx(l1.expr, ctx)
-      return "(~ " +
+      let swi = "(~ " +
         scrut_str +
         " { 0: " +
         false_str +
         " 1+p: " +
         true_str +
         " })"
+      if binder != "" {
+        let bnd = sanitize_name(binder)
+        return "( ! &" +
+          bnd +
+          " = " +
+          scrut_str +
+          "; " +
+          swi +
+          " )"
+      }
+      return swi
     }
   }
 
@@ -566,7 +638,6 @@ fn lower_case(
     Some(fam) => {
       let branches : Array[String] = []
       for ctor in fam.ctors {
-        // Find alternative matching this constructor
         let mut matched_alt : @syntax.Alt? = None
         for alt in alts {
           match alt.pat {
@@ -588,7 +659,6 @@ fn lower_case(
               _ => branches.push(lower_expr_ctx(alt.expr, ctx))
             }
           None =>
-            // Fallback to __DEFAULT alternative if present
             match def_alt {
               Some(d) => {
                 let mut b_str = lower_expr_ctx(d.expr, ctx)
@@ -602,20 +672,24 @@ fn lower_case(
         }
       }
 
-      let mut case_app = lower_expr_ctx(scrutinee, ctx)
-      for branch in branches {
-        case_app = "(" + case_app + " " + branch + ")"
-      }
-
       if binder != "" {
-        "((λ&" +
-        sanitize_name(binder) +
-        " " +
-        case_app +
-        ") " +
+        let bnd = sanitize_name(binder)
+        let mut case_app = bnd
+        for branch in branches {
+          case_app = "(" + case_app + " " + branch + ")"
+        }
+        "( ! &" +
+        bnd +
+        " = " +
         lower_expr_ctx(scrutinee, ctx) +
-        ")"
+        "; " +
+        case_app +
+        " )"
       } else {
+        let mut case_app = lower_expr_ctx(scrutinee, ctx)
+        for branch in branches {
+          case_app = "(" + case_app + " " + branch + ")"
+        }
         case_app
       }
     }
@@ -624,13 +698,14 @@ fn lower_case(
       match def_alt {
         Some(d) =>
           if binder != "" {
-            "((λ&" +
-            sanitize_name(binder) +
-            " " +
-            lower_expr_ctx(d.expr, ctx) +
-            ") " +
+            let bnd = sanitize_name(binder)
+            "( ! &" +
+            bnd +
+            " = " +
             lower_expr_ctx(scrutinee, ctx) +
-            ")"
+            "; " +
+            lower_expr_ctx(d.expr, ctx) +
+            " )"
           } else {
             lower_expr_ctx(d.expr, ctx)
           }

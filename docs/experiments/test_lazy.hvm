@@ -1,0 +1,5 @@
+
+@loop = λ&n (@loop (+ n 1))
+@main =
+  ! &x = (@loop 0)
+  42

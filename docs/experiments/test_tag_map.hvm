@@ -1,0 +1,30 @@
+// List constructors
+// MyNil = ((0 *) ret) & ret ~ ... wait, (0 ret)
+// (0 ret) when applied to ret
+@MyNil = 0
+
+// MyCons h t = ((1 (h t)) ret)
+@MyCons = (h (t (1 (h t))))
+
+// myMap f xs
+// switch on tag of xs:
+@myMap = (f (xs ret))
+  & xs ~ (tag (fields my_res))
+  & tag ~ ?((@map_nil @map_cons) (f (fields (my_res ret))))
+
+@map_nil = (* (f (* (my_res ret))))
+  & @MyNil ~ my_res
+  & my_res ~ ret
+
+@map_cons = (* (f ((h t) (my_res ret))))
+  & {f1 f2} ~ f
+  & f1 ~ (h fh)
+  & @myMap ~ (f2 (t ft))
+  & @MyCons ~ (fh (ft my_res))
+  & my_res ~ ret
+
+@main = ret
+  & @MyCons ~ (1 (l2 l1))
+  & @MyCons ~ (2 (l3 l2))
+  & @MyNil ~ l3
+  & @myMap ~ ((x x) (l1 ret))

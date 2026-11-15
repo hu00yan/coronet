@@ -25,7 +25,6 @@ pub enum Token {
   LBracket
   RBracket
   Semicolon
-  Colon
   DoubleColon
   Comma
   Underscore
@@ -59,7 +58,6 @@ pub impl Show for Token with output(self, logger) {
     LBracket => logger.write_string("[")
     RBracket => logger.write_string("]")
     Semicolon => logger.write_string(";")
-    Colon => logger.write_string(":")
     DoubleColon => logger.write_string("::")
     Comma => logger.write_string(",")
     Underscore => logger.write_string("_")
@@ -97,6 +95,11 @@ fn ident_name(tok : Token) -> String {
     Ident(s) => s
     _ => ""
   }
+}
+
+fn is_op_char(c : Char) -> Bool {
+  c == '+' || c == '-' || c == '*' || c == '/' || c == '<' || c == '>' || c == '=' ||
+  c == '&' || c == '|' || c == '!' || c == '%' || c == '^' || c == '~'
 }
 
 // ----------------------------------------------------------------------------
@@ -217,37 +220,39 @@ fn Lexer::next_token(self : Lexer) -> Result[Token, String] {
     self.pos = self.pos + 2
     return Ok(Token::DoubleColon)
   }
-  if self.starts_with("(:)") {
-    self.pos = self.pos + 3
-    return Ok(Token::Ident("(:)"))
-  }
-  if self.starts_with("(,,)") {
-    self.pos = self.pos + 4
-    return Ok(Token::Ident("(,,)"))
-  }
-  if self.starts_with("(,)") {
-    self.pos = self.pos + 3
-    return Ok(Token::Ident("(,)"))
-  }
-  if self.starts_with("(+)") {
-    self.pos = self.pos + 3
-    return Ok(Token::Ident("+"))
-  }
-  if self.starts_with("(-)") {
-    self.pos = self.pos + 3
-    return Ok(Token::Ident("-"))
-  }
-  if self.starts_with("(*)") {
-    self.pos = self.pos + 3
-    return Ok(Token::Ident("*"))
-  }
-  if self.starts_with("(<=)") {
-    self.pos = self.pos + 4
-    return Ok(Token::Ident("<="))
-  }
   if self.starts_with("[]") {
     self.pos = self.pos + 2
     return Ok(Token::Ident("[]"))
+  }
+  // Check parenthesized operator or tuple constructor: (op) or (,) or (:)
+  if self.char_at(self.pos) == '(' {
+    if self.starts_with("(:)") {
+      self.pos = self.pos + 3
+      return Ok(Token::Ident("(:)"))
+    }
+    if self.pos + 1 < self.src.length() && self.char_at(self.pos + 1) == ',' {
+      let mut i = self.pos + 1
+      while i < self.src.length() && self.char_at(i) == ',' {
+        i = i + 1
+      }
+      if i < self.src.length() && self.char_at(i) == ')' {
+        let tuple_str = self.src[self.pos : i + 1].to_owned()
+        self.pos = i + 1
+        return Ok(Token::Ident(tuple_str))
+      }
+    }
+    let next_c = if self.pos + 1 < self.src.length() { self.char_at(self.pos + 1) } else { ' ' }
+    if is_op_char(next_c) {
+      let mut i = self.pos + 1
+      while i < self.src.length() && (is_op_char(self.char_at(i)) || self.char_at(i) == '#') {
+        i = i + 1
+      }
+      if i < self.src.length() && self.char_at(i) == ')' {
+        let op_str = self.src[self.pos + 1 : i].to_owned()
+        self.pos = i + 1
+        return Ok(Token::Ident(op_str))
+      }
+    }
   }
   // Coercion cast: `cast` <co:...>
   if self.starts_with("`cast`") {
@@ -305,8 +310,12 @@ fn Lexer::next_token(self : Lexer) -> Result[Token, String] {
     return Ok(Token::Comma)
   }
   if c == ':' {
+    if self.pos + 1 < self.src.length() && self.char_at(self.pos + 1) == ':' {
+      self.pos = self.pos + 2
+      return Ok(Token::DoubleColon)
+    }
     self.pos = self.pos + 1
-    return Ok(Token::Colon)
+    return Ok(Token::Ident(":"))
   }
 
   // Type abstraction / application starting with @
@@ -884,6 +893,7 @@ fn Parser::can_start_atom(self : Parser) -> Bool {
     }
     Token::TypeVar(_) => true
     Token::LParen => true
+    Token::LBracket => true
     _ => false
   }
 }
@@ -942,6 +952,27 @@ fn Parser::parse_atom(self : Parser) -> Result[Expr, String] {
         return Err("Expected ')' closing parenthesized expression")
       }
       Ok(expr)
+    }
+    Token::LBracket => {
+      let _ = self.next()
+      let elements : Array[Expr] = []
+      while self.peek() != Token::RBracket && self.peek() != Token::EOF {
+        if self.match_token(Token::Comma) { continue }
+        let elem = match self.parse_expr() {
+          Ok(e) => e
+          Err(e) => return Err(e)
+        }
+        elements.push(elem)
+        let _ = self.match_token(Token::Comma)
+      }
+      if !self.match_token(Token::RBracket) {
+        return Err("Expected ']' closing list literal")
+      }
+      let mut res = Expr::Constr("[]", [])
+      for i = elements.length() - 1; i >= 0; i = i - 1 {
+        res = Expr::Constr(":", [elements[i], res])
+      }
+      Ok(res)
     }
     _ => Err("Expected atomic expression, got: \{self.peek()}")
   }

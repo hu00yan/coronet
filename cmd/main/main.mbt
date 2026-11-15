@@ -10,17 +10,22 @@ struct CliArgs {
 ///|
 fn print_usage() -> Unit {
   let usage = (
-    #|Coronet: GHC Core -> HVM2/3 Compiler
+    #|Coronet: GHC Core -> HVM2/3/GPU Parallel Compiler
     #|
-    #|Usage: coronet <input.core> --target <hvm2|hvm3> [-o <output_file>]
+    #|Usage: coronet <input.core> --target <hvm2|hvm3|gpu> [-o <output_file>]
+    #|       coronet <input.core> --gpu [-o <output_file>]
     #|
     #|Arguments:
-    #|  <input.core>           Input CoreLite source file
+    #|  <input.core>                 Input CoreLite source file
     #|
     #|Options:
-    #|  --target <hvm2|hvm3>   Target backend: hvm2 (Interaction Nets) or hvm3 (Interaction Calculus)
-    #|  -o, --output <file>    Output destination file (default: stdout)
-    #|  -h, --help             Show this help message and exit
+    #|  --target <hvm2|hvm3|gpu>     Target backend:
+    #|                                 hvm2 (Interaction Nets)
+    #|                                 hvm3 (Interaction Calculus)
+    #|                                 gpu  (HVM2 CUDA / Colab GPU)
+    #|  --gpu                        Shortcut for --target gpu
+    #|  -o, --output <file>          Output destination file (default: stdout / execute)
+    #|  -h, --help                   Show this help message and exit
   )
   println(usage)
 }
@@ -36,10 +41,12 @@ fn parse_cli_args(args : Array[String]) -> CliArgs {
     if arg == "-h" || arg == "--help" {
       print_usage()
       @env.exit(0)
+    } else if arg == "--gpu" {
+      target = Some("gpu")
     } else if arg == "--target" {
       i = i + 1
       if i >= args.length() {
-        println("Error: --target requires an argument ('hvm2' or 'hvm3')")
+        println("Error: --target requires an argument ('hvm2', 'hvm3', or 'gpu')")
         print_usage()
         @env.exit(1)
       }
@@ -86,21 +93,81 @@ fn parse_cli_args(args : Array[String]) -> CliArgs {
 
   let tgt = match target {
     Some(t) => {
-      if t != "hvm2" && t != "hvm3" {
-        println("Error: Invalid target '\{t}'. Must be 'hvm2' or 'hvm3'.")
+      if t != "hvm2" && t != "hvm3" && t != "gpu" {
+        println("Error: Invalid target '\{t}'. Must be 'hvm2', 'hvm3', or 'gpu'.")
         print_usage()
         @env.exit(1)
       }
       t
     }
     None => {
-      println("Error: Missing --target option ('hvm2' or 'hvm3')")
+      println("Error: Missing --target option ('hvm2', 'hvm3', or 'gpu')")
       print_usage()
       @env.exit(1)
     }
   }
 
   { input_file: in_file, target: tgt, output_file }
+}
+
+///|
+async fn handle_gpu_target(program : @syntax.Program, output_file : String?) -> Unit {
+  let hvm2_code = @lower_hvm2.lower(program)
+  let tmp_dir = "_build/gpu"
+  if !(@fs.exists(tmp_dir)) {
+    let _ = @process.run("mkdir", ["-p", tmp_dir][:])
+  }
+  let tmp_hvm = "_build/gpu/temp.hvm"
+  let tmp_cu = "_build/gpu/temp.cu"
+  @fs.write_text(tmp_hvm, hvm2_code)
+
+  // Generate CUDA code via hvm gen-cu
+  let gen_res = @process.run(
+    "vendor/HVM2/target/release/hvm",
+    ["gen-cu", tmp_hvm][:],
+    stdout=Collect,
+    stderr=Collect,
+  )
+  if gen_res.exit_code != 0 {
+    println("Warning: 'hvm gen-cu' exited with code \{gen_res.exit_code}")
+  }
+  let cu_code = try { gen_res.stdout_text() } catch { _ => "" }
+  if cu_code.length() > 0 {
+    @fs.write_text(tmp_cu, cu_code)
+  }
+
+  match output_file {
+    Some(out_path) => {
+      if out_path.has_suffix(".cu") {
+        if cu_code.length() > 0 {
+          @fs.write_text(out_path, cu_code)
+        } else {
+          println("Error: failed to generate CUDA code")
+          @env.exit(1)
+        }
+      } else {
+        @fs.write_text(out_path, hvm2_code)
+      }
+    }
+    None => {
+      // Check if scripts/run_colab_gpu.sh is available
+      if @fs.exists("scripts/run_colab_gpu.sh") {
+        let runner = @process.run(
+          "bash",
+          ["scripts/run_colab_gpu.sh", tmp_hvm][:],
+          stdout=Inherit,
+          stderr=Inherit,
+        )
+        if runner.exit_code != 0 {
+          @env.exit(runner.exit_code)
+        }
+      } else if cu_code.length() > 0 {
+        println(cu_code)
+      } else {
+        println(hvm2_code)
+      }
+    }
+  }
 }
 
 ///|
@@ -120,6 +187,11 @@ async fn main {
       println("Parse error in '\{cli.input_file}': \{err}")
       @env.exit(1)
     }
+  }
+
+  if cli.target == "gpu" {
+    handle_gpu_target(program, cli.output_file)
+    return
   }
 
   let generated_code = match cli.target {
