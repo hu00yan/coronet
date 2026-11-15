@@ -1,0 +1,96 @@
+==> Auto-updating Homebrew...
+Adjust how often this is run with `$HOMEBREW_AUTO_UPDATE_SECS` or disable with
+`$HOMEBREW_NO_AUTO_UPDATE=1`. Hide these hints with `$HOMEBREW_NO_ENV_HINTS=1` (see `man brew`).
+==> Auto-updated Homebrew!
+Updated 6 taps (dagger/tap, driceroland/tap, infatoshi/tap, krtirtho/apps, homebrew/core and homebrew/cask).
+==> New Formulae
+abtop: Terminal monitor for AI coding agent sessions
+csound-plugins: Additional opcodes for Csound
+curl-impersonate: Curl build that makes HTTP requests look like they came from a real browser
+dotnet@10: .NET Core
+drydock: Dashboard for a fleet of Git repositories
+emeraldian: Terminal UI for Obsidian vaults, with a graph and an assistant
+engram: Persistent memory system for AI coding agents
+gam: Command-line management for Google Workspace
+globus-cli: Command-line interface to Globus
+goda: Go dependency analysis toolkit
+goose-lang: Systems programming language with flat, pointer-free data structures
+knife: Reverse engineering toolkit for PE, ELF, and Mach-O binaries
+krunkit: CLI tool to start VMs with libkrun
+libkrun: Dynamic library providing KVM-based process isolation capabilities
+llamastash: Terminal-native local LLM orchestrator and proxy
+lsoff: List listening TCP and UDP ports
+mdspan: Reference implementation of mdspan targeting C++23
+muvm: Run programs from your system in a microVM
+otel-tui: Terminal OpenTelemetry viewer
+rea: Reverse engineering CLI and MCP server for agents
+safe-chain: Malware protection for npm, yarn, pnpm, pip, uv and other package managers
+sping: Real-time connectivity monitor with network diagnostics
+sqlmux: Terminal database client with tmux-style panes and Vim keybindings
+strobealign: Fast short-read aligner using dynamic seed size with strobemers
+tennis: Print stylish CSV tables in your terminal
+tidemail: TUI email client, supports IMAP, Gmail & Outlook OAuth
+upmd: Run tasks and dependency-aware workflows from Markdown
+uutils-grep: Cross-platform Rust rewrite of GNU grep
+uutils-sed: Cross-platform Rust rewrite of GNU sed
+ziggy: Data serialization language for expressing clear API messages, config files, etc
+==> New Casks
+agent-orchestrator: Supervisor for coding agents running in parallel Git worktrees
+ardia: Chromium-based web browser with a vertical tab sidebar
+blick: Video editor
+bytemail: Email client with an AI assistant
+devtools: Collection of developer utilities
+dotnet-sdk@10: Developer platform
+emeet-studio: Companion app for EMEET webcams
+fleet-desktop: Self-service portal for devices managed by Fleet
+ftop: System monitor tool
+image-optimizer: Tool to optimise images and vector graphics
+kiwidesk: Tiling window manager
+kugelblitz: 3D globe and atlas for exploring geodata
+lattice: LaTeX editor
+nod: Personal AI agent
+parallels@26: Desktop virtualization software
+plezy: Client for Plex, Jellyfin and Emby media servers
+read-ai: Meeting recorder, transcriber and summariser
+rustgis: GIS platform
+sable: Client for the Matrix chat network
+sidebarfavorites-manager: Finder sidebar icon customiser
+teamwork-graph-cli: Command-line interface for Atlassian Teamwork Graph
+tendedero: Screenshot and screen recording manager
+texpile: Desktop editor for LaTeX, Typst, and Markdown
+time-messenger: Corporate messenger
+tinycast@beta: Application launcher and productivity tool
+tree-outliner: Text outliner
+wallpapermachine: Player for Wallpaper Engine live wallpapers
+wiso-steuer-2027: Tax declaration for the fiscal year 2026
+xcasca: SSH terminal and SFTP file transfer client
+yandex-document: Document and spreadsheet editor
+Warning: Calling string comparison format for `depends_on macos:` is deprecated! Use `depends_on macos: :monterey` instead.
+Please report this issue to the lihaoyun6/homebrew-tap tap (not Homebrew/* repositories), or even better, submit a PR to fix it:
+  /opt/homebrew/Library/Taps/lihaoyun6/homebrew-tap/Casks/quickrecorder.rb:16
+
+Warning: Calling the `verified` parameter in the `url` stanza is deprecated! Use the default URL verification behaviour instead.
+Please report this issue to the th-ch/homebrew-youtube-music tap (not Homebrew/* repositories), or even better, submit a PR to fix it:
+  /opt/homebrew/Library/Taps/th-ch/homebrew-youtube-music/Casks/youtube-music.rb:22
+
+Warning: Calling `postflight` is deprecated! Use `postflight_steps` instead.
+Please report this issue to the th-ch/homebrew-youtube-music tap (not Homebrew/* repositories), or even better, submit a PR to fix it:
+  /opt/homebrew/Library/Taps/th-ch/homebrew-youtube-music/Casks/youtube-music.rb:34
+
+
+You have 54 outdated formulae and 5 outdated casks installed.
+Warning: Calling the `verified` parameter in the `url` stanza is deprecated! Use the default URL verification behaviour instead.
+Please report this issue to the krtirtho/homebrew-apps tap (not Homebrew/* repositories), or even better, submit a PR to fix it:
+  /opt/homebrew/Library/Taps/krtirtho/homebrew-apps/Casks/spotube.rb:5
+
+
+==> Downloading bottle manifests
+✔︎ Bottle Manifest cabal-install (3.18.2.0)
+✔︎ Bottle Manifest ghc (9.14.1)
+==> Fetching downloads for: ghc and cabal-install
+✔︎ Bottle cabal-install (3.18.2.0)
+✔︎ Bottle ghc (9.14.1)
+==> Pouring ghc--9.14.1.arm64_golden_gate.bottle.1.tar.gz
+🍺  /opt/homebrew/Cellar/ghc/9.14.1: 9,400 files, 2.2GB
+==> Pouring cabal-install--3.18.2.0.arm64_golden_gate.bottle.tar.gz
+🍺  /opt/homebrew/Cellar/cabal-install/3.18.2.0: 8 files, 102.6MB
