@@ -1,0 +1,20 @@
+{
+  "modules": [
+    {
+      "name": "Math.Fib",
+      "file": "Math_Fib.core",
+      "exports": ["Math_Fib_$wfib", "Math_Fib_fib"]
+    },
+    {
+      "name": "Data.ListOps",
+      "file": "Data_ListOps.core",
+      "exports": ["Data_ListOps_myMap", "Data_ListOps_$wmySum", "Data_ListOps_mySum"]
+    },
+    {
+      "name": "Main",
+      "file": "Main.core",
+      "exports": ["testList", "lvl", "result"],
+      "entrypoint": "main"
+    }
+  ]
+}

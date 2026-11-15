@@ -1,0 +1,33 @@
+Rec {
+Data_ListOps_myMap
+  = \ f xs ->
+      case xs of {
+        Nil -> Nil;
+        Cons y ys -> Cons (f y) (myMap f ys)
+      };
+end Rec }
+
+myMap = Data_ListOps_myMap
+
+Rec {
+Data_ListOps_$wmySum
+  = \ xs ->
+      case xs of {
+        Nil -> 0#;
+        Cons y ys -> case y of {
+        I# x -> case $wmySum ys of ww {
+        __DEFAULT -> +# x ww
+      }
+      }
+      };
+end Rec }
+
+$wmySum = Data_ListOps_$wmySum
+
+Data_ListOps_mySum
+  = \ xs ->
+      case $wmySum xs of ww {
+        __DEFAULT -> I# ww
+      }
+
+mySum = Data_ListOps_mySum

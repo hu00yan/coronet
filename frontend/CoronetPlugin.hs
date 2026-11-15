@@ -4,8 +4,9 @@ module CoronetPlugin (plugin) where
 import GHC.Plugins
 import GHC.Core
 import GHC.Core.Utils
-import Data.List (isPrefixOf, intercalate)
+import Data.List (isPrefixOf, intercalate, nub)
 import System.IO
+import System.Directory (doesFileExist, createDirectoryIfMissing)
 import Control.Monad.IO.Class (liftIO)
 
 plugin :: Plugin
@@ -16,21 +17,33 @@ plugin = defaultPlugin
 
 install :: [CommandLineOption] -> [CoreToDo] -> CoreM [CoreToDo]
 install opts todos = do
-  -- Run Coronet Core extraction after GHC simplifier
   let pass = CoreDoPluginPass "CoronetDump" (coronetPass opts)
   return (todos ++ [pass])
 
 coronetPass :: [CommandLineOption] -> ModGuts -> CoreM ModGuts
 coronetPass opts guts = do
+  let currentMod = mg_module guts
+  let mName = moduleNameString (moduleName currentMod)
+  let safeMName = sanitizeModName mName
   let rawBinds = mg_binds guts
-  let coreLiteText = dumpCoreProgram rawBinds
+
+  let (coreLiteText, exportedNames, isMainMod) = dumpCoreProgram currentMod rawBinds
+
   liftIO $ do
-    case parseOutPath opts of
-      Just outPath -> writeFile outPath coreLiteText
-      Nothing -> do
-        putStrLn "==================== Coronet CoreLite ===================="
-        putStr coreLiteText
-        putStrLn "=========================================================="
+    case parseDirOpt opts of
+      Just dirPath -> do
+        createDirectoryIfMissing True dirPath
+        let outCorePath = dirPath ++ "/" ++ safeMName ++ ".core"
+        writeFile outCorePath coreLiteText
+        let manifestPath = dirPath ++ "/manifest.json"
+        updateManifest manifestPath mName (safeMName ++ ".core") exportedNames isMainMod
+      Nothing ->
+        case parseOutPath opts of
+          Just outPath -> writeFile outPath coreLiteText
+          Nothing -> do
+            putStrLn ("==================== Coronet CoreLite: " ++ mName ++ " ====================")
+            putStr coreLiteText
+            putStrLn "=========================================================="
   return guts
 
 parseOutPath :: [CommandLineOption] -> Maybe FilePath
@@ -41,21 +54,50 @@ parseOutPath (opt:opts)
   | "-o=" `isPrefixOf` opt     = Just (drop 3 opt)
   | otherwise                  = parseOutPath opts
 
-dumpCoreProgram :: CoreProgram -> String
-dumpCoreProgram binds =
-  let filtered = filter (not . isMetadataBind) binds
+parseDirOpt :: [CommandLineOption] -> Maybe FilePath
+parseDirOpt [] = Nothing
+parseDirOpt (opt:opts)
+  | "dir=" `isPrefixOf` opt    = Just (drop 4 opt)
+  | "-dir=" `isPrefixOf` opt   = Just (drop 5 opt)
+  | otherwise                  = parseDirOpt opts
+
+sanitizeModName :: String -> String
+sanitizeModName = map (\c -> if c == '.' then '_' else c)
+
+isUserModule :: String -> Bool
+isUserModule mName =
+  not ("GHC." `isPrefixOf` mName ||
+       "System." `isPrefixOf` mName ||
+       "Control." `isPrefixOf` mName ||
+       "Data.Tuple" `isPrefixOf` mName)
+
+dumpCoreProgram :: Module -> CoreProgram -> (String, [String], Bool)
+dumpCoreProgram currentMod binds =
+  let mName = moduleNameString (moduleName currentMod)
+      safeMName = sanitizeModName mName
+      isMain = mName == "Main"
+
+      filtered = filter (not . isMetadataBind) binds
       hasResult = any hasResultBind filtered
       pruned = if hasResult then filter (not . isIoMainBind) filtered else filtered
-      rendered = map renderBind pruned
+
+      exportedNames = nub [ qualifyTopBinder currentMod b | b <- collectTopBinders pruned, not (isMetadataName (bndrName b)) ]
+
+      rendered = map (renderBind currentMod) pruned
       finalBinds = if hasResult then rendered ++ ["main = result\n"] else rendered
-  in intercalate "\n" finalBinds
+  in (intercalate "\n" finalBinds, exportedNames, isMain)
+
+collectTopBinders :: [CoreBind] -> [CoreBndr]
+collectTopBinders [] = []
+collectTopBinders (NonRec b _ : rest) = b : collectTopBinders rest
+collectTopBinders (Rec pairs : rest) = map fst pairs ++ collectTopBinders rest
 
 isMetadataBind :: CoreBind -> Bool
-isMetadataBind (NonRec b _) = isMetaName (bndrName b)
-isMetadataBind (Rec pairs)  = all (\(b, _) -> isMetaName (bndrName b)) pairs
+isMetadataBind (NonRec b _) = isMetadataName (bndrName b)
+isMetadataBind (Rec pairs)  = all (\(b, _) -> isMetadataName (bndrName b)) pairs
 
-isMetaName :: String -> Bool
-isMetaName name =
+isMetadataName :: String -> Bool
+isMetadataName name =
   "$trModule" `isPrefixOf` name ||
   "$tc" `isPrefixOf` name ||
   "$krep" `isPrefixOf` name
@@ -73,42 +115,91 @@ isIoMainBind (Rec pairs)  =
 bndrName :: CoreBndr -> String
 bndrName b = occNameString (getOccName b)
 
-renderBind :: CoreBind -> String
-renderBind (NonRec b expr) =
-  bndrName b ++ "\n  = " ++ renderExpr expr ++ "\n"
-renderBind (Rec pairs) =
-  "Rec {\n" ++
-  concatMap (\(b, expr) -> bndrName b ++ "\n  = " ++ renderExpr expr ++ ";\n") pairs ++
-  "end Rec }\n"
+qualifyTopBinder :: Module -> CoreBndr -> String
+qualifyTopBinder currentMod b =
+  let mName = moduleNameString (moduleName currentMod)
+      occ = bndrName b
+  in if mName == "Main" || occ == "main" || occ == "result"
+     then occ
+     else sanitizeModName mName ++ "_" ++ occ
 
-renderExpr :: CoreExpr -> String
-renderExpr expr = case expr of
-  Var v -> normalizeVarName (bndrName v)
+qualifyVarUse :: Module -> CoreBndr -> String
+qualifyVarUse currentMod v
+  | isLocalId v = normalizeVarName (bndrName v)
+  | isDataConWorkId v || isDataConWrapId v = normalizeVarName (bndrName v)
+  | otherwise =
+      let occ = bndrName v
+          curMName = moduleNameString (moduleName currentMod)
+      in if isPrimitiveName occ
+         then normalizeVarName occ
+         else case nameModule_maybe (idName v) of
+           Just m ->
+             let vMod = moduleNameString (moduleName m)
+             in if isUserModule vMod
+                then if vMod == curMName
+                     then if curMName == "Main" then occ else sanitizeModName curMName ++ "_" ++ occ
+                     else sanitizeModName vMod ++ "_" ++ occ
+                else normalizeVarName occ
+           Nothing ->
+             if curMName /= "Main"
+             then sanitizeModName curMName ++ "_" ++ occ
+             else normalizeVarName occ
+
+isPrimitiveName :: String -> Bool
+isPrimitiveName occ =
+  occ `elem` ["I#", "True", "False", "+#", "-#", "*#", "<=#", "==#", "/=#", "<#", ">#", "+", "-", "*"]
+
+renderBind :: Module -> CoreBind -> String
+renderBind currentMod (NonRec b expr) =
+  let qName = qualifyTopBinder currentMod b
+      bodyStr = renderExpr currentMod expr
+      aliasStr =
+        let orig = bndrName b
+        in if qName /= orig && not (isMetadataName orig)
+           then "\n" ++ orig ++ " = " ++ qName ++ "\n"
+           else ""
+  in qName ++ "\n  = " ++ bodyStr ++ "\n" ++ aliasStr
+renderBind currentMod (Rec pairs) =
+  let recBody = "Rec {\n" ++
+        concatMap (\(b, expr) -> qualifyTopBinder currentMod b ++ "\n  = " ++ renderExpr currentMod expr ++ ";\n") pairs ++
+        "end Rec }\n"
+      aliases = concatMap (\(b, _) ->
+        let q = qualifyTopBinder currentMod b
+            orig = bndrName b
+        in if q /= orig && not (isMetadataName orig)
+           then orig ++ " = " ++ q ++ "\n"
+           else ""
+        ) pairs
+  in recBody ++ (if null aliases then "" else "\n" ++ aliases)
+
+renderExpr :: Module -> CoreExpr -> String
+renderExpr currentMod expr = case expr of
+  Var v -> qualifyVarUse currentMod v
   Lit l -> renderLiteral l
-  Cast e _ -> renderExpr e
-  Tick _ e -> renderExpr e
+  Cast e _ -> renderExpr currentMod e
+  Tick _ e -> renderExpr currentMod e
   Type _ -> "*"
   Coercion _ -> "*"
-  App f (Type _) -> renderExpr f
-  App f (Coercion _) -> renderExpr f
+  App f (Type _) -> renderExpr currentMod f
+  App f (Coercion _) -> renderExpr currentMod f
   App _ _ ->
     let (headFn, args) = collectArgs expr
         cleanArgs = filter (not . isTypeOrCoercion) args
     in if null cleanArgs
-       then renderExpr headFn
-       else renderExpr headFn ++ " " ++ unwords (map renderAtom cleanArgs)
+       then renderExpr currentMod headFn
+       else renderExpr currentMod headFn ++ " " ++ unwords (map (renderAtom currentMod) cleanArgs)
   Lam _ _ ->
     let (bndrs, body) = collectBinders expr
         termBndrs = filter isId bndrs
     in if null termBndrs
-       then renderExpr body
-       else "\\ " ++ unwords (map bndrName termBndrs) ++ " ->\n      " ++ renderExpr body
+       then renderExpr currentMod body
+       else "\\ " ++ unwords (map bndrName termBndrs) ++ " ->\n      " ++ renderExpr currentMod body
   Let bind body ->
-    "let " ++ renderInlineBind bind ++ " in " ++ renderExpr body
+    "let " ++ renderInlineBind currentMod bind ++ " in " ++ renderExpr currentMod body
   Case scrut bndr _ alts ->
     let bndrStr = let n = bndrName bndr in if isWild n then "" else " " ++ n
-    in "case " ++ renderExpr scrut ++ " of" ++ bndrStr ++ " {\n" ++
-       intercalate ";\n" (map renderAlt alts) ++ "\n      }"
+    in "case " ++ renderExpr currentMod scrut ++ " of" ++ bndrStr ++ " {\n" ++
+       intercalate ";\n" (map (renderAlt currentMod) alts) ++ "\n      }"
 
 isTypeOrCoercion :: CoreExpr -> Bool
 isTypeOrCoercion (Type _)     = True
@@ -118,20 +209,21 @@ isTypeOrCoercion _            = False
 isWild :: String -> Bool
 isWild n = "wild" `isPrefixOf` n || "ds" `isPrefixOf` n || n == "_"
 
-renderInlineBind :: CoreBind -> String
-renderInlineBind (NonRec b e) = bndrName b ++ " = " ++ renderExpr e
-renderInlineBind (Rec pairs) =
-  "Rec { " ++ intercalate "; " (map (\(b, e) -> bndrName b ++ " = " ++ renderExpr e) pairs) ++ " end Rec }"
+renderInlineBind :: Module -> CoreBind -> String
+renderInlineBind currentMod (NonRec b e) =
+  bndrName b ++ " = " ++ renderExpr currentMod e
+renderInlineBind currentMod (Rec pairs) =
+  "Rec { " ++ intercalate "; " (map (\(b, e) -> bndrName b ++ " = " ++ renderExpr currentMod e) pairs) ++ " end Rec }"
 
-renderAtom :: CoreExpr -> String
-renderAtom expr = case expr of
-  Var v -> normalizeVarName (bndrName v)
+renderAtom :: Module -> CoreExpr -> String
+renderAtom currentMod expr = case expr of
+  Var v -> qualifyVarUse currentMod v
   Lit l -> renderLiteral l
-  App f (Type _) -> renderAtom f
-  App f (Coercion _) -> renderAtom f
-  Cast e _ -> renderAtom e
-  Tick _ e -> renderAtom e
-  _ -> "(" ++ renderExpr expr ++ ")"
+  App f (Type _) -> renderAtom currentMod f
+  App f (Coercion _) -> renderAtom currentMod f
+  Cast e _ -> renderAtom currentMod e
+  Tick _ e -> renderAtom currentMod e
+  _ -> "(" ++ renderExpr currentMod expr ++ ")"
 
 renderLiteral :: Literal -> String
 renderLiteral lit = case lit of
@@ -147,8 +239,8 @@ normalizeVarName name
   | name == "$fNumInt_$c*" = "*"
   | otherwise              = name
 
-renderAlt :: CoreAlt -> String
-renderAlt (Alt con bndrs e) =
+renderAlt :: Module -> CoreAlt -> String
+renderAlt currentMod (Alt con bndrs e) =
   let patStr = case con of
         DEFAULT -> "__DEFAULT"
         LitAlt l -> renderLiteral l
@@ -156,4 +248,97 @@ renderAlt (Alt con bndrs e) =
           let cname = occNameString (getOccName dc)
               termArgs = [bndrName v | v <- bndrs, isId v]
           in if null termArgs then cname else cname ++ " " ++ unwords termArgs
-  in "        " ++ patStr ++ " -> " ++ renderExpr e
+  in "        " ++ patStr ++ " -> " ++ renderExpr currentMod e
+
+-- Manifest JSON generation and updating
+data ModEntry = ModEntry
+  { entryModName :: String
+  , entryCoreFile :: String
+  , entryExports :: [String]
+  , entryIsMain :: Bool
+  } deriving (Show, Eq)
+
+updateManifest :: FilePath -> String -> String -> [String] -> Bool -> IO ()
+updateManifest manifestPath mName coreFileName exps isMain = do
+  exists <- doesFileExist manifestPath
+  prevEntries <- if exists
+                 then do
+                   content <- withFile manifestPath ReadMode $ \h -> do
+                     c <- hGetContents h
+                     length c `seq` return c
+                   return (parseManifest content)
+                 else return []
+  let newEntry = ModEntry mName coreFileName exps isMain
+  let merged = filter (\e -> entryModName e /= mName) prevEntries ++ [newEntry]
+  writeFile manifestPath (renderManifest merged)
+
+renderManifest :: [ModEntry] -> String
+renderManifest entries =
+  "{\n  \"modules\": [\n" ++
+  intercalate ",\n" (map renderEntry entries) ++
+  "\n  ]\n}\n"
+  where
+    renderEntry e =
+      "    {\n" ++
+      "      \"name\": \"" ++ entryModName e ++ "\",\n" ++
+      "      \"file\": \"" ++ entryCoreFile e ++ "\",\n" ++
+      "      \"exports\": [" ++ intercalate ", " (map (\x -> "\"" ++ x ++ "\"") (entryExports e)) ++ "]" ++
+      (if entryIsMain e then ",\n      \"entrypoint\": \"main\"" else "") ++
+      "\n    }"
+
+parseManifest :: String -> [ModEntry]
+parseManifest content =
+  let chunks = splitOnObject content
+  in [e | Just e <- map parseEntry chunks]
+
+splitOnObject :: String -> [String]
+splitOnObject s =
+  case break (== '{') s of
+    (_, "") -> []
+    (_, rest) ->
+      case break (== '}') (drop 1 rest) of
+        (chunk, after) -> chunk : splitOnObject after
+
+parseEntry :: String -> Maybe ModEntry
+parseEntry chunk =
+  case (extractField "name" chunk, extractField "file" chunk) of
+    (Just m, Just f) ->
+      let exts = extractList "exports" chunk
+          hasEntry = extractField "entrypoint" chunk == Just "main"
+      in Just (ModEntry m f exts hasEntry)
+    _ -> Nothing
+
+extractField :: String -> String -> Maybe String
+extractField key chunk =
+  let needle = "\"" ++ key ++ "\":"
+  in case findSub needle chunk of
+    Just rest ->
+      let trimmed = dropWhile (\c -> c == ' ' || c == '\t' || c == '\n') rest
+      in case trimmed of
+        '"':afterQuote -> Just (takeWhile (/= '"') afterQuote)
+        _ -> Nothing
+    Nothing -> Nothing
+
+extractList :: String -> String -> [String]
+extractList key chunk =
+  let needle = "\"" ++ key ++ "\":"
+  in case findSub needle chunk of
+    Just rest ->
+      case dropWhile (/= '[') rest of
+        '[':inside ->
+          let content = takeWhile (/= ']') inside
+              tokens = words (map (\c -> if c == ',' then ' ' else c) content)
+          in [stripQuotes t | t <- tokens, not (null (stripQuotes t))]
+        _ -> []
+    Nothing -> []
+
+stripQuotes :: String -> String
+stripQuotes s = filter (/= '"') s
+
+findSub :: String -> String -> Maybe String
+findSub [] ys = Just ys
+findSub _ [] = Nothing
+findSub xs (y:ys) =
+  if take (length xs) (y:ys) == xs
+  then Just (drop (length xs) (y:ys))
+  else findSub xs ys

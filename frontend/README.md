@@ -201,3 +201,74 @@ tests/fixtures/hs/06_lazy_stream.hs: 55
 tests/fixtures/hs/07_nqueens.hs: 92
 tests/fixtures/hs/08_mergesort.hs: 481054039
 ```
+
+---
+
+## 8. Multi-Module Compilation Testbed (`tests/fixtures/multimodule/`)
+
+Coronet supports multi-module Haskell projects compiled via `CoronetPlugin`.
+
+### 8.1 Architecture & Layout
+
+```
+tests/fixtures/multimodule/
+├── Math/
+│   └── Fib.hs              # Module Math.Fib, exports fib
+├── Data/
+│   └── ListOps.hs          # Module Data.ListOps, exports List, myMap, mySum
+├── Main.hs                 # Main module importing Math.Fib and Data.ListOps
+└── core/
+    ├── Math_Fib.core       # Qualified CoreLite for Math.Fib
+    ├── Data_ListOps.core   # Qualified CoreLite for Data.ListOps
+    ├── Main.core           # Qualified CoreLite for Main
+    └── manifest.json       # Multi-module package manifest
+```
+
+### 8.2 Extraction via CoronetPlugin
+
+When compiling a multi-module tree, supply `-fplugin-opt=CoronetPlugin:dir=<output_dir>`:
+
+```bash
+ghc -c -O -package ghc -fplugin=CoronetPlugin \
+    "-fplugin-opt=CoronetPlugin:dir=tests/fixtures/multimodule/core" \
+    -i. -ifrontend \
+    Math/Fib.hs Data/ListOps.hs Main.hs
+```
+
+`CoronetPlugin`:
+1. Discovers the current module name from GHC's `mg_module`.
+2. Emits `<SafeModName>.core` with qualified top-level symbols (e.g. `Math_Fib_fib`, `Data_ListOps_myMap`, `Data_ListOps_mySum`).
+3. Emits aliases (`fib = Math_Fib_fib`) to preserve backwards compatibility.
+4. Generates and atomically updates `manifest.json` mapping each module to its CoreLite file and exported symbols.
+
+### 8.3 Package Manifest (`manifest.json`)
+
+```json
+{
+  "modules": [
+    {
+      "name": "Math.Fib",
+      "file": "Math_Fib.core",
+      "exports": ["Math_Fib_$wfib", "Math_Fib_fib"]
+    },
+    {
+      "name": "Data.ListOps",
+      "file": "Data_ListOps.core",
+      "exports": ["Data_ListOps_myMap", "Data_ListOps_$wmySum", "Data_ListOps_mySum"]
+    },
+    {
+      "name": "Main",
+      "file": "Main.core",
+      "exports": ["testList", "lvl", "result"],
+      "entrypoint": "main"
+    }
+  ]
+}
+```
+
+### 8.4 Verification
+
+```bash
+cd tests/fixtures/multimodule && runghc Main.hs
+# Output: 12
+```

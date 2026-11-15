@@ -1,0 +1,24 @@
+Rec {
+Math_Fib_$wfib
+  = \ ww ->
+      case <=# ww 1# of lwild {
+        __DEFAULT -> case $wfib (-# ww 1#) of ww {
+        __DEFAULT -> case $wfib (-# ww 2#) of ww {
+        __DEFAULT -> +# ww ww
+      }
+      };
+        1# -> ww
+      };
+end Rec }
+
+$wfib = Math_Fib_$wfib
+
+Math_Fib_fib
+  = \ n ->
+      case n of {
+        I# ww -> case $wfib ww of ww {
+        __DEFAULT -> I# ww
+      }
+      }
+
+fib = Math_Fib_fib

@@ -1,0 +1,44 @@
+testList
+  = I# 1#
+
+testList
+  = I# 2#
+
+testList
+  = I# 3#
+
+testList
+  = I# 4#
+
+testList
+  = I# 5#
+
+testList
+  = Cons testList Nil
+
+testList
+  = Cons testList testList
+
+testList
+  = Cons testList testList
+
+testList
+  = Cons testList testList
+
+testList
+  = Cons testList testList
+
+lvl
+  = Data_ListOps_myMap Math_Fib_fib testList
+
+result
+  = case Data_ListOps_$wmySum lvl of ww {
+        __DEFAULT -> I# ww
+      }
+
+lvl
+  = case result of {
+        I# n -> itos n []
+      }
+
+main = result
