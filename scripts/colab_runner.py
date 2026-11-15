@@ -82,6 +82,10 @@ def adapt_cuda_for_gpu(cu_source: str, gpu: str) -> str:
             "const u32 L_VARS_LEN = 0x2000;",
             "const u32 L_VARS_LEN = 0x1000;",
         )
+        cu_source = cu_source.replace(
+            "const u32 TPB_L2 = 7;",
+            "const u32 TPB_L2 = 6;",
+        )
     return cu_source
 
 
@@ -283,11 +287,6 @@ def main():
         keep_session=args.keep,
     )
     elapsed = time.time() - t0
-
-    if code != 0:
-        print(f"DEBUG: colab run returned {code}", file=sys.stderr)
-        print(f"DEBUG stdout:\n{stdout}", file=sys.stderr)
-        print(f"DEBUG stderr:\n{stderr}", file=sys.stderr)
 
     # 3. Filter and stream stdout
     # Remove colab CLI update chatter if present for clean reporting
