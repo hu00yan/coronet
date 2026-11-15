@@ -1,5 +1,5 @@
 Rec {
-$sfromHsList
+$sfromHsList_s2PJ
   = \ sc_s2PF sc_s2PG ->
       Cons sc_s2PF (fromHsList sc_s2PG);
 fromHsList
@@ -107,12 +107,12 @@ lvl_s2IB
   = W32# 0#
 
 Rec {
-$slistIndex
+$slistIndex_s2Pu
   = \ sc_s2Pb sc_s2Pa ->
       case sc_s2Pa of wild_X1E {
         Nil -> lvl_s2IB;
         Cons y_aT1 ys_aT2 -> case <=# sc_s2Pb 0# of lwild_s2Lr {
-        __DEFAULT -> $slistIndex (-# sc_s2Pb 1#) ys_aT2;
+        __DEFAULT -> $slistIndex_s2Pu (-# sc_s2Pb 1#) ys_aT2;
         1# -> y_aT1
       }
       };
@@ -124,20 +124,20 @@ listIndex
         Nil -> lvl_s2IB;
         Cons y_aT1 ys_aT2 -> case i_aT0 of wild_a2Ll {
         I# x_a2Lm -> case <=# x_a2Lm 0# of lwild_s2Lr {
-        __DEFAULT -> $slistIndex (-# x_a2Lm 1#) ys_aT2;
+        __DEFAULT -> $slistIndex_s2Pu (-# x_a2Lm 1#) ys_aT2;
         1# -> y_aT1
       }
       }
       }
 
 Rec {
-$sexpandSchedule
+$sexpandSchedule_s2P5
   = \ sc_s2P4 sc_s2P3 ->
       case >=# sc_s2P4 64# of lwild_s2LA {
-        __DEFAULT -> $sexpandSchedule (+# sc_s2P4 1#) (appendL sc_s2P3 (Cons (case $slistIndex (-# sc_s2P4 16#) sc_s2P3 of wild_a1Xb {
-        W32# x#_a1Xc -> case $slistIndex (-# sc_s2P4 15#) sc_s2P3 of wild_a1WT {
-        W32# x#_a1WU -> case $slistIndex (-# sc_s2P4 7#) sc_s2P3 of wild1_X1F {
-        W32# y#_X1G -> case $slistIndex (-# sc_s2P4 2#) sc_s2P3 of wild_X1H {
+        __DEFAULT -> $sexpandSchedule_s2P5 (+# sc_s2P4 1#) (appendL sc_s2P3 (Cons (case $slistIndex_s2Pu (-# sc_s2P4 16#) sc_s2P3 of wild_a1Xb {
+        W32# x#_a1Xc -> case $slistIndex_s2Pu (-# sc_s2P4 15#) sc_s2P3 of wild_a1WT {
+        W32# x#_a1WU -> case $slistIndex_s2Pu (-# sc_s2P4 7#) sc_s2P3 of wild1_X1F {
+        W32# y#_X1G -> case $slistIndex_s2Pu (-# sc_s2P4 2#) sc_s2P3 of wild_X1H {
         W32# x#_X1I -> W32# (plusWord32# (plusWord32# (plusWord32# x#_a1Xc (wordToWord32# (xor# (and# (xor# (and# (or# (and# (uncheckedShiftRL# (word32ToWord# x#_a1WU) 7#) 4294967295#) (and# (uncheckedShiftL# (word32ToWord# x#_a1WU) 25#) 4294967295#)) 4294967295#) (and# (or# (and# (uncheckedShiftRL# (word32ToWord# x#_a1WU) 18#) 4294967295#) (and# (uncheckedShiftL# (word32ToWord# x#_a1WU) 14#) 4294967295#)) 4294967295#)) 4294967295#) (and# (uncheckedShiftRL# (word32ToWord# x#_a1WU) 3#) 4294967295#)))) y#_X1G) (wordToWord32# (xor# (and# (xor# (and# (or# (and# (uncheckedShiftRL# (word32ToWord# x#_X1I) 17#) 4294967295#) (and# (uncheckedShiftL# (word32ToWord# x#_X1I) 15#) 4294967295#)) 4294967295#) (and# (or# (and# (uncheckedShiftRL# (word32ToWord# x#_X1I) 19#) 4294967295#) (and# (uncheckedShiftL# (word32ToWord# x#_X1I) 13#) 4294967295#)) 4294967295#)) 4294967295#) (and# (uncheckedShiftRL# (word32ToWord# x#_X1I) 10#) 4294967295#))))
       }
       }
@@ -151,10 +151,10 @@ expandSchedule
   = \ w_a15E i_a15F ->
       case i_a15F of wild_a2Lu {
         I# x_a2Lv -> case >=# x_a2Lv 64# of lwild_s2LA {
-        __DEFAULT -> $sexpandSchedule (+# x_a2Lv 1#) (appendL w_a15E (Cons (case $slistIndex (-# x_a2Lv 16#) w_a15E of wild_a1Xb {
-        W32# x#_a1Xc -> case $slistIndex (-# x_a2Lv 15#) w_a15E of wild_a1WT {
-        W32# x#_a1WU -> case $slistIndex (-# x_a2Lv 7#) w_a15E of wild1_X1F {
-        W32# y#_X1G -> case $slistIndex (-# x_a2Lv 2#) w_a15E of wild_X1H {
+        __DEFAULT -> $sexpandSchedule_s2P5 (+# x_a2Lv 1#) (appendL w_a15E (Cons (case $slistIndex_s2Pu (-# x_a2Lv 16#) w_a15E of wild_a1Xb {
+        W32# x#_a1Xc -> case $slistIndex_s2Pu (-# x_a2Lv 15#) w_a15E of wild_a1WT {
+        W32# x#_a1WU -> case $slistIndex_s2Pu (-# x_a2Lv 7#) w_a15E of wild1_X1F {
+        W32# y#_X1G -> case $slistIndex_s2Pu (-# x_a2Lv 2#) w_a15E of wild_X1H {
         W32# x#_X1I -> W32# (plusWord32# (plusWord32# (plusWord32# x#_a1Xc (wordToWord32# (xor# (and# (xor# (and# (or# (and# (uncheckedShiftRL# (word32ToWord# x#_a1WU) 7#) 4294967295#) (and# (uncheckedShiftL# (word32ToWord# x#_a1WU) 25#) 4294967295#)) 4294967295#) (and# (or# (and# (uncheckedShiftRL# (word32ToWord# x#_a1WU) 18#) 4294967295#) (and# (uncheckedShiftL# (word32ToWord# x#_a1WU) 14#) 4294967295#)) 4294967295#)) 4294967295#) (and# (uncheckedShiftRL# (word32ToWord# x#_a1WU) 3#) 4294967295#)))) y#_X1G) (wordToWord32# (xor# (and# (xor# (and# (or# (and# (uncheckedShiftRL# (word32ToWord# x#_X1I) 17#) 4294967295#) (and# (uncheckedShiftL# (word32ToWord# x#_X1I) 15#) 4294967295#)) 4294967295#) (and# (or# (and# (uncheckedShiftRL# (word32ToWord# x#_X1I) 19#) 4294967295#) (and# (uncheckedShiftL# (word32ToWord# x#_X1I) 13#) 4294967295#)) 4294967295#)) 4294967295#) (and# (uncheckedShiftRL# (word32ToWord# x#_X1I) 10#) 4294967295#))))
       }
       }
@@ -546,7 +546,7 @@ lvl_s2NJ
   = : lvl_s2LI lvl_s2NI
 
 kConstants
-  = $sfromHsList lvl_s2LH lvl_s2NJ
+  = $sfromHsList_s2PJ lvl_s2LH lvl_s2NJ
 
 lvl_s2NL
   = W32# 1131377263#
@@ -612,7 +612,7 @@ lvl_s2Of
   = : lvl_s2NM lvl_s2Oe
 
 initialWords
-  = $sfromHsList lvl_s2NL lvl_s2Of
+  = $sfromHsList_s2PJ lvl_s2NL lvl_s2Of
 
 Rec {
 compressRounds
@@ -624,8 +624,8 @@ compressRounds
         W32# x#_a1Xc -> case e_a15R of wild_a1WT {
         W32# x#_a1WU -> case f_a15S of wild1_a1Wo {
         W32# y#_a1Wp -> case g_a15T of wild1_X1F {
-        W32# y#_X1G -> case $slistIndex x_a2Lv k_a15W of wild1_X1H {
-        W32# y#_X1I -> case $slistIndex x_a2Lv w_a15V of wild1_X1J {
+        W32# y#_X1G -> case $slistIndex_s2Pu x_a2Lv k_a15W of wild1_X1H {
+        W32# y#_X1I -> case $slistIndex_s2Pu x_a2Lv w_a15V of wild1_X1J {
         W32# y#_X1K -> W32# (plusWord32# (plusWord32# (plusWord32# (plusWord32# x#_a1Xc (wordToWord32# (xor# (and# (xor# (and# (or# (and# (uncheckedShiftRL# (word32ToWord# x#_a1WU) 6#) 4294967295#) (and# (uncheckedShiftL# (word32ToWord# x#_a1WU) 26#) 4294967295#)) 4294967295#) (and# (or# (and# (uncheckedShiftRL# (word32ToWord# x#_a1WU) 11#) 4294967295#) (and# (uncheckedShiftL# (word32ToWord# x#_a1WU) 21#) 4294967295#)) 4294967295#)) 4294967295#) (and# (or# (and# (uncheckedShiftRL# (word32ToWord# x#_a1WU) 25#) 4294967295#) (and# (uncheckedShiftL# (word32ToWord# x#_a1WU) 7#) 4294967295#)) 4294967295#)))) (wordToWord32# (xor# (and# (and# (word32ToWord# x#_a1WU) (word32ToWord# y#_a1Wp)) 4294967295#) (and# (and# (and# (not# (word32ToWord# x#_a1WU)) 4294967295#) (word32ToWord# y#_X1G)) 4294967295#)))) y#_X1I) y#_X1K)
       }
       }
@@ -691,7 +691,7 @@ lvl_s2Op
   = HashState lvl_s2Oh lvl_s2Oi lvl_s2Oj lvl_s2Ok lvl_s2Ol lvl_s2Om lvl_s2On lvl_s2Oo
 
 lvl_s2Or
-  = $sexpandSchedule 16# initialWords
+  = $sexpandSchedule_s2P5 16# initialWords
 
 lvl_s2Os
   = I# 0#

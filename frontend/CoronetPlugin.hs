@@ -133,7 +133,7 @@ bndrName :: CoreBndr -> String
 bndrName b =
   let name = varName b
       occ = occNameString (getOccName b)
-  in if isExternalName name || occ == "main" || occ == "result" || "$" `isPrefixOf` occ
+  in if isExternalName name || occ == "main" || occ == "result"
      then occ
      else showSDocUnsafe (ppr b)
 
