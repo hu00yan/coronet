@@ -48,8 +48,11 @@ def find_hvm2_bin() -> Path:
         return Path(custom)
     if DEFAULT_HVM2_BIN.exists() and os.access(DEFAULT_HVM2_BIN, os.X_OK):
         return DEFAULT_HVM2_BIN
+    local_bin = REPO_ROOT / "vendor" / "HVM2" / "hvm"
+    if local_bin.exists() and os.access(local_bin, os.X_OK):
+        return local_bin
     raise FileNotFoundError(
-        f"HVM2 executable not found at {DEFAULT_HVM2_BIN}. Build HVM2 with cargo build --release."
+        f"HVM2 executable not found at {DEFAULT_HVM2_BIN} or {local_bin}. Build HVM2 with cargo build --release."
     )
 
 
@@ -122,12 +125,11 @@ def main():
     run = subprocess.run([bin_path], capture_output=True, text=True)
     t_run = time.time() - t1
 
-    print(run.stdout, end="", flush=True)
+    print(f"[colab-gpu] Execution finished in {{t_run:.3f}}s, exit code: {{run.returncode}}", flush=True)
+    if run.stdout:
+        print(run.stdout, end="", flush=True)
     if run.stderr:
-        print(run.stderr, file=sys.stderr, end="", flush=True)
-
-    if run.returncode != 0:
-        print(f"[colab-gpu] Execution exited with code {{run.returncode}}", file=sys.stderr, flush=True)
+        print(f"[colab-gpu-stderr] {{run.stderr}}", flush=True)
 
     sys.exit(run.returncode)
 
@@ -149,7 +151,13 @@ def parse_hvm2_gpu_output(output: str) -> Dict[str, Any]:
     for line in output.splitlines():
         line = line.strip()
         if line.startswith("Result:"):
-            res["result"] = line[len("Result:") :].strip()
+            raw_res = line[len("Result:") :].strip()
+            res["result"] = raw_res
+            m = re.match(r"^\(?\s*(\d+)\s+(\d+)\s*\)?$", raw_res)
+            if m:
+                hi = int(m.group(1))
+                lo = int(m.group(2))
+                res["decoded_result"] = (hi << 24) + lo
         elif line.startswith("- ITRS:"):
             try:
                 res["itrs"] = int(line[len("- ITRS:") :].strip())
@@ -276,6 +284,11 @@ def main():
     )
     elapsed = time.time() - t0
 
+    if code != 0:
+        print(f"DEBUG: colab run returned {code}", file=sys.stderr)
+        print(f"DEBUG stdout:\n{stdout}", file=sys.stderr)
+        print(f"DEBUG stderr:\n{stderr}", file=sys.stderr)
+
     # 3. Filter and stream stdout
     # Remove colab CLI update chatter if present for clean reporting
     filtered_lines = []
@@ -287,19 +300,22 @@ def main():
         filtered_lines.append(line)
     clean_stdout = "\n".join(filtered_lines).strip()
 
-    if clean_stdout:
-        print(clean_stdout)
-
-    if stderr.strip():
-        # Only print relevant stderr (exclude standard colab info if code == 0)
-        err_lines = [l for l in stderr.splitlines() if not l.startswith("[colab]")]
-        if err_lines and code != 0:
-            print("\n".join(err_lines), file=sys.stderr)
-
-    # 4. Parse output
+    # 3. Parse output
     parsed = parse_hvm2_gpu_output(clean_stdout)
     parsed["elapsed_wall_s"] = elapsed
     parsed["returncode"] = code
+
+    # 4. Filter and stream stdout
+    if clean_stdout:
+        print(clean_stdout)
+        if parsed.get("decoded_result") is not None:
+            print(f"Decoded Result: {parsed['decoded_result']}")
+
+    if stderr.strip():
+        # Only print relevant stderr (exclude standard colab info)
+        err_lines = [l for l in stderr.splitlines() if not l.startswith("[colab]")]
+        if err_lines:
+            print("\n".join(err_lines), file=sys.stderr)
 
     if args.json:
         print(json.dumps(parsed, indent=2))

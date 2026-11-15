@@ -9,7 +9,15 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-HVM2_BIN="${HVM2_BIN:-$REPO_ROOT/vendor/HVM2/target/release/hvm}"
+if [[ -z "${HVM2_BIN:-}" ]]; then
+  if [[ -x "$REPO_ROOT/vendor/HVM2/target/release/hvm" ]]; then
+    HVM2_BIN="$REPO_ROOT/vendor/HVM2/target/release/hvm"
+  elif [[ -x "$REPO_ROOT/vendor/HVM2/hvm" ]]; then
+    HVM2_BIN="$REPO_ROOT/vendor/HVM2/hvm"
+  else
+    HVM2_BIN="$REPO_ROOT/vendor/HVM2/target/release/hvm"
+  fi
+fi
 
 if [[ ! -x "$HVM2_BIN" ]]; then
   echo "Error: HVM2 binary not found or not executable at: $HVM2_BIN" >&2

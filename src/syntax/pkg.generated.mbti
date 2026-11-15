@@ -116,6 +116,7 @@ pub impl Show for Program
 pub enum Token {
   Ident(String)
   IntLit(Int32)
+  FloatLit(Double)
   CharLit(Char)
   StringLit(String)
   TypeVar(String)

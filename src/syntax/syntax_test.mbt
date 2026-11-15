@@ -839,3 +839,118 @@ test "parse and link multimodule fixtures (Math_Fib, Data_ListOps, Main)" {
   assert_true(linked_from_sources.lookup("Data_ListOps_myMap") is Some(_))
 }
 
+test "parse 32-bit bitwise primitives and operators" {
+  let e1 = @syntax.parse_expr("and# a b").unwrap()
+  assert_eq(e1, @syntax.Expr::App(@syntax.Expr::App(@syntax.Expr::Var("and#"), @syntax.Expr::Var("a")), @syntax.Expr::Var("b")))
+
+  let e2 = @syntax.parse_expr("or# x y").unwrap()
+  assert_eq(e2, @syntax.Expr::App(@syntax.Expr::App(@syntax.Expr::Var("or#"), @syntax.Expr::Var("x")), @syntax.Expr::Var("y")))
+
+  let e3 = @syntax.parse_expr("xor# a (uncheckedIShiftRL# b 2#)").unwrap()
+  assert_eq(
+    e3,
+    @syntax.Expr::App(
+      @syntax.Expr::App(@syntax.Expr::Var("xor#"), @syntax.Expr::Var("a")),
+      @syntax.Expr::App(@syntax.Expr::App(@syntax.Expr::Var("uncheckedIShiftRL#"), @syntax.Expr::Var("b")), @syntax.Expr::LitInt(2))
+    )
+  )
+
+  let e4 = @syntax.parse_expr("uncheckedIShiftL# x 5#").unwrap()
+  assert_eq(e4, @syntax.Expr::App(@syntax.Expr::App(@syntax.Expr::Var("uncheckedIShiftL#"), @syntax.Expr::Var("x")), @syntax.Expr::LitInt(5)))
+
+  let e5 = @syntax.parse_expr("(.&.) a b").unwrap()
+  assert_eq(e5, @syntax.Expr::App(@syntax.Expr::App(@syntax.Expr::Var(".&."), @syntax.Expr::Var("a")), @syntax.Expr::Var("b")))
+
+  let e6 = @syntax.parse_expr("not# (word32ToWord# x)").unwrap()
+  assert_true(e6 is @syntax.Expr::App(@syntax.Expr::Var("not#"), _))
+}
+
+test "parse hex literals, float patterns, and large 32-bit unsigned words" {
+  let e_hex1 = @syntax.parse_expr("0x428a2f98#").unwrap()
+  assert_eq(e_hex1, @syntax.Expr::LitInt(0x428a2f98))
+
+  let e_hex2 = @syntax.parse_expr("0x80##").unwrap()
+  assert_eq(e_hex2, @syntax.Expr::LitInt(0x80))
+
+  let e_max_word = @syntax.parse_expr("4294967295#").unwrap()
+  assert_eq(e_max_word, @syntax.Expr::LitInt(-1))
+
+  let e_high_bit = @syntax.parse_expr("2147483648#").unwrap()
+  assert_eq(e_high_bit, @syntax.Expr::LitInt(-2147483648))
+
+  let e_float1 = @syntax.parse_expr("1.5##").unwrap()
+  assert_eq(e_float1, @syntax.Expr::LitInt(1))
+
+  let e_float2 = @syntax.parse_expr("0.0##").unwrap()
+  assert_eq(e_float2, @syntax.Expr::LitInt(0))
+
+  let e_min64 = @syntax.parse_expr("-9223372036854775808#").unwrap()
+  assert_eq(e_min64, @syntax.Expr::LitInt(-2147483648))
+}
+
+test "parse empty case expression alternatives" {
+  let src =
+    #|foo = \ x ->
+    #|  case x of {
+    #|    0# -> case overflowError of { };
+    #|    __DEFAULT -> 42#
+    #|  }
+  let prog = @syntax.parse_program(src).unwrap()
+  assert_true(prog.lookup("foo") is Some(_))
+}
+
+test "parse Raytracer Core pattern with fixed-point math and Vec3 ADT" {
+  let src =
+    #|vdot
+    #|  = \ ds_d1O9 ds_d1Oa ->
+    #|      case ds_d1O9 of {
+    #|        Vec3 x1_aJ6 y1_aJ7 z1_aJ8 -> case ds_d1Oa of {
+    #|        Vec3 x2_aJ9 y2_aJa z2_aJb -> case x1_aJ6 of {
+    #|        I# x_a1kS -> case x2_aJ9 of {
+    #|        I# y_a1kU -> case y1_aJ7 of {
+    #|        I# x_X1j -> case y2_aJa of {
+    #|        I# y_X1l -> case z1_aJ8 of {
+    #|        I# x_X1n -> case z2_aJb of {
+    #|        I# y_X1p -> case divZeroError of {
+    #|          -9223372036854775808# -> case overflowError of { };
+    #|          __DEFAULT -> I# (quotInt# (+# (+# (*# x_a1kS y_a1kU) (*# x_X1j y_X1l)) (*# x_X1n y_X1p)) 1000#)
+    #|        }
+    #|        }
+    #|        }
+    #|        }
+    #|        }
+    #|        }
+    #|        }
+    #|      }
+    #|      }
+  let prog = @syntax.parse_program(src).unwrap()
+  assert_true(prog.lookup("vdot") is Some(_))
+}
+
+test "parse Sha256 Core pattern with schedule expansion and bitwise compression" {
+  let src =
+    #|sigma0
+    #|  = \ x_aPL ->
+    #|      case x_aPL of {
+    #|        W32# x#_a1TY -> W32# (wordToWord32# (xor# (and# (xor# (and# (or# (and# (uncheckedShiftRL# (word32ToWord# x#_a1TY) 2#) 4294967295#) (and# (uncheckedShiftL# (word32ToWord# x#_a1TY) 30#) 4294967295#)) 4294967295#) (and# (or# (and# (uncheckedShiftRL# (word32ToWord# x#_a1TY) 13#) 4294967295#) (and# (uncheckedShiftL# (word32ToWord# x#_a1TY) 19#) 4294967295#)) 4294967295#)) 4294967295#) (and# (or# (and# (uncheckedShiftRL# (word32ToWord# x#_a1TY) 22#) 4294967295#) (and# (uncheckedShiftL# (word32ToWord# x#_a1TY) 10#) 4294967295#)) 4294967295#)))
+    #|      }
+    #|
+    #|rotr
+    #|  = \ x_aKk n_aKl ->
+    #|      case x_aKk of {
+    #|        W32# x#_a1TY -> case n_aKl of {
+    #|        I# i#_a1U1 -> case >=# i#_a1U1 0# of lwild_a1U3 {
+    #|        __DEFAULT -> case overflowError of { };
+    #|        1# -> let i#_s2FC = -# 32# i#_a1U1 in case >=# i#_s2FC 0# of lwild_a1TL {
+    #|        __DEFAULT -> case overflowError of { };
+    #|        1# -> W32# (wordToWord32# (or# (and# (and# (uncheckedShiftRL# (word32ToWord# x#_a1TY) i#_a1U1) (int2Word# (negateInt# (<# i#_a1U1 64#)))) 4294967295#) (and# (and# (uncheckedShiftL# (word32ToWord# x#_a1TY) i#_s2FC) (int2Word# (negateInt# (<# i#_s2FC 64#)))) 4294967295#)))
+    #|      }
+    #|      }
+    #|      }
+    #|      }
+  let prog = @syntax.parse_program(src).unwrap()
+  assert_true(prog.lookup("sigma0") is Some(_))
+  assert_true(prog.lookup("rotr") is Some(_))
+}
+
+

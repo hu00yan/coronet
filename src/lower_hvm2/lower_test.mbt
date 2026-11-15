@@ -297,3 +297,21 @@ test "64-bit arithmetic helper nets generation" {
   assert_true(hvm.contains("@sub64"))
   assert_true(hvm.contains("@mul64"))
 }
+
+test "lower bitwise operators" {
+  let src =
+    #| testBit = \ a b ->
+    #|   case a of { W# x ->
+    #|   case b of { W# y ->
+    #|     W# (xor# (or# (and# x y) (uncheckedIShiftL# 1# 4#)) (uncheckedIShiftRL# 64# 2#))
+    #|   }
+    #|   }
+    #| result = testBit (W# 12#) (W# 10#)
+    #| main = result
+  let hvm = @lower_hvm2.lower_core(src).unwrap()
+  assert_true(hvm.contains("$([&]"))
+  assert_true(hvm.contains("$([|]"))
+  assert_true(hvm.contains("$([^]"))
+  assert_true(hvm.contains("$([<<]"))
+  assert_true(hvm.contains("$([>>]"))
+}

@@ -1,0 +1,1645 @@
+@prim_add = (a (b ret))
+  & a ~ $([+] $(b ret))
+
+@prim_sub = (a (b ret))
+  & a ~ $([-] $(b ret))
+
+@prim_mul = (a (b ret))
+  & a ~ $([*] $(b ret))
+
+@prim_div = (a (b ret))
+  & a ~ $([/] $(b ret))
+
+@prim_rem = (a (b ret))
+  & a ~ $([%] $(b ret))
+
+@prim_eq = (a (b ret))
+  & a ~ $([=] $(b ret))
+
+@prim_neq = (a (b ret))
+  & a ~ $([!] $(b ret))
+
+@prim_lt = (a (b ret))
+  & a ~ $([<] $(b ret))
+
+@prim_gt = (a (b ret))
+  & a ~ $([>] $(b ret))
+
+@prim_lte = (a (b ret))
+  & b ~ $([<] $(a lt))
+  & 1 ~ $([-] $(lt ret))
+
+@prim_gte = (a (b ret))
+  & a ~ $([<] $(b lt))
+  & 1 ~ $([-] $(lt ret))
+
+@prim_and = (a (b ret))
+  & a ~ $([&] $(b ret))
+
+@prim_or = (a (b ret))
+  & a ~ $([|] $(b ret))
+
+@prim_xor = (a (b ret))
+  & a ~ $([^] $(b ret))
+
+@prim_shl = (a (b ret))
+  & a ~ $([<<] $(b ret))
+
+@prim_shr = (a (b ret))
+  & a ~ $([>>] $(b ret))
+
+@I_hash = (x x)
+
+@divZeroError = 0
+
+@overflowError = 0
+
+@_fNumWord32__c = (* (a (b ret)))
+  & a ~ $([+] $(b ret))
+
+@slt = (x (y ret))
+  & x_d1 ~ $([>>] $(23 sx))
+  & y_d1 ~ $([>>] $(23 sy))
+  & sx_d1 ~ $([!] $(sy diff_sign))
+  & diff_sign ~ ?((@slt_same @slt_diff) (x_d2 (y_d2 (sx_d2 ret))))
+  & {x_d1 x_d2} ~ x
+  & {y_d1 y_d2} ~ y
+  & {sx_d1 sx_d2} ~ sx
+
+@slt_same = (x (y (* ret)))
+  & x ~ $([<] $(y ret))
+
+@slt_diff = (* (* (* (sx ret))))
+  & sx ~ ret
+
+@sra = (x (y ret))
+  & x_d1 ~ $([>>] $(23 sx))
+  & sx ~ ?((@sra_pos @sra_neg) (x_d2 (y ret)))
+  & {x_d1 x_d2} ~ x
+
+@sra_pos = (x (y ret))
+  & x ~ $([>>] $(y ret))
+
+@sra_neg = (* (x (y ret)))
+  & x ~ $([>>] $(y_d1 shr_x))
+  & 16777215 ~ $([>>] $(y_d2 shr_mask))
+  & 16777215 ~ $([^] $(shr_mask sign_fill))
+  & shr_x ~ $([|] $(sign_fill ret))
+  & {y_d1 y_d2} ~ y
+
+@abs24 = (x ret)
+  & x_d1 ~ $([>>] $(23 sx))
+  & sx ~ ?((@id24 @neg24) (x_d2 ret))
+  & {x_d1 x_d2} ~ x
+
+@id24 = (x ret)
+  & x ~ ret
+
+@neg24 = (* (x ret))
+  & 0 ~ $([-] $(x ret))
+
+@sdiv = (x (y ret))
+  & x_d1 ~ $([>>] $(23 sx))
+  & y_d1 ~ $([>>] $(23 sy))
+  & sx ~ $([^] $(sy sign))
+  & @abs24 ~ (x_d2 ax)
+  & @abs24 ~ (y_d2 ay)
+  & ax ~ $([/] $(ay q))
+  & sign ~ ?((@id24 @neg24) (q ret))
+  & {x_d1 x_d2} ~ x
+  & {y_d1 y_d2} ~ y
+
+@srem = (x (y ret))
+  & x_d1 ~ $([>>] $(23 sx))
+  & @abs24 ~ (x_d2 ax)
+  & @abs24 ~ (y ay)
+  & ax ~ $([%] $(ay r))
+  & sx ~ ?((@id24 @neg24) (r ret))
+  & {x_d1 x_d2} ~ x
+
+@add64 = (a (b ret))
+  & a ~ (a_hi a_lo)
+  & b ~ (b_hi b_lo)
+  & a_lo_d1 ~ $([+] $(b_lo sum_lo))
+  & sum_lo_d1 ~ $([<] $(a_lo_d2 carry))
+  & a_hi ~ $([+] $(b_hi sum_hi))
+  & sum_hi ~ $([+] $(carry res_hi))
+  & ret ~ (res_hi sum_lo_d2)
+  & {a_lo_d1 a_lo_d2} ~ a_lo
+  & {sum_lo_d1 sum_lo_d2} ~ sum_lo
+
+@sub64 = (a (b ret))
+  & a ~ (a_hi a_lo)
+  & b ~ (b_hi b_lo)
+  & a_lo_d1 ~ $([-] $(b_lo_d1 diff_lo))
+  & a_lo_d2 ~ $([<] $(b_lo_d2 borrow))
+  & a_hi ~ $([-] $(b_hi diff_hi))
+  & diff_hi ~ $([-] $(borrow res_hi))
+  & ret ~ (res_hi diff_lo)
+  & {a_lo_d1 a_lo_d2} ~ a_lo
+  & {b_lo_d1 b_lo_d2} ~ b_lo
+
+@mul64 = (a (b ret))
+  & a ~ (a_hi a_lo)
+  & b ~ (b_hi b_lo)
+  & a_hi ~ $([*] $(b_lo_d1 hi_term1))
+  & a_lo_d1 ~ $([*] $(b_hi hi_term2))
+  & hi_term1 ~ $([+] $(hi_term2 hi_terms))
+  & a_lo_d2 ~ $([>>] $(12 a_hi12))
+  & a_lo_d3 ~ $([&] $(4095 a_lo12))
+  & b_lo_d2 ~ $([>>] $(12 b_hi12))
+  & b_lo_d3 ~ $([&] $(4095 b_lo12))
+  & a_lo12_d1 ~ $([*] $(b_lo12_d1 p0))
+  & a_hi12_d1 ~ $([*] $(b_lo12_d2 p1a))
+  & a_lo12_d2 ~ $([*] $(b_hi12_d1 p1b))
+  & a_hi12_d2 ~ $([*] $(b_hi12_d2 p2))
+  & p0_d1 ~ $([>>] $(12 p0_hi))
+  & p0_d2 ~ $([&] $(4095 p0_lo))
+  & p1a_d1 ~ $([&] $(4095 p1a_lo))
+  & p1a_d2 ~ $([>>] $(12 p1a_hi))
+  & p1b_d1 ~ $([&] $(4095 p1b_lo))
+  & p1b_d2 ~ $([>>] $(12 p1b_hi))
+  & p0_hi ~ $([+] $(p1a_lo mid_part1))
+  & mid_part1 ~ $([+] $(p1b_lo mid_lo))
+  & mid_lo_d1 ~ $([>>] $(12 mid_carry))
+  & mid_lo_d2 ~ $([&] $(4095 mid_bits))
+  & mid_bits ~ $([<<] $(12 mid_shifted))
+  & p0_lo ~ $([|] $(mid_shifted res_lo))
+  & p2 ~ $([+] $(p1a_hi carry_part1))
+  & carry_part1 ~ $([+] $(p1b_hi carry_part2))
+  & carry_part2 ~ $([+] $(mid_carry carry_to_hi))
+  & carry_to_hi ~ $([+] $(hi_terms res_hi))
+  & ret ~ (res_hi res_lo)
+  & {a_lo_d1 {a_lo_d2 a_lo_d3}} ~ a_lo
+  & {b_lo_d1 {b_lo_d2 b_lo_d3}} ~ b_lo
+  & {a_hi12_d1 a_hi12_d2} ~ a_hi12
+  & {a_lo12_d1 a_lo12_d2} ~ a_lo12
+  & {b_hi12_d1 b_hi12_d2} ~ b_hi12
+  & {b_lo12_d1 b_lo12_d2} ~ b_lo12
+  & {p0_d1 p0_d2} ~ p0
+  & {p1a_d1 p1a_d2} ~ p1a
+  & {p1b_d1 p1b_d2} ~ p1b
+  & {mid_lo_d1 mid_lo_d2} ~ mid_lo
+
+@div1000 = (n (x ret))
+  & n_d1 ~ $([%] $(x_d1 r))
+  & n_d2 ~ $([/] $(x_d2 q))
+  & r ~ $([*] $(125 t))
+  & t_d1 ~ $([/] $(x_d3 qt))
+  & t_d2 ~ $([%] $(x_d4 rt))
+  & qt ~ $([*] $(8 qt8))
+  & rt ~ $([*] $(8 rt8))
+  & rt8 ~ $([/] $(x_d5 rem_rt))
+  & qt8 ~ $([+] $(rem_rt rem_part))
+  & q ~ $([*] $(1000 q1000))
+  & q1000 ~ $([+] $(rem_part ret))
+  & {n_d1 n_d2} ~ n
+  & {x_d1 {x_d2 {x_d3 {x_d4 x_d5}}}} ~ x
+  & {t_d1 t_d2} ~ t
+
+@isqrt1000_step = (n (x ret))
+  & @div1000 ~ (n_d1 (x_d1 div_res))
+  & x_d2 ~ $([+] $(div_res sum))
+  & sum ~ $([>>] $(1 nxt))
+  & @slt ~ (nxt_d1 (x_d3 is_less))
+  & is_less ~ ?((@isqrt1000_done @isqrt1000_loop) (n_d2 (nxt_d2 (x_d4 ret))))
+  & {n_d1 n_d2} ~ n
+  & {x_d1 {x_d2 {x_d3 x_d4}}} ~ x
+  & {nxt_d1 nxt_d2} ~ nxt
+
+@isqrt1000_done = (* (* (x ret)))
+  & x ~ ret
+
+@isqrt1000_loop = (* (n (nxt (* ret))))
+  & @isqrt1000_step ~ (n (nxt ret))
+
+@isqrt1000 = (n ret)
+  & @slt ~ (0 (n_d1 is_pos))
+  & is_pos ~ ?((@isqrt1000_zero @isqrt1000_pos) (n_d2 ret))
+  & {n_d1 n_d2} ~ n
+
+@isqrt1000_zero = (* (* ret))
+  & 0 ~ ret
+
+@isqrt1000_pos = (* (n ret))
+  & @isqrt ~ (n_d1 sqrt_n)
+  & sqrt_n ~ $([*] $(32 s32))
+  & s32 ~ $([+] $(32 x0))
+  & @isqrt1000_step ~ (n_d2 (x0 ret))
+  & {n_d1 n_d2} ~ n
+
+@isqrt = (n ret)
+  & @slt ~ (0 (n_d1 is_pos))
+  & is_pos ~ ?((@isqrt_zero @isqrt_pos) (n_d2 ret))
+  & {n_d1 n_d2} ~ n
+
+@isqrt_zero = (* (* ret))
+  & 0 ~ ret
+
+@isqrt_pos = (* (n ret))
+  & n_d1 ~ $([>>] $(1 half_n))
+  & half_n ~ $([+] $(1 x0))
+  & @isqrt_step ~ (x0 (n_d2 ret))
+  & {n_d1 n_d2} ~ n
+
+@isqrt_step = (x (n ret))
+  & n_d1 ~ $([/] $(x_d1 div_res))
+  & x_d2 ~ $([+] $(div_res sum))
+  & sum ~ $([>>] $(1 nxt))
+  & @slt ~ (nxt_d1 (x_d3 is_less))
+  & is_less ~ ?((@isqrt_done @isqrt_loop) (n_d2 (nxt_d2 (x_d4 ret))))
+  & {x_d1 {x_d2 {x_d3 x_d4}}} ~ x
+  & {n_d1 n_d2} ~ n
+  & {nxt_d1 nxt_d2} ~ nxt
+
+@isqrt_done = (* (* (x ret)))
+  & x ~ ret
+
+@isqrt_loop = (* (n (nxt (* ret))))
+  & @isqrt_step ~ (nxt (n ret))
+
+@add_mod = (a (b ret))
+  & a ~ (a_hi a_lo)
+  & b ~ (b_hi b_lo)
+  & a_lo_d1 ~ $([+] $(b_lo sum_lo))
+  & sum_lo_d1 ~ $([<] $(a_lo_d2 carry))
+  & a_hi ~ $([+] $(b_hi sum_hi1))
+  & sum_hi1 ~ $([+] $(carry sum_hi))
+  & @ge_mod ~ (sum_hi_d1 (sum_lo_d2 is_ge))
+  & is_ge ~ ?((@sub_mod_no @sub_mod_yes) (sum_hi_d2 (sum_lo_d3 ret)))
+  & {a_lo_d1 a_lo_d2} ~ a_lo
+  & {sum_lo_d1 {sum_lo_d2 sum_lo_d3}} ~ sum_lo
+  & {sum_hi_d1 sum_hi_d2} ~ sum_hi
+
+@sub_mod_no = (hi (lo ret))
+  & ret ~ (hi lo)
+
+@sub_mod_yes = (* (hi (lo ret)))
+  & lo_d1 ~ $([<] $(10144263 borrow))
+  & lo_d2 ~ $([-] $(10144263 res_lo))
+  & hi ~ $([-] $(59 diff_hi))
+  & diff_hi ~ $([-] $(borrow res_hi))
+  & ret ~ (res_hi res_lo)
+  & {lo_d1 lo_d2} ~ lo
+
+@ge_mod = (hi (lo ret))
+  & hi_d1 ~ $([<] $(59 lt59))
+  & lt59 ~ ?((@check_gt59 @ret_zero) (hi_d2 (lo ret)))
+  & {hi_d1 hi_d2} ~ hi
+
+@ret_zero = (* (* (* ret)))
+  & 0 ~ ret
+
+@check_gt59 = (hi (lo ret))
+  & 59 ~ $([<] $(hi gt59))
+  & gt59 ~ ?((@check_lo @ret_one) (lo ret))
+
+@ret_one = (* (* ret))
+  & 1 ~ ret
+
+@check_lo = (lo ret)
+  & 10144262 ~ $([<] $(lo ret))
+
+@mul31_mod = (x ret)
+  & @add_mod ~ (x_d1 (x_d2 y2))
+  & @add_mod ~ (y2_d1 (y2_d2 y4))
+  & @add_mod ~ (y4_d1 (y4_d2 y8))
+  & @add_mod ~ (y8_d1 (y8_d2 y16))
+  & @add_mod ~ (y2_d3 (x_d3 t1))
+  & @add_mod ~ (y4_d3 (t1 t2))
+  & @add_mod ~ (y8_d3 (t2 t3))
+  & @add_mod ~ (y16 (t3 ret))
+  & {x_d1 {x_d2 x_d3}} ~ x
+  & {y2_d1 {y2_d2 y2_d3}} ~ y2
+  & {y4_d1 {y4_d2 y4_d3}} ~ y4
+  & {y8_d1 {y8_d2 y8_d3}} ~ y8
+
+@add = @prim_add
+
+@sub = @prim_sub
+
+@mul = @prim_mul
+
+@div = @prim_div
+
+@rem = @prim_rem
+
+@eq = @prim_eq
+
+@neq = @prim_neq
+
+@lt = @prim_lt
+
+@gt = @prim_gt
+
+@lte = @prim_lte
+
+@gte = @prim_gte
+
+@and = @prim_and
+
+@or = @prim_or
+
+@xor = @prim_xor
+
+@shl = @prim_shl
+
+@shr = @prim_shr
+
+@MyNil = (call (* call))
+
+@MyCons = (h (t (* ((h (t call)) call))))
+
+@Nil = (call (* call))
+
+@Cons = (h (t (* ((h (t call)) call))))
+
+@LCons = (h (t (* ((h (t call)) call))))
+
+@MyNothing = (call (* call))
+
+@MyJust = (x (* ((x call) call)))
+
+@MyFalse = (call (* call))
+
+@MyTrue = (* (call call))
+
+@False = (call (* call))
+
+@True = (* (call call))
+
+@Leaf = (x ((x call) (* call)))
+
+@Node = (l (r (* ((l (r call)) call))))
+
+@Pair = (l (r (l r)))
+
+@Vec3 = (x (y (z (x (y z)))))
+
+@Ray = (o (d (o d)))
+
+@Sphere = (c (r (col (c (r col)))))
+
+@Light = (p (i (p i)))
+
+@HashState = (a (b (c (d (e (f (g (h (a (b (c (d (e (f (g h)))))))))))))))
+
+@alt0__C1 = (_u2 ret_3)
+  & _u2 ~ ret_3
+
+@alt1__C2 = (_u4 (_u5 (_u2 ret_4)))
+  & @appendL ~ (_u5 (_u2 app_ret_6))
+  & @Cons ~ (_u4 (app_ret_6 constr_ret_5))
+  & constr_ret_5 ~ ret_4
+
+@appendL = (_u1 (_u2 top_ret_1))
+  & _u1 ~ _u3
+  & _u3 ~ (@alt0__C1 (@alt1__C2 (_u2 match_ret_2)))
+  & match_ret_2 ~ top_ret_1
+
+@sceneLight_s1N5 = top_ret_7
+  & 500 ~ top_ret_7
+
+@sceneLight_s1N6 = top_ret_8
+  & 1000 ~ top_ret_8
+
+@sceneLight_s1N8 = top_ret_9
+  & @Vec3 ~ (500 (1000 (500 constr_ret_10)))
+  & constr_ret_10 ~ top_ret_9
+
+@sceneLight_s1N9 = top_ret_11
+  & 800 ~ top_ret_11
+
+@sceneLight = top_ret_12
+  & @Light ~ (@sceneLight_s1N8 (800 constr_ret_13))
+  & constr_ret_13 ~ top_ret_12
+
+@branch_zero__C3 = (* (* ret_16))
+  & 0 ~ ret_16
+
+@branch_else__C5 = (* (_u13 (_u7 ret_34)))
+  & @_sisqrtStep_s2PF ~ (_u13 (_u7 app_ret_35))
+  & app_ret_35 ~ ret_34
+
+@branch_then__C6 = (* (_u8 (* (* ret_36))))
+  & _u8 ~ ret_36
+
+@branch_default__C4 = (* (_u8 (_u7 ret_17)))
+  & @slt ~ (_u8_d1 (0 lt_res_18))
+  & lt_res_18 ~ _u9
+  & @slt ~ (_u7_d1 (0 lt_res_19))
+  & _u9_d1 ~ $([^] $(16777215 not_res_20))
+  & lt_res_19 ~ $([&] $(not_res_20 and_res_21))
+  & and_res_21 ~ _u10
+  & @slt ~ (0 (_u7_d2 gt_res_22))
+  & gt_res_22 ~ $([&] $(_u9_d2 and_res_23))
+  & and_res_23 ~ _u11
+  & _u10_d1 ~ $([-] $(_u11_d1 sub_res_24))
+  & _u7_d3 ~ $([+] $(sub_res_24 add_res_25))
+  & @sdiv ~ (add_res_25 (_u8_d2 div_res_26))
+  & _u10_d2 ~ $([|] $(_u11_d2 or_res_27))
+  & div_res_26 ~ $([-] $(or_res_27 sub_res_28))
+  & sub_res_28 ~ _u12
+  & _u8_d3 ~ $([+] $(_u12 add_res_29))
+  & @sra ~ (add_res_29 (1 sra_res_30))
+  & sra_res_30 ~ _u13
+  & @slt ~ (_u13_d1 (_u8_d4 cmp_lt_31))
+  & 1 ~ $([-] $(cmp_lt_31 cmp_res_32))
+  & cmp_res_32 ~ _u14
+  & _u14 ~ ?((@branch_else__C5 @branch_then__C6) (_u8_d5 (_u13_d2 (_u7_d4 case_ret_33))))
+  & case_ret_33 ~ ret_17
+  & {_u8_d1 {_u8_d2 {_u8_d3 {_u8_d4 _u8_d5}}}} ~ _u8
+  & {_u7_d1 {_u7_d2 {_u7_d3 _u7_d4}}} ~ _u7
+  & {_u9_d1 _u9_d2} ~ _u9
+  & {_u10_d1 _u10_d2} ~ _u10
+  & {_u11_d1 _u11_d2} ~ _u11
+  & {_u13_d1 _u13_d2} ~ _u13
+
+@_sisqrtStep_s2PF = (_u6 (_u7 top_ret_14))
+  & _u6 ~ _u8
+  & _u8_d1 ~ ?((@branch_zero__C3 @branch_default__C4) (_u8_d2 (_u7 case_ret_15)))
+  & case_ret_15 ~ top_ret_14
+  & {_u8_d1 _u8_d2} ~ _u8
+
+@branch_zero__C7 = (* (* (* ret_39)))
+  & 0 ~ ret_39
+
+@branch_else__C9 = (* (_u33 (_u28 ret_57)))
+  & @_sisqrtStep_s2PF ~ (_u33 (_u28 app_ret_58))
+  & app_ret_58 ~ ret_57
+
+@branch_then__C10 = (* (_u24 (* (* ret_59))))
+  & _u24 ~ ret_59
+
+@branch_default__C8 = (* (_u22 (_u26 (_u24 ret_40))))
+  & _u22 ~ _u27
+  & _u27 ~ _u28
+  & @slt ~ (_u26_d1 (0 lt_res_41))
+  & lt_res_41 ~ _u29
+  & @slt ~ (_u28_d1 (0 lt_res_42))
+  & _u29_d1 ~ $([^] $(16777215 not_res_43))
+  & lt_res_42 ~ $([&] $(not_res_43 and_res_44))
+  & and_res_44 ~ _u30
+  & @slt ~ (0 (_u28_d2 gt_res_45))
+  & gt_res_45 ~ $([&] $(_u29_d2 and_res_46))
+  & and_res_46 ~ _u31
+  & _u30_d1 ~ $([-] $(_u31_d1 sub_res_47))
+  & _u28_d3 ~ $([+] $(sub_res_47 add_res_48))
+  & @sdiv ~ (add_res_48 (_u26_d2 div_res_49))
+  & _u30_d2 ~ $([|] $(_u31_d2 or_res_50))
+  & div_res_49 ~ $([-] $(or_res_50 sub_res_51))
+  & sub_res_51 ~ _u32
+  & _u26_d3 ~ $([+] $(_u32 add_res_52))
+  & @sra ~ (add_res_52 (1 sra_res_53))
+  & sra_res_53 ~ _u33
+  & @slt ~ (_u33_d1 (_u26_d4 cmp_lt_54))
+  & 1 ~ $([-] $(cmp_lt_54 cmp_res_55))
+  & cmp_res_55 ~ _u34
+  & _u34 ~ ?((@branch_else__C9 @branch_then__C10) (_u24 (_u33_d2 (_u28_d4 case_ret_56))))
+  & case_ret_56 ~ ret_40
+  & {_u26_d1 {_u26_d2 {_u26_d3 _u26_d4}}} ~ _u26
+  & {_u28_d1 {_u28_d2 {_u28_d3 _u28_d4}}} ~ _u28
+  & {_u29_d1 _u29_d2} ~ _u29
+  & {_u30_d1 _u30_d2} ~ _u30
+  & {_u31_d1 _u31_d2} ~ _u31
+  & {_u33_d1 _u33_d2} ~ _u33
+
+@isqrtStep = (_u22 (_u23 top_ret_37))
+  & _u23 ~ _u24
+  & _u24_d1 ~ _u25
+  & _u25 ~ _u26
+  & _u26_d1 ~ ?((@branch_zero__C7 @branch_default__C8) (_u22 (_u26_d2 (_u24_d2 case_ret_38))))
+  & case_ret_38 ~ top_ret_37
+  & {_u24_d1 _u24_d2} ~ _u24
+  & {_u26_d1 _u26_d2} ~ _u26
+
+@sceneSpheres_s1Of = top_ret_60
+  & 0 ~ top_ret_60
+
+@sceneSpheres_s1Oh = top_ret_61
+  & 16776216 ~ top_ret_61
+
+@sceneSpheres_s1Oi = top_ret_62
+  & @Vec3 ~ (0 (0 (16776216 constr_ret_63)))
+  & constr_ret_63 ~ top_ret_62
+
+@sceneSpheres_s1Oj = top_ret_64
+  & 400 ~ top_ret_64
+
+@sceneSpheres_s1Ok = top_ret_65
+  & 1 ~ top_ret_65
+
+@sceneSpheres_s1Ol = top_ret_66
+  & @Sphere ~ (@sceneSpheres_s1Oi (400 (1 constr_ret_67)))
+  & constr_ret_67 ~ top_ret_66
+
+@sceneSpheres_s1Om = top_ret_68
+  & 16776816 ~ top_ret_68
+
+@sceneSpheres_s1On = top_ret_69
+  & 200 ~ top_ret_69
+
+@sceneSpheres_s1Oo = top_ret_70
+  & 16776016 ~ top_ret_70
+
+@sceneSpheres_s1Op = top_ret_71
+  & @Vec3 ~ (16776816 (200 (16776016 constr_ret_72)))
+  & constr_ret_72 ~ top_ret_71
+
+@sceneSpheres_s1Oq = top_ret_73
+  & 300 ~ top_ret_73
+
+@sceneSpheres_s1Or = top_ret_74
+  & 2 ~ top_ret_74
+
+@sceneSpheres_s1Os = top_ret_75
+  & @Sphere ~ (@sceneSpheres_s1Op (300 (2 constr_ret_76)))
+  & constr_ret_76 ~ top_ret_75
+
+@sceneSpheres_s1Ou = top_ret_77
+  & 16777016 ~ top_ret_77
+
+@sceneSpheres_s1Ov = top_ret_78
+  & 16776416 ~ top_ret_78
+
+@sceneSpheres_s1Ow = top_ret_79
+  & @Vec3 ~ (400 (16777016 (16776416 constr_ret_80)))
+  & constr_ret_80 ~ top_ret_79
+
+@sceneSpheres_s1Ox = top_ret_81
+  & 250 ~ top_ret_81
+
+@sceneSpheres_s1Oy = top_ret_82
+  & 3 ~ top_ret_82
+
+@sceneSpheres_s1Oz = top_ret_83
+  & @Sphere ~ (@sceneSpheres_s1Ow (250 (3 constr_ret_84)))
+  & constr_ret_84 ~ top_ret_83
+
+@sceneSpheres_s1OA = top_ret_85
+  & @Cons ~ (@sceneSpheres_s1Oz (@Nil constr_ret_86))
+  & constr_ret_86 ~ top_ret_85
+
+@sceneSpheres_s1OB = top_ret_87
+  & @Cons ~ (@sceneSpheres_s1Os (@sceneSpheres_s1OA constr_ret_88))
+  & constr_ret_88 ~ top_ret_87
+
+@sceneSpheres = top_ret_89
+  & @Cons ~ (@sceneSpheres_s1Ol (@sceneSpheres_s1OB constr_ret_90))
+  & constr_ret_90 ~ top_ret_89
+
+@alt0__checksumList = ret
+  & (0 0) ~ ret
+
+@alt1__checksumList = (p (ps ret))
+  & @checksumList ~ (ps c_rest)
+  & @mul31_mod ~ (c_rest prod)
+  & @add_mod ~ ((0 p) (prod ret))
+
+@checksumList = (xs top_ret)
+  & xs ~ (@alt0__checksumList (@alt1__checksumList match_ret))
+  & match_ret ~ top_ret
+
+@branch_else__C11 = (_u56 ret_95)
+  & @sra ~ (_u56_d1 (1 sra_res_96))
+  & sra_res_96 ~ $([+] $(1 add_res_97))
+  & @_sisqrtStep_s2PF ~ (add_res_97 (_u56_d2 app_ret_98))
+  & app_ret_98 ~ ret_95
+  & {_u56_d1 _u56_d2} ~ _u56
+
+@branch_then__C12 = (* (* ret_99))
+  & 0 ~ ret_99
+
+@isqrt = (_u54 top_ret_91)
+  & _u54 ~ _u55
+  & _u55 ~ _u56
+  & @slt ~ (0 (_u56_d1 cmp_lt_92))
+  & 1 ~ $([-] $(cmp_lt_92 cmp_res_93))
+  & cmp_res_93 ~ _u57
+  & _u57 ~ ?((@branch_else__C11 @branch_then__C12) (_u56_d2 case_ret_94))
+  & case_ret_94 ~ top_ret_91
+  & {_u56_d1 _u56_d2} ~ _u56
+
+@vscale = (_u58 (_u59 top_ret_100))
+  & _u58 ~ _u60
+  & _u60 ~ (_u61 (_u62 _u63))
+  & _u61 ~ _u64
+  & _u64 ~ _u65
+  & _u59_d1 ~ _u66
+  & _u66 ~ _u67
+  & _u65 ~ $([*] $(_u67 mul_res_102))
+  & mul_res_102 ~ _u68
+  & @slt ~ (_u68_d1 (0 lt_res_103))
+  & lt_res_103 ~ _u69
+  & _u68_d2 ~ $([+] $(_u69_d1 add_res_104))
+  & @sdiv ~ (add_res_104 (1000 div_res_105))
+  & div_res_105 ~ $([-] $(_u69_d2 sub_res_106))
+  & _u62 ~ _u70
+  & _u70 ~ _u71
+  & _u59_d2 ~ _u72
+  & _u72 ~ _u73
+  & _u71 ~ $([*] $(_u73 mul_res_107))
+  & mul_res_107 ~ _u74
+  & @slt ~ (_u74_d1 (0 lt_res_108))
+  & lt_res_108 ~ _u75
+  & _u74_d2 ~ $([+] $(_u75_d1 add_res_109))
+  & @sdiv ~ (add_res_109 (1000 div_res_110))
+  & div_res_110 ~ $([-] $(_u75_d2 sub_res_111))
+  & _u63 ~ _u76
+  & _u76 ~ _u77
+  & _u59_d3 ~ _u78
+  & _u78 ~ _u79
+  & _u77 ~ $([*] $(_u79 mul_res_112))
+  & mul_res_112 ~ _u80
+  & @slt ~ (_u80_d1 (0 lt_res_113))
+  & lt_res_113 ~ _u81
+  & _u80_d2 ~ $([+] $(_u81_d1 add_res_114))
+  & @sdiv ~ (add_res_114 (1000 div_res_115))
+  & div_res_115 ~ $([-] $(_u81_d2 sub_res_116))
+  & @Vec3 ~ (sub_res_106 (sub_res_111 (sub_res_116 constr_ret_101)))
+  & constr_ret_101 ~ top_ret_100
+  & {_u59_d1 {_u59_d2 _u59_d3}} ~ _u59
+  & {_u68_d1 _u68_d2} ~ _u68
+  & {_u69_d1 _u69_d2} ~ _u69
+  & {_u74_d1 _u74_d2} ~ _u74
+  & {_u75_d1 _u75_d2} ~ _u75
+  & {_u80_d1 _u80_d2} ~ _u80
+  & {_u81_d1 _u81_d2} ~ _u81
+
+@vdot = (_u82 (_u83 top_ret_117))
+  & _u82 ~ _u84
+  & _u84 ~ (_u85 (_u86 _u87))
+  & _u83 ~ _u88
+  & _u88 ~ (_u89 (_u90 _u91))
+  & _u85 ~ _u92
+  & _u92 ~ _u93
+  & _u89 ~ _u94
+  & _u94 ~ _u95
+  & _u86 ~ _u96
+  & _u96 ~ _u97
+  & _u90 ~ _u98
+  & _u98 ~ _u99
+  & _u87 ~ _u100
+  & _u100 ~ _u101
+  & _u91 ~ _u102
+  & _u102 ~ _u103
+  & _u93 ~ $([*] $(_u95 mul_res_118))
+  & _u97 ~ $([*] $(_u99 mul_res_119))
+  & mul_res_118 ~ $([+] $(mul_res_119 add_res_120))
+  & _u101 ~ $([*] $(_u103 mul_res_121))
+  & add_res_120 ~ $([+] $(mul_res_121 add_res_122))
+  & add_res_122 ~ _u104
+  & @slt ~ (_u104_d1 (0 lt_res_123))
+  & lt_res_123 ~ _u105
+  & _u104_d2 ~ $([+] $(_u105_d1 add_res_124))
+  & @sdiv ~ (add_res_124 (1000 div_res_125))
+  & div_res_125 ~ $([-] $(_u105_d2 sub_res_126))
+  & sub_res_126 ~ top_ret_117
+  & {_u104_d1 _u104_d2} ~ _u104
+  & {_u105_d1 _u105_d2} ~ _u105
+
+@lvl_s2Kc = top_ret_127
+  & @Vec3 ~ (0 (0 (1000 constr_ret_128)))
+  & constr_ret_128 ~ top_ret_127
+
+@branch_zero__C15 = (* (* ret_147))
+  & @divZeroError ~ ret_147
+
+@branch_default__C16 = (* (_u112 (_u122 ret_148)))
+  & _u112 ~ $([*] $(1000 mul_res_149))
+  & mul_res_149 ~ _u123
+  & @slt ~ (_u122_d1 (0 lt_res_150))
+  & lt_res_150 ~ _u124
+  & @slt ~ (_u123_d1 (0 lt_res_151))
+  & _u124_d1 ~ $([^] $(16777215 not_res_152))
+  & lt_res_151 ~ $([&] $(not_res_152 and_res_153))
+  & and_res_153 ~ _u125
+  & @slt ~ (0 (_u123_d2 gt_res_154))
+  & gt_res_154 ~ $([&] $(_u124_d2 and_res_155))
+  & and_res_155 ~ _u126
+  & _u125_d1 ~ $([-] $(_u126_d1 sub_res_156))
+  & _u123_d3 ~ $([+] $(sub_res_156 add_res_157))
+  & @sdiv ~ (add_res_157 (_u122_d2 div_res_158))
+  & _u125_d2 ~ $([|] $(_u126_d2 or_res_159))
+  & div_res_158 ~ $([-] $(or_res_159 sub_res_160))
+  & sub_res_160 ~ _u127
+  & _u127 ~ ret_148
+  & {_u122_d1 _u122_d2} ~ _u122
+  & {_u123_d1 {_u123_d2 _u123_d3}} ~ _u123
+  & {_u124_d1 _u124_d2} ~ _u124
+  & {_u125_d1 _u125_d2} ~ _u125
+  & {_u126_d1 _u126_d2} ~ _u126
+
+@branch_zero__C17 = (* (* ret_162))
+  & @divZeroError ~ ret_162
+
+@branch_default__C18 = (* (_u114 (_u131 ret_163)))
+  & _u114 ~ $([*] $(1000 mul_res_164))
+  & mul_res_164 ~ _u132
+  & @slt ~ (_u131_d1 (0 lt_res_165))
+  & lt_res_165 ~ _u133
+  & @slt ~ (_u132_d1 (0 lt_res_166))
+  & _u133_d1 ~ $([^] $(16777215 not_res_167))
+  & lt_res_166 ~ $([&] $(not_res_167 and_res_168))
+  & and_res_168 ~ _u134
+  & @slt ~ (0 (_u132_d2 gt_res_169))
+  & gt_res_169 ~ $([&] $(_u133_d2 and_res_170))
+  & and_res_170 ~ _u135
+  & _u134_d1 ~ $([-] $(_u135_d1 sub_res_171))
+  & _u132_d3 ~ $([+] $(sub_res_171 add_res_172))
+  & @sdiv ~ (add_res_172 (_u131_d2 div_res_173))
+  & _u134_d2 ~ $([|] $(_u135_d2 or_res_174))
+  & div_res_173 ~ $([-] $(or_res_174 sub_res_175))
+  & sub_res_175 ~ _u136
+  & _u136 ~ ret_163
+  & {_u131_d1 _u131_d2} ~ _u131
+  & {_u132_d1 {_u132_d2 _u132_d3}} ~ _u132
+  & {_u133_d1 _u133_d2} ~ _u133
+  & {_u134_d1 _u134_d2} ~ _u134
+  & {_u135_d1 _u135_d2} ~ _u135
+
+@branch_zero__C19 = (* (* ret_177))
+  & @divZeroError ~ ret_177
+
+@branch_default__C20 = (* (_u116 (_u140 ret_178)))
+  & _u116 ~ $([*] $(1000 mul_res_179))
+  & mul_res_179 ~ _u141
+  & @slt ~ (_u140_d1 (0 lt_res_180))
+  & lt_res_180 ~ _u142
+  & @slt ~ (_u141_d1 (0 lt_res_181))
+  & _u142_d1 ~ $([^] $(16777215 not_res_182))
+  & lt_res_181 ~ $([&] $(not_res_182 and_res_183))
+  & and_res_183 ~ _u143
+  & @slt ~ (0 (_u141_d2 gt_res_184))
+  & gt_res_184 ~ $([&] $(_u142_d2 and_res_185))
+  & and_res_185 ~ _u144
+  & _u143_d1 ~ $([-] $(_u144_d1 sub_res_186))
+  & _u141_d3 ~ $([+] $(sub_res_186 add_res_187))
+  & @sdiv ~ (add_res_187 (_u140_d2 div_res_188))
+  & _u143_d2 ~ $([|] $(_u144_d2 or_res_189))
+  & div_res_188 ~ $([-] $(or_res_189 sub_res_190))
+  & sub_res_190 ~ _u145
+  & _u145 ~ ret_178
+  & {_u140_d1 _u140_d2} ~ _u140
+  & {_u141_d1 {_u141_d2 _u141_d3}} ~ _u141
+  & {_u142_d1 _u142_d2} ~ _u142
+  & {_u143_d1 _u143_d2} ~ _u143
+  & {_u144_d1 _u144_d2} ~ _u144
+
+@branch_else__C14 = (_u120 (_u112 (_u114 (_u116 ret_144))))
+  & _u120_d1 ~ _u122
+  & _u122_d1 ~ ?((@branch_zero__C15 @branch_default__C16) (_u112 (_u122_d2 case_ret_146)))
+  & _u120_d2 ~ _u131
+  & _u131_d1 ~ ?((@branch_zero__C17 @branch_default__C18) (_u114 (_u131_d2 case_ret_161)))
+  & _u120_d3 ~ _u140
+  & _u140_d1 ~ ?((@branch_zero__C19 @branch_default__C20) (_u116 (_u140_d2 case_ret_176)))
+  & @Vec3 ~ (case_ret_146 (case_ret_161 (case_ret_176 constr_ret_145)))
+  & constr_ret_145 ~ ret_144
+  & {_u120_d1 {_u120_d2 _u120_d3}} ~ _u120
+  & {_u122_d1 _u122_d2} ~ _u122
+  & {_u131_d1 _u131_d2} ~ _u131
+  & {_u140_d1 _u140_d2} ~ _u140
+
+@branch_then__C21 = (* (* (* (* (* ret_191)))))
+  & @lvl_s2Kc ~ ret_191
+
+@lambda__C13 = (_u112 (_u114 (_u116 (_u120 ret_140))))
+  & @slt ~ (0 (_u120_d1 cmp_lt_141))
+  & 1 ~ $([-] $(cmp_lt_141 cmp_res_142))
+  & cmp_res_142 ~ _u121
+  & _u121 ~ ?((@branch_else__C14 @branch_then__C21) (_u120_d2 (_u112 (_u114 (_u116 case_ret_143)))))
+  & case_ret_143 ~ ret_140
+  & {_u120_d1 _u120_d2} ~ _u120
+
+@branch_else__C22 = (_u149 (_u119 ret_196))
+  & @sra ~ (_u119_d1 (1 sra_res_197))
+  & sra_res_197 ~ $([+] $(1 add_res_198))
+  & @_sisqrtStep_s2PF ~ (add_res_198 (_u119_d2 app_ret_199))
+  & app_ret_199 ~ _u151
+  & _u151 ~ _u152
+  & _u149 ~ (_u152 app_ret_200)
+  & app_ret_200 ~ ret_196
+  & {_u119_d1 _u119_d2} ~ _u119
+
+@branch_then__C23 = (* (_u149 (* ret_201)))
+  & _u149 ~ (0 app_ret_202)
+  & app_ret_202 ~ ret_201
+
+@vnorm = (_u106 top_ret_129)
+  & _u106 ~ _u107
+  & _u107 ~ (_u108 (_u109 _u110))
+  & _u108 ~ _u111
+  & _u111 ~ _u112
+  & _u109 ~ _u113
+  & _u113 ~ _u114
+  & _u110 ~ _u115
+  & _u115 ~ _u116
+  & _u112_d1 ~ $([*] $(_u112_d2 mul_res_130))
+  & _u114_d1 ~ $([*] $(_u114_d2 mul_res_131))
+  & mul_res_130 ~ $([+] $(mul_res_131 add_res_132))
+  & _u116_d1 ~ $([*] $(_u116_d2 mul_res_133))
+  & add_res_132 ~ $([+] $(mul_res_133 add_res_134))
+  & add_res_134 ~ _u117
+  & @slt ~ (_u117_d1 (0 lt_res_135))
+  & lt_res_135 ~ _u118
+  & _u117_d2 ~ $([+] $(_u118_d1 add_res_136))
+  & @sdiv ~ (add_res_136 (1000 div_res_137))
+  & div_res_137 ~ $([-] $(_u118_d2 sub_res_138))
+  & sub_res_138 ~ $([*] $(1000 mul_res_139))
+  & mul_res_139 ~ _u119
+  & @lambda__C13 ~ (_u112_d3 (_u114_d3 (_u116_d3 closure_192)))
+  & closure_192 ~ _u149
+  & @slt ~ (0 (_u119_d1 cmp_lt_193))
+  & 1 ~ $([-] $(cmp_lt_193 cmp_res_194))
+  & cmp_res_194 ~ _u150
+  & _u150 ~ ?((@branch_else__C22 @branch_then__C23) (_u149 (_u119_d2 case_ret_195)))
+  & case_ret_195 ~ top_ret_129
+  & {_u112_d1 {_u112_d2 _u112_d3}} ~ _u112
+  & {_u114_d1 {_u114_d2 _u114_d3}} ~ _u114
+  & {_u116_d1 {_u116_d2 _u116_d3}} ~ _u116
+  & {_u117_d1 _u117_d2} ~ _u117
+  & {_u118_d1 _u118_d2} ~ _u118
+  & {_u119_d1 _u119_d2} ~ _u119
+
+@vsub = (_u153 (_u154 top_ret_203))
+  & _u153 ~ _u155
+  & _u155 ~ (_u156 (_u157 _u158))
+  & _u154 ~ _u159
+  & _u159 ~ (_u160 (_u161 _u162))
+  & _u156 ~ $([-] $(_u160 sub_res_205))
+  & _u157 ~ $([-] $(_u161 sub_res_206))
+  & _u158 ~ $([-] $(_u162 sub_res_207))
+  & @Vec3 ~ (sub_res_205 (sub_res_206 (sub_res_207 constr_ret_204)))
+  & constr_ret_204 ~ top_ret_203
+
+@lvl_s2Kn = top_ret_208
+  & 16777215 ~ top_ret_208
+
+@branch_zero__C26 = (* (* (* ret_257)))
+  & 0 ~ ret_257
+
+@branch_else__C28 = (* ret_275)
+  & 16777215 ~ ret_275
+
+@branch_then__C29 = (* (_u225 ret_276))
+  & _u225 ~ ret_276
+
+@branch_default__C27 = (* (_u220 (_u209 (_u219 ret_258))))
+  & @slt ~ (_u220_d1 (0 lt_res_259))
+  & lt_res_259 ~ _u221
+  & _u209 ~ $([*] $(1000 mul_res_260))
+  & 0 ~ $([-] $(mul_res_260 neg_res_261))
+  & neg_res_261 ~ $([-] $(_u219 sub_res_262))
+  & sub_res_262 ~ _u222
+  & @slt ~ (_u222_d1 (0 lt_res_263))
+  & _u221_d1 ~ $([^] $(16777215 not_res_264))
+  & lt_res_263 ~ $([&] $(not_res_264 and_res_265))
+  & and_res_265 ~ _u223
+  & @slt ~ (0 (_u222_d2 gt_res_266))
+  & gt_res_266 ~ $([&] $(_u221_d2 and_res_267))
+  & and_res_267 ~ _u224
+  & _u223_d1 ~ $([-] $(_u224_d1 sub_res_268))
+  & _u222_d3 ~ $([+] $(sub_res_268 add_res_269))
+  & @sdiv ~ (add_res_269 (_u220_d2 div_res_270))
+  & _u223_d2 ~ $([|] $(_u224_d2 or_res_271))
+  & div_res_270 ~ $([-] $(or_res_271 sub_res_272))
+  & sub_res_272 ~ _u225
+  & @slt ~ (10 (_u225_d1 gt_res_273))
+  & gt_res_273 ~ _u226
+  & _u226 ~ ?((@branch_else__C28 @branch_then__C29) (_u225_d2 case_ret_274))
+  & case_ret_274 ~ ret_258
+  & {_u220_d1 _u220_d2} ~ _u220
+  & {_u221_d1 _u221_d2} ~ _u221
+  & {_u222_d1 {_u222_d2 _u222_d3}} ~ _u222
+  & {_u223_d1 _u223_d2} ~ _u223
+  & {_u224_d1 _u224_d2} ~ _u224
+  & {_u225_d1 _u225_d2} ~ _u225
+
+@lambda__C25 = (_u212 (_u209 (_u219 ret_254)))
+  & 2 ~ $([*] $(_u212 mul_res_255))
+  & mul_res_255 ~ _u220
+  & _u220_d1 ~ ?((@branch_zero__C26 @branch_default__C27) (_u220_d2 (_u209 (_u219 case_ret_256))))
+  & case_ret_256 ~ ret_254
+  & {_u220_d1 _u220_d2} ~ _u220
+
+@branch_else__C24 = (_u212 (_u209 (_u217 ret_253)))
+  & @lambda__C25 ~ (_u212 (_u209 closure_277))
+  & closure_277 ~ _u234
+  & @isqrt1000 ~ (_u217 app_ret_278)
+  & _u234 ~ (app_ret_278 app_ret_279)
+  & app_ret_279 ~ ret_253
+
+@branch_then__C30 = (* (* (* (* ret_280))))
+  & 16777215 ~ ret_280
+
+@intersectSphere = (_u163 (_u164 top_ret_209))
+  & _u163 ~ _u165
+  & _u165 ~ (_u166 _u167)
+  & _u164 ~ _u168
+  & _u168 ~ (_u169 (_u170 *))
+  & _u166 ~ _u172
+  & _u172 ~ (_u173 (_u174 _u175))
+  & _u169 ~ _u176
+  & _u176 ~ (_u177 (_u178 _u179))
+  & _u167 ~ _u180
+  & _u180 ~ (_u181 (_u182 _u183))
+  & _u173 ~ _u184
+  & _u184 ~ _u185
+  & _u177 ~ _u186
+  & _u186 ~ _u187
+  & _u181 ~ _u188
+  & _u188 ~ _u189
+  & _u174 ~ _u190
+  & _u190 ~ _u191
+  & _u178 ~ _u192
+  & _u192 ~ _u193
+  & _u182 ~ _u194
+  & _u194 ~ _u195
+  & _u175 ~ _u196
+  & _u196 ~ _u197
+  & _u179 ~ _u198
+  & _u198 ~ _u199
+  & _u183 ~ _u200
+  & _u200 ~ _u201
+  & _u170 ~ _u202
+  & _u202 ~ _u203
+  & _u185 ~ $([-] $(_u187 sub_res_210))
+  & sub_res_210 ~ _u204
+  & _u191 ~ $([-] $(_u193 sub_res_211))
+  & sub_res_211 ~ _u205
+  & _u197 ~ $([-] $(_u199 sub_res_212))
+  & sub_res_212 ~ _u206
+  & _u204_d1 ~ $([*] $(_u189_d1 mul_res_213))
+  & _u205_d1 ~ $([*] $(_u195_d1 mul_res_214))
+  & mul_res_213 ~ $([+] $(mul_res_214 add_res_215))
+  & _u206_d1 ~ $([*] $(_u201_d1 mul_res_216))
+  & add_res_215 ~ $([+] $(mul_res_216 add_res_217))
+  & add_res_217 ~ _u207
+  & @slt ~ (_u207_d1 (0 lt_res_218))
+  & lt_res_218 ~ _u208
+  & _u207_d2 ~ $([+] $(_u208_d1 add_res_219))
+  & @sdiv ~ (add_res_219 (1000 div_res_220))
+  & div_res_220 ~ $([-] $(_u208_d2 sub_res_221))
+  & 2 ~ $([*] $(sub_res_221 mul_res_222))
+  & mul_res_222 ~ _u209
+  & _u189_d2 ~ $([*] $(_u189_d3 mul_res_223))
+  & _u195_d2 ~ $([*] $(_u195_d3 mul_res_224))
+  & mul_res_223 ~ $([+] $(mul_res_224 add_res_225))
+  & _u201_d2 ~ $([*] $(_u201_d3 mul_res_226))
+  & add_res_225 ~ $([+] $(mul_res_226 add_res_227))
+  & add_res_227 ~ _u210
+  & @slt ~ (_u210_d1 (0 lt_res_228))
+  & lt_res_228 ~ _u211
+  & _u210_d2 ~ $([+] $(_u211_d1 add_res_229))
+  & @sdiv ~ (add_res_229 (1000 div_res_230))
+  & div_res_230 ~ $([-] $(_u211_d2 sub_res_231))
+  & sub_res_231 ~ _u212
+  & _u204_d2 ~ $([*] $(_u204_d3 mul_res_232))
+  & _u205_d2 ~ $([*] $(_u205_d3 mul_res_233))
+  & mul_res_232 ~ $([+] $(mul_res_233 add_res_234))
+  & _u206_d2 ~ $([*] $(_u206_d3 mul_res_235))
+  & add_res_234 ~ $([+] $(mul_res_235 add_res_236))
+  & add_res_236 ~ _u213
+  & @slt ~ (_u213_d1 (0 lt_res_237))
+  & lt_res_237 ~ _u214
+  & _u203_d1 ~ $([*] $(_u203_d2 mul_res_238))
+  & mul_res_238 ~ _u215
+  & @slt ~ (_u215_d1 (0 lt_res_239))
+  & lt_res_239 ~ _u216
+  & _u209_d1 ~ $([*] $(_u209_d2 mul_res_240))
+  & 4 ~ $([*] $(_u212_d1 mul_res_241))
+  & _u213_d2 ~ $([+] $(_u214_d1 add_res_242))
+  & @sdiv ~ (add_res_242 (1000 div_res_243))
+  & div_res_243 ~ $([-] $(_u214_d2 sub_res_244))
+  & _u215_d2 ~ $([+] $(_u216_d1 add_res_245))
+  & @sdiv ~ (add_res_245 (1000 div_res_246))
+  & div_res_246 ~ $([-] $(_u216_d2 sub_res_247))
+  & sub_res_244 ~ $([-] $(sub_res_247 sub_res_248))
+  & mul_res_241 ~ $([*] $(sub_res_248 mul_res_249))
+  & mul_res_240 ~ $([-] $(mul_res_249 sub_res_250))
+  & sub_res_250 ~ _u217
+  & @slt ~ (_u217_d1 (0 lt_res_251))
+  & lt_res_251 ~ _u218
+  & _u218 ~ ?((@branch_else__C24 @branch_then__C30) (_u212_d2 (_u209_d3 (_u217_d2 case_ret_252))))
+  & case_ret_252 ~ top_ret_209
+  & {_u189_d1 {_u189_d2 _u189_d3}} ~ _u189
+  & {_u195_d1 {_u195_d2 _u195_d3}} ~ _u195
+  & {_u201_d1 {_u201_d2 _u201_d3}} ~ _u201
+  & {_u203_d1 _u203_d2} ~ _u203
+  & {_u204_d1 {_u204_d2 _u204_d3}} ~ _u204
+  & {_u205_d1 {_u205_d2 _u205_d3}} ~ _u205
+  & {_u206_d1 {_u206_d2 _u206_d3}} ~ _u206
+  & {_u207_d1 _u207_d2} ~ _u207
+  & {_u208_d1 _u208_d2} ~ _u208
+  & {_u209_d1 {_u209_d2 _u209_d3}} ~ _u209
+  & {_u210_d1 _u210_d2} ~ _u210
+  & {_u211_d1 _u211_d2} ~ _u211
+  & {_u212_d1 _u212_d2} ~ _u212
+  & {_u213_d1 _u213_d2} ~ _u213
+  & {_u214_d1 _u214_d2} ~ _u214
+  & {_u215_d1 _u215_d2} ~ _u215
+  & {_u216_d1 _u216_d2} ~ _u216
+  & {_u217_d1 _u217_d2} ~ _u217
+
+@vadd = (_u235 (_u236 top_ret_281))
+  & _u235 ~ _u237
+  & _u237 ~ (_u238 (_u239 _u240))
+  & _u236 ~ _u241
+  & _u241 ~ (_u242 (_u243 _u244))
+  & _u238 ~ $([+] $(_u242 add_res_283))
+  & _u239 ~ $([+] $(_u243 add_res_284))
+  & _u240 ~ $([+] $(_u244 add_res_285))
+  & @Vec3 ~ (add_res_283 (add_res_284 (add_res_285 constr_ret_282)))
+  & constr_ret_282 ~ top_ret_281
+
+@lambda__C33 = (_u254 (_u257 (_u319 ret_321)))
+  & _u254 ~ _u320
+  & _u320 ~ _u321
+  & _u319 ~ $([*] $(_u321 mul_res_322))
+  & mul_res_322 ~ _u322
+  & @slt ~ (_u322_d1 (0 lt_res_323))
+  & lt_res_323 ~ _u323
+  & _u322_d2 ~ $([+] $(_u323_d1 add_res_324))
+  & @sdiv ~ (add_res_324 (1000 div_res_325))
+  & div_res_325 ~ $([-] $(_u323_d2 sub_res_326))
+  & _u257 ~ $([+] $(sub_res_326 add_res_327))
+  & add_res_327 ~ ret_321
+  & {_u322_d1 _u322_d2} ~ _u322
+  & {_u323_d1 _u323_d2} ~ _u323
+
+@branch_else__C34 = (_u324 (_u318 ret_331))
+  & _u324 ~ (_u318 app_ret_332)
+  & app_ret_332 ~ ret_331
+
+@branch_then__C35 = (* (_u324 (* ret_333)))
+  & _u324 ~ (0 app_ret_334)
+  & app_ret_334 ~ ret_333
+
+@lambda__C32 = (_u253 (_u292 (_u283 (_u274 (_u254 (_u257 (_u293 (_u294 (_u295 ret_306)))))))))
+  & _u253 ~ _u296
+  & _u296 ~ (_u297 (_u298 _u299))
+  & _u297 ~ $([-] $(_u292 sub_res_308))
+  & _u298 ~ $([-] $(_u283 sub_res_309))
+  & _u299 ~ $([-] $(_u274 sub_res_310))
+  & @Vec3 ~ (sub_res_308 (sub_res_309 (sub_res_310 constr_ret_307)))
+  & @vnorm ~ (constr_ret_307 app_ret_311)
+  & app_ret_311 ~ _u300
+  & _u300 ~ (_u301 (_u302 _u303))
+  & _u293 ~ _u304
+  & _u304 ~ _u305
+  & _u301 ~ _u306
+  & _u306 ~ _u307
+  & _u294 ~ _u308
+  & _u308 ~ _u309
+  & _u302 ~ _u310
+  & _u310 ~ _u311
+  & _u295 ~ _u312
+  & _u312 ~ _u313
+  & _u303 ~ _u314
+  & _u314 ~ _u315
+  & _u305 ~ $([*] $(_u307 mul_res_312))
+  & _u309 ~ $([*] $(_u311 mul_res_313))
+  & mul_res_312 ~ $([+] $(mul_res_313 add_res_314))
+  & _u313 ~ $([*] $(_u315 mul_res_315))
+  & add_res_314 ~ $([+] $(mul_res_315 add_res_316))
+  & add_res_316 ~ _u316
+  & @slt ~ (_u316_d1 (0 lt_res_317))
+  & lt_res_317 ~ _u317
+  & _u316_d2 ~ $([+] $(_u317_d1 add_res_318))
+  & @sdiv ~ (add_res_318 (1000 div_res_319))
+  & div_res_319 ~ $([-] $(_u317_d2 sub_res_320))
+  & sub_res_320 ~ _u318
+  & @lambda__C33 ~ (_u254 (_u257 closure_328))
+  & closure_328 ~ _u324
+  & @slt ~ (_u318_d1 (0 lt_res_329))
+  & lt_res_329 ~ _u325
+  & _u325 ~ ?((@branch_else__C34 @branch_then__C35) (_u324 (_u318_d2 case_ret_330)))
+  & case_ret_330 ~ ret_306
+  & {_u316_d1 _u316_d2} ~ _u316
+  & {_u317_d1 _u317_d2} ~ _u317
+  & {_u318_d1 _u318_d2} ~ _u318
+
+@branch_zero__C36 = (_u292 (_u283 (_u274 (_u326 ret_337))))
+  & _u274 ~ _u338
+  & _u338 ~ _u339
+  & _u339 ~ $([-] $(16776216 sub_res_339))
+  & @Vec3 ~ (_u292 (_u283 (sub_res_339 constr_ret_338)))
+  & @vnorm ~ (constr_ret_338 app_ret_340)
+  & app_ret_340 ~ _u340
+  & _u340 ~ (_u341 (_u342 _u343))
+  & _u326 ~ (_u341 (_u342 (_u343 app_ret_341)))
+  & app_ret_341 ~ ret_337
+
+@branch_one__C37 = (_u292 (_u283 (_u274 (_u326 ret_342))))
+  & _u292 ~ _u344
+  & _u344 ~ _u345
+  & _u345 ~ $([-] $(16776816 sub_res_344))
+  & _u283 ~ _u346
+  & _u346 ~ _u347
+  & _u347 ~ $([-] $(200 sub_res_345))
+  & _u274 ~ _u348
+  & _u348 ~ _u349
+  & _u349 ~ $([-] $(16776016 sub_res_346))
+  & @Vec3 ~ (sub_res_344 (sub_res_345 (sub_res_346 constr_ret_343)))
+  & @vnorm ~ (constr_ret_343 app_ret_347)
+  & app_ret_347 ~ _u350
+  & _u350 ~ (_u351 (_u352 _u353))
+  & _u326 ~ (_u351 (_u352 (_u353 app_ret_348)))
+  & app_ret_348 ~ ret_342
+
+@branch_default__C38 = (* (_u292 (_u283 (_u274 (_u326 ret_349)))))
+  & _u292 ~ _u328
+  & _u328 ~ _u329
+  & _u329 ~ $([-] $(400 sub_res_351))
+  & _u283 ~ _u330
+  & _u330 ~ _u331
+  & _u331 ~ $([-] $(16777016 sub_res_352))
+  & _u274 ~ _u332
+  & _u332 ~ _u333
+  & _u333 ~ $([-] $(16776416 sub_res_353))
+  & @Vec3 ~ (sub_res_351 (sub_res_352 (sub_res_353 constr_ret_350)))
+  & @vnorm ~ (constr_ret_350 app_ret_354)
+  & app_ret_354 ~ _u334
+  & _u334 ~ (_u335 (_u336 _u337))
+  & _u326 ~ (_u335 (_u336 (_u337 app_ret_355)))
+  & app_ret_355 ~ ret_349
+
+@branch_succ__C39 = (pred_357 (_u292 (_u283 (_u274 (_u326 ret_356)))))
+  & pred_357 ~ ?((@branch_one__C37 @branch_default__C38) (_u292 (_u283 (_u274 (_u326 ret_356)))))
+
+@lambda__C31 = (_u250 (_u251 (_u247 (_u253 (_u254 (_u256 (_u257 ret_287)))))))
+  & _u250 ~ _u258
+  & _u258 ~ (_u259 (_u260 _u261))
+  & _u251 ~ _u262
+  & _u262 ~ (_u263 (_u264 _u265))
+  & _u261 ~ _u266
+  & _u266 ~ _u267
+  & _u265 ~ _u268
+  & _u268 ~ _u269
+  & _u247_d1 ~ _u270
+  & _u270 ~ _u271
+  & _u269 ~ $([*] $(_u271 mul_res_288))
+  & mul_res_288 ~ _u272
+  & @slt ~ (_u272_d1 (0 lt_res_289))
+  & lt_res_289 ~ _u273
+  & _u272_d2 ~ $([+] $(_u273_d1 add_res_290))
+  & @sdiv ~ (add_res_290 (1000 div_res_291))
+  & div_res_291 ~ $([-] $(_u273_d2 sub_res_292))
+  & _u267 ~ $([+] $(sub_res_292 add_res_293))
+  & add_res_293 ~ _u274
+  & _u260 ~ _u275
+  & _u275 ~ _u276
+  & _u264 ~ _u277
+  & _u277 ~ _u278
+  & _u247_d2 ~ _u279
+  & _u279 ~ _u280
+  & _u278 ~ $([*] $(_u280 mul_res_294))
+  & mul_res_294 ~ _u281
+  & @slt ~ (_u281_d1 (0 lt_res_295))
+  & lt_res_295 ~ _u282
+  & _u281_d2 ~ $([+] $(_u282_d1 add_res_296))
+  & @sdiv ~ (add_res_296 (1000 div_res_297))
+  & div_res_297 ~ $([-] $(_u282_d2 sub_res_298))
+  & _u276 ~ $([+] $(sub_res_298 add_res_299))
+  & add_res_299 ~ _u283
+  & _u259 ~ _u284
+  & _u284 ~ _u285
+  & _u263 ~ _u286
+  & _u286 ~ _u287
+  & _u247_d3 ~ _u288
+  & _u288 ~ _u289
+  & _u287 ~ $([*] $(_u289 mul_res_300))
+  & mul_res_300 ~ _u290
+  & @slt ~ (_u290_d1 (0 lt_res_301))
+  & lt_res_301 ~ _u291
+  & _u290_d2 ~ $([+] $(_u291_d1 add_res_302))
+  & @sdiv ~ (add_res_302 (1000 div_res_303))
+  & div_res_303 ~ $([-] $(_u291_d2 sub_res_304))
+  & _u285 ~ $([+] $(sub_res_304 add_res_305))
+  & add_res_305 ~ _u292
+  & @lambda__C32 ~ (_u253 (_u292_d1 (_u283_d1 (_u274_d1 (_u254 (_u257 closure_335))))))
+  & closure_335 ~ _u326
+  & _u256 ~ _u327
+  & _u327 ~ ?((@branch_zero__C36 @branch_succ__C39) (_u292_d2 (_u283_d2 (_u274_d2 (_u326 case_ret_336)))))
+  & case_ret_336 ~ ret_287
+  & {_u247_d1 {_u247_d2 _u247_d3}} ~ _u247
+  & {_u272_d1 _u272_d2} ~ _u272
+  & {_u273_d1 _u273_d2} ~ _u273
+  & {_u274_d1 _u274_d2} ~ _u274
+  & {_u281_d1 _u281_d2} ~ _u281
+  & {_u282_d1 _u282_d2} ~ _u282
+  & {_u283_d1 _u283_d2} ~ _u283
+  & {_u290_d1 _u290_d2} ~ _u290
+  & {_u291_d1 _u291_d2} ~ _u291
+  & {_u292_d1 _u292_d2} ~ _u292
+
+@branch_zero__C40 = (_u354 ret_360)
+  & _u354 ~ (100 app_ret_361)
+  & app_ret_361 ~ ret_360
+
+@branch_one__C41 = (_u354 ret_362)
+  & _u354 ~ (200 app_ret_363)
+  & app_ret_363 ~ ret_362
+
+@branch_default__C42 = (* (_u354 ret_364))
+  & _u354 ~ (300 app_ret_365)
+  & app_ret_365 ~ ret_364
+
+@branch_succ__C43 = (pred_367 (_u354 ret_366))
+  & pred_367 ~ ?((@branch_one__C41 @branch_default__C42) (_u354 ret_366))
+
+@shadeRay = (_u245 (_u246 (_u247 (_u248 top_ret_286))))
+  & _u245 ~ _u249
+  & _u249 ~ (_u250 _u251)
+  & _u248 ~ _u252
+  & _u252 ~ (_u253 _u254)
+  & _u246 ~ _u255
+  & _u255 ~ _u256
+  & @lambda__C31 ~ (_u250 (_u251 (_u247 (_u253 (_u254 (_u256_d1 closure_358))))))
+  & closure_358 ~ _u354
+  & _u256_d2 ~ _u355
+  & _u355 ~ ?((@branch_zero__C40 @branch_succ__C43) (_u354 case_ret_359))
+  & case_ret_359 ~ top_ret_286
+  & {_u256_d1 _u256_d2} ~ _u256
+
+@lvl_s2KB = top_ret_368
+  & 20 ~ top_ret_368
+
+@branch_else__C45 = (_u360 (_u358 (_u357 (_u361 ret_374))))
+  & @shadeRay ~ (_u360 (_u358 (_u357 (_u361 app_ret_375))))
+  & app_ret_375 ~ ret_374
+
+@branch_then__C46 = (* (* (* (* (* ret_376)))))
+  & 20 ~ ret_376
+
+@alt0__C44 = (_u358 (_u360 (_u357 (_u361 (* ret_371)))))
+  & @slt ~ (_u358_d1 (0 lt_res_372))
+  & lt_res_372 ~ _u363
+  & _u363 ~ ?((@branch_else__C45 @branch_then__C46) (_u360 (_u358_d2 (_u357 (_u361 case_ret_373)))))
+  & case_ret_373 ~ ret_371
+  & {_u358_d1 _u358_d2} ~ _u358
+
+@branch_else__C48 = (* (_u357 (_u368 (_u358 (_u365 (_u360 (_u361 ret_382)))))))
+  & @_sfindClosest_s2OD ~ (_u368 (_u357 (_u358 (_u365 (_u360 (_u361 app_ret_383))))))
+  & app_ret_383 ~ ret_382
+
+@branch_else__C50 = (_u368 (* (_u365 (_u360 (_u361 (_u357 (_u358 ret_387)))))))
+  & @_sfindClosest_s2OD ~ (_u368 (_u357 (_u358 (_u365 (_u360 (_u361 app_ret_388))))))
+  & app_ret_388 ~ ret_387
+
+@branch_then__C51 = (* (_u368 (_u367 (_u365 (_u360 (_u361 (* (* ret_389))))))))
+  & @_sfindClosest_s2OD ~ (_u368_d1 (_u367 (_u368_d2 (_u365 (_u360 (_u361 app_ret_390))))))
+  & app_ret_390 ~ ret_389
+  & {_u368_d1 _u368_d2} ~ _u368
+
+@branch_then__C49 = (* (_u367 (_u357 (_u368 (_u358 (_u365 (_u360 (_u361 ret_384))))))))
+  & @slt ~ (_u367_d1 (_u357_d1 lt_res_385))
+  & lt_res_385 ~ _u370
+  & _u370 ~ ?((@branch_else__C50 @branch_then__C51) (_u368 (_u367_d2 (_u365 (_u360 (_u361 (_u357_d2 (_u358 case_ret_386))))))))
+  & case_ret_386 ~ ret_384
+  & {_u367_d1 _u367_d2} ~ _u367
+  & {_u357_d1 _u357_d2} ~ _u357
+
+@alt1__C47 = (_u364 (_u365 (_u358 (_u360 (_u357 (_u361 (_u356 ret_377)))))))
+  & @intersectSphere ~ (_u360_d1 (_u364 app_ret_378))
+  & app_ret_378 ~ _u366
+  & _u366 ~ _u367
+  & _u356 ~ $([+] $(1 add_res_379))
+  & add_res_379 ~ _u368
+  & @slt ~ (0 (_u367_d1 gt_res_380))
+  & gt_res_380 ~ _u369
+  & _u369 ~ ?((@branch_else__C48 @branch_then__C49) (_u367_d2 (_u357 (_u368 (_u358 (_u365 (_u360_d2 (_u361 case_ret_381))))))))
+  & case_ret_381 ~ ret_377
+  & {_u360_d1 _u360_d2} ~ _u360
+  & {_u367_d1 _u367_d2} ~ _u367
+
+@_sfindClosest_s2OD = (_u356 (_u357 (_u358 (_u359 (_u360 (_u361 top_ret_369))))))
+  & _u359 ~ _u362
+  & _u362 ~ (@alt0__C44 (@alt1__C47 (_u358 (_u360 (_u357 (_u361 (_u356 match_ret_370)))))))
+  & match_ret_370 ~ top_ret_369
+
+@branch_else__C53 = (_u374 (_u378 (_u371 (_u376 ret_396))))
+  & @shadeRay ~ (_u374 (_u378 (_u371 (_u376 app_ret_397))))
+  & app_ret_397 ~ ret_396
+
+@branch_then__C54 = (* (* (* (* (* ret_398)))))
+  & 20 ~ ret_398
+
+@alt0__C52 = (_u372 (_u374 (_u371 (_u376 (* ret_393)))))
+  & _u372 ~ _u378
+  & _u378_d1 ~ _u379
+  & @slt ~ (_u379 (0 lt_res_394))
+  & lt_res_394 ~ _u380
+  & _u380 ~ ?((@branch_else__C53 @branch_then__C54) (_u374 (_u378_d2 (_u371 (_u376 case_ret_395)))))
+  & case_ret_395 ~ ret_393
+  & {_u378_d1 _u378_d2} ~ _u378
+
+@branch_else__C56 = (* (_u371 (_u372 (_u382 (_u374 (_u387 (_u376 ret_404)))))))
+  & @_sfindClosest_s2Pe ~ (_u371 (_u372 (_u382 (_u374 (_u387 (_u376 app_ret_405))))))
+  & app_ret_405 ~ ret_404
+
+@branch_else__C58 = (* (_u387 (_u382 (_u374 (_u376 (_u371 (_u372 ret_409)))))))
+  & @_sfindClosest_s2Pe ~ (_u371 (_u372 (_u382 (_u374 (_u387 (_u376 app_ret_410))))))
+  & app_ret_410 ~ ret_409
+
+@branch_then__C59 = (* (_u384 (_u387 (_u382 (_u374 (_u376 (* (* ret_411))))))))
+  & @_sfindClosest_s2Pe ~ (_u384 (_u387_d1 (_u382 (_u374 (_u387_d2 (_u376 app_ret_412))))))
+  & app_ret_412 ~ ret_411
+  & {_u387_d1 _u387_d2} ~ _u387
+
+@branch_then__C57 = (* (_u384 (_u371 (_u372 (_u382 (_u374 (_u387 (_u376 ret_406))))))))
+  & @slt ~ (_u384_d1 (_u371_d1 lt_res_407))
+  & lt_res_407 ~ _u389
+  & _u389 ~ ?((@branch_else__C58 @branch_then__C59) (_u384_d2 (_u387 (_u382 (_u374 (_u376 (_u371_d2 (_u372 case_ret_408))))))))
+  & case_ret_408 ~ ret_406
+  & {_u384_d1 _u384_d2} ~ _u384
+  & {_u371_d1 _u371_d2} ~ _u371
+
+@alt1__C55 = (_u381 (_u382 (_u372 (_u374 (_u371 (_u376 (_u375 ret_399)))))))
+  & @intersectSphere ~ (_u374_d1 (_u381 app_ret_400))
+  & app_ret_400 ~ _u383
+  & _u383 ~ _u384
+  & _u375 ~ _u385
+  & _u385 ~ _u386
+  & _u386 ~ $([+] $(1 add_res_401))
+  & add_res_401 ~ _u387
+  & @slt ~ (0 (_u384_d1 gt_res_402))
+  & gt_res_402 ~ _u388
+  & _u388 ~ ?((@branch_else__C56 @branch_then__C57) (_u384_d2 (_u371 (_u372 (_u382 (_u374_d2 (_u387 (_u376 case_ret_403))))))))
+  & case_ret_403 ~ ret_399
+  & {_u374_d1 _u374_d2} ~ _u374
+  & {_u384_d1 _u384_d2} ~ _u384
+
+@_sfindClosest_s2Pe = (_u371 (_u372 (_u373 (_u374 (_u375 (_u376 top_ret_391))))))
+  & _u373 ~ _u377
+  & _u377 ~ (@alt0__C52 (@alt1__C55 (_u372 (_u374 (_u371 (_u376 (_u375 match_ret_392)))))))
+  & match_ret_392 ~ top_ret_391
+
+@branch_else__C61 = (_u390 (_u397 (_u393 (_u395 ret_418))))
+  & @shadeRay ~ (_u390 (_u397 (_u393 (_u395 app_ret_419))))
+  & app_ret_419 ~ ret_418
+
+@branch_then__C62 = (* (* (* (* (* ret_420)))))
+  & 20 ~ ret_420
+
+@alt0__C60 = (_u392 (_u390 (_u393 (_u395 (* ret_415)))))
+  & _u392 ~ _u397
+  & _u397_d1 ~ _u398
+  & @slt ~ (_u398 (0 lt_res_416))
+  & lt_res_416 ~ _u399
+  & _u399 ~ ?((@branch_else__C61 @branch_then__C62) (_u390 (_u397_d2 (_u393 (_u395 case_ret_417)))))
+  & case_ret_417 ~ ret_415
+  & {_u397_d1 _u397_d2} ~ _u397
+
+@branch_else__C64 = (_u393 (* (_u392 (_u401 (_u390 (_u406 (_u395 ret_426)))))))
+  & @findClosest ~ (_u390 (_u401 (_u392 (_u393 (_u406 (_u395 app_ret_427))))))
+  & app_ret_427 ~ ret_426
+
+@branch_else__C66 = (* (_u406 (_u401 (_u390 (_u395 (_u409 (_u392 ret_431)))))))
+  & @_sfindClosest_s2Pe ~ (_u409 (_u392 (_u401 (_u390 (_u406 (_u395 app_ret_432))))))
+  & app_ret_432 ~ ret_431
+
+@branch_then__C67 = (* (_u403 (_u406 (_u401 (_u390 (_u395 (* (* ret_433))))))))
+  & @_sfindClosest_s2Pe ~ (_u403 (_u406_d1 (_u401 (_u390 (_u406_d2 (_u395 app_ret_434))))))
+  & app_ret_434 ~ ret_433
+  & {_u406_d1 _u406_d2} ~ _u406
+
+@branch_then__C65 = (* (_u393 (_u403 (_u392 (_u401 (_u390 (_u406 (_u395 ret_428))))))))
+  & _u393 ~ _u408
+  & _u408 ~ _u409
+  & @slt ~ (_u403_d1 (_u409_d1 lt_res_429))
+  & lt_res_429 ~ _u410
+  & _u410 ~ ?((@branch_else__C66 @branch_then__C67) (_u403_d2 (_u406 (_u401 (_u390 (_u395 (_u409_d2 (_u392 case_ret_430))))))))
+  & case_ret_430 ~ ret_428
+  & {_u403_d1 _u403_d2} ~ _u403
+  & {_u409_d1 _u409_d2} ~ _u409
+
+@alt1__C63 = (_u400 (_u401 (_u392 (_u390 (_u393 (_u395 (_u394 ret_421)))))))
+  & @intersectSphere ~ (_u390_d1 (_u400 app_ret_422))
+  & app_ret_422 ~ _u402
+  & _u402 ~ _u403
+  & _u394 ~ _u404
+  & _u404 ~ _u405
+  & _u405 ~ $([+] $(1 add_res_423))
+  & add_res_423 ~ _u406
+  & @slt ~ (0 (_u403_d1 gt_res_424))
+  & gt_res_424 ~ _u407
+  & _u407 ~ ?((@branch_else__C64 @branch_then__C65) (_u393 (_u403_d2 (_u392 (_u401 (_u390_d2 (_u406 (_u395 case_ret_425))))))))
+  & case_ret_425 ~ ret_421
+  & {_u390_d1 _u390_d2} ~ _u390
+  & {_u403_d1 _u403_d2} ~ _u403
+
+@findClosest = (_u390 (_u391 (_u392 (_u393 (_u394 (_u395 top_ret_413))))))
+  & _u391 ~ _u396
+  & _u396 ~ (@alt0__C60 (@alt1__C63 (_u392 (_u390 (_u393 (_u395 (_u394 match_ret_414)))))))
+  & match_ret_414 ~ top_ret_413
+
+@traceRay = (_u411 (_u412 (_u413 top_ret_435)))
+  & @_sfindClosest_s2OD ~ (16777215 (999999 (16777215 (_u412 (_u411 (_u413 app_ret_436))))))
+  & app_ret_436 ~ top_ret_435
+
+@branch_else__C68 = (_u417 (_u415 (_u414 (_u416 (_u418 ret_441)))))
+  & @sra ~ (_u414_d1 (1 sra_res_445))
+  & _u415_d1 ~ $([-] $(sra_res_445 sub_res_446))
+  & sub_res_446 ~ $([*] $(50 mul_res_447))
+  & _u416_d1 ~ _u420
+  & _u420 ~ _u421
+  & @sra ~ (_u414_d2 (1 sra_res_448))
+  & _u421 ~ $([-] $(sra_res_448 sub_res_449))
+  & sub_res_449 ~ $([*] $(50 mul_res_450))
+  & @Vec3 ~ (mul_res_447 (mul_res_450 (16776216 constr_ret_444)))
+  & @vnorm ~ (constr_ret_444 app_ret_451)
+  & @Ray ~ (@lvl_s2Kc (app_ret_451 constr_ret_443))
+  & @_sfindClosest_s2OD ~ (16777215 (999999 (16777215 (_u417_d1 (constr_ret_443 (_u418_d1 app_ret_452))))))
+  & _u415_d2 ~ $([+] $(1 add_res_453))
+  & @_srenderRow_s2NX ~ (_u414_d3 (add_res_453 (_u416_d2 (_u417_d2 (_u418_d2 app_ret_454)))))
+  & @Cons ~ (app_ret_452 (app_ret_454 constr_ret_442))
+  & constr_ret_442 ~ ret_441
+  & {_u417_d1 _u417_d2} ~ _u417
+  & {_u415_d1 _u415_d2} ~ _u415
+  & {_u414_d1 {_u414_d2 _u414_d3}} ~ _u414
+  & {_u416_d1 _u416_d2} ~ _u416
+  & {_u418_d1 _u418_d2} ~ _u418
+
+@branch_then__C69 = (* (* (* (* (* (* ret_455))))))
+  & @Nil ~ ret_455
+
+@_srenderRow_s2NX = (_u414 (_u415 (_u416 (_u417 (_u418 top_ret_437)))))
+  & @slt ~ (_u415_d1 (_u414_d1 cmp_lt_438))
+  & 1 ~ $([-] $(cmp_lt_438 cmp_res_439))
+  & cmp_res_439 ~ _u419
+  & _u419 ~ ?((@branch_else__C68 @branch_then__C69) (_u417 (_u415_d2 (_u414_d2 (_u416 (_u418 case_ret_440))))))
+  & case_ret_440 ~ top_ret_437
+  & {_u414_d1 _u414_d2} ~ _u414
+  & {_u415_d1 _u415_d2} ~ _u415
+
+@branch_else__C70 = (_u425 (_u423 (_u422 (_u424 (_u426 ret_460)))))
+  & @sra ~ (_u422_d1 (1 sra_res_464))
+  & _u423_d1 ~ $([-] $(sra_res_464 sub_res_465))
+  & sub_res_465 ~ $([*] $(50 mul_res_466))
+  & @sra ~ (_u422_d2 (1 sra_res_467))
+  & _u424_d1 ~ $([-] $(sra_res_467 sub_res_468))
+  & sub_res_468 ~ $([*] $(50 mul_res_469))
+  & @Vec3 ~ (mul_res_466 (mul_res_469 (16776216 constr_ret_463)))
+  & @vnorm ~ (constr_ret_463 app_ret_470)
+  & @Ray ~ (@lvl_s2Kc (app_ret_470 constr_ret_462))
+  & @_sfindClosest_s2OD ~ (16777215 (999999 (16777215 (_u425_d1 (constr_ret_462 (_u426_d1 app_ret_471))))))
+  & _u423_d2 ~ $([+] $(1 add_res_472))
+  & @_srenderRow_s2NY ~ (_u422_d3 (add_res_472 (_u424_d2 (_u425_d2 (_u426_d2 app_ret_473)))))
+  & @Cons ~ (app_ret_471 (app_ret_473 constr_ret_461))
+  & constr_ret_461 ~ ret_460
+  & {_u425_d1 _u425_d2} ~ _u425
+  & {_u423_d1 _u423_d2} ~ _u423
+  & {_u422_d1 {_u422_d2 _u422_d3}} ~ _u422
+  & {_u424_d1 _u424_d2} ~ _u424
+  & {_u426_d1 _u426_d2} ~ _u426
+
+@branch_then__C71 = (* (* (* (* (* (* ret_474))))))
+  & @Nil ~ ret_474
+
+@_srenderRow_s2NY = (_u422 (_u423 (_u424 (_u425 (_u426 top_ret_456)))))
+  & @slt ~ (_u423_d1 (_u422_d1 cmp_lt_457))
+  & 1 ~ $([-] $(cmp_lt_457 cmp_res_458))
+  & cmp_res_458 ~ _u427
+  & _u427 ~ ?((@branch_else__C70 @branch_then__C71) (_u425 (_u423_d2 (_u422_d2 (_u424 (_u426 case_ret_459))))))
+  & case_ret_459 ~ top_ret_456
+  & {_u422_d1 _u422_d2} ~ _u422
+  & {_u423_d1 _u423_d2} ~ _u423
+
+@branch_else__C72 = (_u431 (_u428 (_u434 (_u429 (_u432 ret_479)))))
+  & @sra ~ (_u434_d1 (1 sra_res_483))
+  & _u428_d1 ~ $([-] $(sra_res_483 sub_res_484))
+  & sub_res_484 ~ $([*] $(50 mul_res_485))
+  & @sra ~ (_u434_d2 (1 sra_res_486))
+  & _u429_d1 ~ $([-] $(sra_res_486 sub_res_487))
+  & sub_res_487 ~ $([*] $(50 mul_res_488))
+  & @Vec3 ~ (mul_res_485 (mul_res_488 (16776216 constr_ret_482)))
+  & @vnorm ~ (constr_ret_482 app_ret_489)
+  & @Ray ~ (@lvl_s2Kc (app_ret_489 constr_ret_481))
+  & @_sfindClosest_s2OD ~ (16777215 (999999 (16777215 (_u431_d1 (constr_ret_481 (_u432_d1 app_ret_490))))))
+  & _u428_d2 ~ $([+] $(1 add_res_491))
+  & @_srenderRow_s2NY ~ (_u434_d3 (add_res_491 (_u429_d2 (_u431_d2 (_u432_d2 app_ret_492)))))
+  & @Cons ~ (app_ret_490 (app_ret_492 constr_ret_480))
+  & constr_ret_480 ~ ret_479
+  & {_u431_d1 _u431_d2} ~ _u431
+  & {_u428_d1 _u428_d2} ~ _u428
+  & {_u434_d1 {_u434_d2 _u434_d3}} ~ _u434
+  & {_u429_d1 _u429_d2} ~ _u429
+  & {_u432_d1 _u432_d2} ~ _u432
+
+@branch_then__C73 = (* (* (* (* (* (* ret_493))))))
+  & @Nil ~ ret_493
+
+@_srenderRow_s2NM = (_u428 (_u429 (_u430 (_u431 (_u432 top_ret_475)))))
+  & _u430 ~ _u433
+  & _u433 ~ _u434
+  & @slt ~ (_u428_d1 (_u434_d1 cmp_lt_476))
+  & 1 ~ $([-] $(cmp_lt_476 cmp_res_477))
+  & cmp_res_477 ~ _u435
+  & _u435 ~ ?((@branch_else__C72 @branch_then__C73) (_u431 (_u428_d2 (_u434_d2 (_u429 (_u432 case_ret_478))))))
+  & case_ret_478 ~ top_ret_475
+  & {_u428_d1 _u428_d2} ~ _u428
+  & {_u434_d1 _u434_d2} ~ _u434
+
+@branch_else__C74 = (_u439 (_u442 (_u444 (_u436 (_u440 ret_498)))))
+  & @sra ~ (_u444_d1 (1 sra_res_502))
+  & _u442_d1 ~ $([-] $(sra_res_502 sub_res_503))
+  & sub_res_503 ~ $([*] $(50 mul_res_504))
+  & _u436_d1 ~ _u446
+  & _u446 ~ _u447
+  & @sra ~ (_u444_d2 (1 sra_res_505))
+  & _u447 ~ $([-] $(sra_res_505 sub_res_506))
+  & sub_res_506 ~ $([*] $(50 mul_res_507))
+  & @Vec3 ~ (mul_res_504 (mul_res_507 (16776216 constr_ret_501)))
+  & @vnorm ~ (constr_ret_501 app_ret_508)
+  & @Ray ~ (@lvl_s2Kc (app_ret_508 constr_ret_500))
+  & @_sfindClosest_s2OD ~ (16777215 (999999 (16777215 (_u439_d1 (constr_ret_500 (_u440_d1 app_ret_509))))))
+  & _u442_d2 ~ $([+] $(1 add_res_510))
+  & @_srenderRow_s2NX ~ (_u444_d3 (add_res_510 (_u436_d2 (_u439_d2 (_u440_d2 app_ret_511)))))
+  & @Cons ~ (app_ret_509 (app_ret_511 constr_ret_499))
+  & constr_ret_499 ~ ret_498
+  & {_u439_d1 _u439_d2} ~ _u439
+  & {_u442_d1 _u442_d2} ~ _u442
+  & {_u444_d1 {_u444_d2 _u444_d3}} ~ _u444
+  & {_u436_d1 _u436_d2} ~ _u436
+  & {_u440_d1 _u440_d2} ~ _u440
+
+@branch_then__C75 = (* (* (* (* (* (* ret_512))))))
+  & @Nil ~ ret_512
+
+@renderRow = (_u436 (_u437 (_u438 (_u439 (_u440 top_ret_494)))))
+  & _u437 ~ _u441
+  & _u441 ~ _u442
+  & _u438 ~ _u443
+  & _u443 ~ _u444
+  & @slt ~ (_u442_d1 (_u444_d1 cmp_lt_495))
+  & 1 ~ $([-] $(cmp_lt_495 cmp_res_496))
+  & cmp_res_496 ~ _u445
+  & _u445 ~ ?((@branch_else__C74 @branch_then__C75) (_u439 (_u442_d2 (_u444_d2 (_u436 (_u440 case_ret_497))))))
+  & case_ret_497 ~ top_ret_494
+  & {_u442_d1 _u442_d2} ~ _u442
+  & {_u444_d1 _u444_d2} ~ _u444
+
+@branch_else__C76 = (_u449 (_u450 (_u451 (_u452 (_u448 ret_517)))))
+  & @_srenderRow_s2NM ~ (0 (_u449_d1 (_u450_d1 (_u451_d1 (_u452_d1 app_ret_518)))))
+  & _u449_d2 ~ $([+] $(1 add_res_519))
+  & @_srenderGrid_s2Nr ~ (_u448 (add_res_519 (_u450_d2 (_u451_d2 (_u452_d2 app_ret_520)))))
+  & @appendL ~ (app_ret_518 (app_ret_520 app_ret_521))
+  & app_ret_521 ~ ret_517
+  & {_u449_d1 _u449_d2} ~ _u449
+  & {_u450_d1 _u450_d2} ~ _u450
+  & {_u451_d1 _u451_d2} ~ _u451
+  & {_u452_d1 _u452_d2} ~ _u452
+
+@branch_then__C77 = (* (* (* (* (* (* ret_522))))))
+  & @Nil ~ ret_522
+
+@_srenderGrid_s2Nr = (_u448 (_u449 (_u450 (_u451 (_u452 top_ret_513)))))
+  & @slt ~ (_u449_d1 (_u448_d1 cmp_lt_514))
+  & 1 ~ $([-] $(cmp_lt_514 cmp_res_515))
+  & cmp_res_515 ~ _u453
+  & _u453 ~ ?((@branch_else__C76 @branch_then__C77) (_u449_d2 (_u450 (_u451 (_u452 (_u448_d2 case_ret_516))))))
+  & case_ret_516 ~ top_ret_513
+  & {_u448_d1 _u448_d2} ~ _u448
+  & {_u449_d1 _u449_d2} ~ _u449
+
+@branch_else__C78 = (_u460 (_u456 (_u457 (_u458 (_u462 ret_527)))))
+  & @_srenderRow_s2NM ~ (0 (_u460_d1 (_u456_d1 (_u457_d1 (_u458_d1 app_ret_528)))))
+  & _u460_d2 ~ $([+] $(1 add_res_529))
+  & @_srenderGrid_s2Nr ~ (_u462 (add_res_529 (_u456_d2 (_u457_d2 (_u458_d2 app_ret_530)))))
+  & @appendL ~ (app_ret_528 (app_ret_530 app_ret_531))
+  & app_ret_531 ~ ret_527
+  & {_u460_d1 _u460_d2} ~ _u460
+  & {_u456_d1 _u456_d2} ~ _u456
+  & {_u457_d1 _u457_d2} ~ _u457
+  & {_u458_d1 _u458_d2} ~ _u458
+
+@branch_then__C79 = (* (* (* (* (* (* ret_532))))))
+  & @Nil ~ ret_532
+
+@renderGrid = (_u454 (_u455 (_u456 (_u457 (_u458 top_ret_523)))))
+  & _u454 ~ _u459
+  & _u459 ~ _u460
+  & _u455 ~ _u461
+  & _u461 ~ _u462
+  & @slt ~ (_u460_d1 (_u462_d1 cmp_lt_524))
+  & 1 ~ $([-] $(cmp_lt_524 cmp_res_525))
+  & cmp_res_525 ~ _u463
+  & _u463 ~ ?((@branch_else__C78 @branch_then__C79) (_u460_d2 (_u456 (_u457 (_u458 (_u462_d2 case_ret_526))))))
+  & case_ret_526 ~ top_ret_523
+  & {_u460_d1 _u460_d2} ~ _u460
+  & {_u462_d1 _u462_d2} ~ _u462
+
+@lvl_s2MN = top_ret_533
+  & 16 ~ top_ret_533
+
+@lvl_s2MP = top_ret_534
+  & @_srenderGrid_s2Nr ~ (16 (0 (16 (@sceneSpheres (@sceneLight app_ret_535)))))
+  & app_ret_535 ~ top_ret_534
+
+@result = top_ret_536
+  & @checksumList ~ (@lvl_s2MP app_ret_537)
+  & app_ret_537 ~ top_ret_536
+
+@main = (hi lo)
+  & @result ~ (hi lo)

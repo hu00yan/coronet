@@ -5,6 +5,7 @@
 pub enum Token {
   Ident(String)
   IntLit(Int)
+  FloatLit(Double)
   CharLit(Char)
   StringLit(String)
   TypeVar(String)
@@ -38,6 +39,7 @@ pub impl Show for Token with output(self, logger) {
   match self {
     Ident(s) => logger.write_string("Ident(\{s})")
     IntLit(n) => logger.write_string("IntLit(\{n})")
+    FloatLit(d) => logger.write_string("FloatLit(\{d})")
     CharLit(c) => logger.write_string("CharLit(\{c})")
     StringLit(s) => logger.write_string("StringLit(\{s})")
     TypeVar(s) => logger.write_string("TypeVar(@\{s})")
@@ -229,6 +231,58 @@ fn Lexer::skip_whitespace_and_comments(self : Lexer) -> Unit {
   }
 }
 
+fn parse_double_str(s : String) -> Double {
+  let mut i = 0
+  let mut neg = false
+  if i < s.length() && s[i] == '-' {
+    neg = true
+    i = i + 1
+  }
+  let mut int_val : Double = 0.0
+  while i < s.length() && s[i] >= '0' && s[i] <= '9' {
+    let digit = s[i].to_int() - '0'.to_int()
+    int_val = int_val * 10.0 + digit.to_double()
+    i = i + 1
+  }
+  let mut frac_val : Double = 0.0
+  let mut divisor : Double = 1.0
+  if i < s.length() && s[i] == '.' {
+    i = i + 1
+    while i < s.length() && s[i] >= '0' && s[i] <= '9' {
+      let digit = s[i].to_int() - '0'.to_int()
+      divisor = divisor * 10.0
+      frac_val = frac_val + digit.to_double() / divisor
+      i = i + 1
+    }
+  }
+  let mut res = int_val + frac_val
+  if i < s.length() && (s[i] == 'e' || s[i] == 'E') {
+    i = i + 1
+    let mut exp_neg = false
+    if i < s.length() && s[i] == '-' {
+      exp_neg = true
+      i = i + 1
+    } else if i < s.length() && s[i] == '+' {
+      i = i + 1
+    }
+    let mut exp : Int = 0
+    while i < s.length() && s[i] >= '0' && s[i] <= '9' {
+      exp = exp * 10 + (s[i].to_int() - '0'.to_int())
+      i = i + 1
+    }
+    let mut factor : Double = 1.0
+    for _ in 0..<exp {
+      factor = factor * 10.0
+    }
+    if exp_neg {
+      res = res / factor
+    } else {
+      res = res * factor
+    }
+  }
+  if neg { -res } else { res }
+}
+
 fn Lexer::next_token(self : Lexer) -> Result[Token, String] {
   self.skip_whitespace_and_comments()
   if self.pos >= self.src.length() {
@@ -266,9 +320,9 @@ fn Lexer::next_token(self : Lexer) -> Result[Token, String] {
       }
     }
     let next_c = if self.pos + 1 < self.src.length() { self.char_at(self.pos + 1) } else { ' ' }
-    if is_op_char(next_c) {
+    if is_op_char(next_c) || next_c == '.' {
       let mut i = self.pos + 1
-      while i < self.src.length() && (is_op_char(self.char_at(i)) || self.char_at(i) == '#') {
+      while i < self.src.length() && (is_op_char(self.char_at(i)) || self.char_at(i) == '#' || self.char_at(i) == '.') {
         i = i + 1
       }
       if i < self.src.length() && self.char_at(i) == ')' {
@@ -434,38 +488,119 @@ fn Lexer::next_token(self : Lexer) -> Result[Token, String] {
     return Ok(Token::CharLit(ch))
   }
 
-  // Integer literal (positive or negative)
-  let is_negative = c == '-' && self.pos + 1 < self.src.length() && self.char_at(self.pos + 1) >= '0' && self.char_at(self.pos + 1) <= '9'
+  // Numeric literal (positive or negative, decimal, hex, or float)
+  let is_negative = c == '-' && self.pos + 1 < self.src.length() && (
+    (self.char_at(self.pos + 1) >= '0' && self.char_at(self.pos + 1) <= '9') ||
+    (self.char_at(self.pos + 1) == '.' && self.pos + 2 < self.src.length() && self.char_at(self.pos + 2) >= '0' && self.char_at(self.pos + 2) <= '9')
+  )
   if (c >= '0' && c <= '9') || is_negative {
+    let start_pos = self.pos
     if is_negative {
       self.pos = self.pos + 1
     }
+    // Check for hex: 0x or 0X
+    let is_hex = self.pos + 1 < self.src.length() && self.char_at(self.pos) == '0' && (self.char_at(self.pos + 1) == 'x' || self.char_at(self.pos + 1) == 'X')
+    if is_hex {
+      self.pos = self.pos + 2
+      let mut n : Int64 = 0L
+      while self.pos < self.src.length() {
+        let ch = self.char_at(self.pos)
+        if ch >= '0' && ch <= '9' {
+          n = (n << 4) | (ch.to_int() - '0'.to_int()).to_int64()
+          self.pos = self.pos + 1
+        } else if ch >= 'a' && ch <= 'f' {
+          n = (n << 4) | (ch.to_int() - 'a'.to_int() + 10).to_int64()
+          self.pos = self.pos + 1
+        } else if ch >= 'A' && ch <= 'F' {
+          n = (n << 4) | (ch.to_int() - 'A'.to_int() + 10).to_int64()
+          self.pos = self.pos + 1
+        } else {
+          break
+        }
+      }
+      if is_negative {
+        n = -n
+      }
+      // Consume any hash suffix: #, ##, #Word32, #Word64, etc.
+      while self.pos < self.src.length() && self.char_at(self.pos) == '#' {
+        self.pos = self.pos + 1
+        while self.pos < self.src.length() {
+          let ch = self.char_at(self.pos)
+          if (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9') || ch == '#' {
+            self.pos = self.pos + 1
+          } else {
+            break
+          }
+        }
+      }
+      return Ok(Token::IntLit(n.to_int()))
+    }
+
+    // Decimal digits
     let digits_start = self.pos
     while self.pos < self.src.length() && self.char_at(self.pos) >= '0' && self.char_at(self.pos) <= '9' {
       self.pos = self.pos + 1
     }
-    let num_str = self.src[digits_start:self.pos].to_owned()
-    let mut n : Int = 0
-    for d in num_str {
-      let digit = d.to_int() - '0'.to_int()
-      n = (n * 10 + digit) & 0x7FFFFFFF
+
+    // Check for float dot
+    let mut is_float = false
+    if self.pos < self.src.length() && self.char_at(self.pos) == '.' && self.pos + 1 < self.src.length() && self.char_at(self.pos + 1) >= '0' && self.char_at(self.pos + 1) <= '9' {
+      is_float = true
+      self.pos = self.pos + 1
+      while self.pos < self.src.length() && self.char_at(self.pos) >= '0' && self.char_at(self.pos) <= '9' {
+        self.pos = self.pos + 1
+      }
+      if self.pos < self.src.length() && (self.char_at(self.pos) == 'e' || self.char_at(self.pos) == 'E') {
+        self.pos = self.pos + 1
+        if self.pos < self.src.length() && (self.char_at(self.pos) == '+' || self.char_at(self.pos) == '-') {
+          self.pos = self.pos + 1
+        }
+        while self.pos < self.src.length() && self.char_at(self.pos) >= '0' && self.char_at(self.pos) <= '9' {
+          self.pos = self.pos + 1
+        }
+      }
     }
-    if is_negative {
-      n = -n
-    }
-    // Suffix: #, #Word64, #Int64, #Int
-    if self.pos < self.src.length() && self.char_at(self.pos) == '#' {
+
+    let raw_num_str = self.src[start_pos:self.pos].to_owned()
+
+    // Consume any hash suffix: #, ##, #Word32, #Word64, etc.
+    while self.pos < self.src.length() && self.char_at(self.pos) == '#' {
       self.pos = self.pos + 1
       while self.pos < self.src.length() {
         let ch = self.char_at(self.pos)
-        if (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9') {
+        if (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9') || ch == '#' {
           self.pos = self.pos + 1
         } else {
           break
         }
       }
     }
-    return Ok(Token::IntLit(n))
+
+    if is_float {
+      let d = parse_double_str(raw_num_str)
+      return Ok(Token::FloatLit(d))
+    }
+
+    // Decimal integer using Int64
+    let mut n : Int64 = 0L
+    for i in digits_start..<self.pos {
+      let ch = self.char_at(i)
+      if ch >= '0' && ch <= '9' {
+        let digit = (ch.to_int() - '0'.to_int()).to_int64()
+        n = n * 10L + digit
+      } else {
+        break
+      }
+    }
+    if is_negative {
+      n = -n
+    }
+    let val : Int = if n == -9223372036854775808L {
+      -2147483648
+    } else {
+      n.to_int()
+    }
+    return Ok(Token::IntLit(val))
   }
 
   // Underscore '_'
@@ -485,6 +620,21 @@ fn Lexer::next_token(self : Lexer) -> Result[Token, String] {
       self.pos = self.pos + 1
       return Ok(Token::Equal)
     }
+  }
+
+  // Dot operators: .&., .|., .^., etc.
+  if c == '.' && self.pos + 1 < self.src.length() && is_op_char(self.char_at(self.pos + 1)) {
+    let start = self.pos
+    while self.pos < self.src.length() {
+      let ch = self.char_at(self.pos)
+      if is_op_char(ch) || ch == '.' || ch == '#' {
+        self.pos = self.pos + 1
+      } else {
+        break
+      }
+    }
+    let op = self.src[start:self.pos].to_owned()
+    return Ok(Token::Ident(op))
   }
 
   // Operators: +, -, *, /, <, >, ==, etc.
@@ -875,6 +1025,10 @@ fn Parser::parse_alt(self : Parser) -> Result[Alt, String] {
       let _ = self.next()
       Pat::Lit(n)
     }
+    Token::FloatLit(d) => {
+      let _ = self.next()
+      Pat::Lit(d.to_int())
+    }
     Token::Ident(name) => {
       if is_constructor_name(name) {
         let _ = self.next()
@@ -907,6 +1061,7 @@ fn Parser::parse_alt(self : Parser) -> Result[Alt, String] {
 fn Parser::can_start_atom(self : Parser) -> Bool {
   match self.peek() {
     Token::IntLit(_) => true
+    Token::FloatLit(_) => true
     Token::CharLit(_) => true
     Token::StringLit(_) => true
     Token::Ident(_) => {
@@ -949,6 +1104,10 @@ fn Parser::parse_atom(self : Parser) -> Result[Expr, String] {
     Token::IntLit(n) => {
       let _ = self.next()
       Ok(Expr::LitInt(n))
+    }
+    Token::FloatLit(d) => {
+      let _ = self.next()
+      Ok(Expr::LitInt(d.to_int()))
     }
     Token::CharLit(c) => {
       let _ = self.next()

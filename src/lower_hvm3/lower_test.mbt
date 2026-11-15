@@ -522,3 +522,96 @@ test "lower 08_mergesort fixture" {
   assert_true(hvm3_code.contains("@mergesort = (λ&xs"))
   assert_true(hvm3_code.contains("@main = @result"))
 }
+
+test "lower bitwise operators" {
+  let e_and = @syntax.Expr::App(
+    @syntax.Expr::App(@syntax.Expr::Var("and#"), @syntax.Expr::LitInt(12)),
+    @syntax.Expr::LitInt(10),
+  )
+  assert_eq(@lower_hvm3.lower_expr(e_and), "(& 12 10)")
+
+  let e_or = @syntax.Expr::App(
+    @syntax.Expr::App(@syntax.Expr::Var("or#"), @syntax.Expr::LitInt(12)),
+    @syntax.Expr::LitInt(10),
+  )
+  assert_eq(@lower_hvm3.lower_expr(e_or), "(| 12 10)")
+
+  let e_xor = @syntax.Expr::App(
+    @syntax.Expr::App(@syntax.Expr::Var("xor#"), @syntax.Expr::LitInt(12)),
+    @syntax.Expr::LitInt(10),
+  )
+  assert_eq(@lower_hvm3.lower_expr(e_xor), "(^ 12 10)")
+
+  let e_shl = @syntax.Expr::App(
+    @syntax.Expr::App(
+      @syntax.Expr::Var("uncheckedIShiftL#"),
+      @syntax.Expr::LitInt(1),
+    ),
+    @syntax.Expr::LitInt(4),
+  )
+  assert_eq(@lower_hvm3.lower_expr(e_shl), "(<< 1 4)")
+
+  let e_shr = @syntax.Expr::App(
+    @syntax.Expr::App(
+      @syntax.Expr::Var("uncheckedIShiftRL#"),
+      @syntax.Expr::LitInt(32),
+    ),
+    @syntax.Expr::LitInt(2),
+  )
+  assert_eq(@lower_hvm3.lower_expr(e_shr), "(>> 32 2)")
+}
+
+test "lower W# unboxed word expressions" {
+  let src =
+    #|bitOp = \ a b ->
+    #|  case a of { W# x ->
+    #|  case b of { W# y ->
+    #|    W# (xor# (and# x y) (uncheckedIShiftL# 1# 4#))
+    #|  }
+    #|  }
+    #|result = bitOp (W# 12#) (W# 10#)
+    #|main = result
+  let prog = @syntax.parse_program(src).unwrap()
+  let hvm3_code = @lower_hvm3.lower(prog)
+
+  assert_true(hvm3_code.contains("(^ (& x y) (<< 1 4))"))
+  assert_true(hvm3_code.contains("@main = @result"))
+  assert_false(hvm3_code.contains("@W_hash ="))
+}
+
+test "lower multi-branch numeric switch" {
+  let src =
+    #|getColor = \ idx ->
+    #|  case idx of {
+    #|    __DEFAULT -> 300#;
+    #|    0# -> 100#;
+    #|    1# -> 200#
+    #|  }
+    #|main = getColor 0#
+  let prog = @syntax.parse_program(src).unwrap()
+  let hvm3_code = @lower_hvm3.lower(prog)
+
+  assert_true(hvm3_code.contains("(~ idx { 0: 100 1: 200 2+_: 300 })"))
+  assert_true(hvm3_code.contains("@main = (@getColor 0)"))
+}
+
+test "lower sha256 rotate and hashstate snippet" {
+  let src =
+    #|rotr = \ x n ->
+    #|  case n of { I# i ->
+    #|    case >=# i 0# of {
+    #|      __DEFAULT -> 0#;
+    #|      1# -> let j = -# 32# i in
+    #|        case >=# j 0# of {
+    #|          __DEFAULT -> 0#;
+    #|          1# -> or# (uncheckedShiftRL# x i) (uncheckedShiftL# x j)
+    #|        }
+    #|    }
+    #|  }
+    #|main = rotr 0x12345678# 4#
+  let prog = @syntax.parse_program(src).unwrap()
+  let hvm3_code = @lower_hvm3.lower(prog)
+
+  assert_true(hvm3_code.contains("(| (>> x i) (<< x j))"))
+  assert_true(hvm3_code.contains("@main = ((@rotr 305419896) 4)"))
+}

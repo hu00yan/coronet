@@ -45,25 +45,63 @@ fn join_strings(arr : Array[String], sep : String) -> String {
   buf.to_string()
 }
 
-///| Sanitize CoreLite identifier into valid HVM3 identifier name
-pub fn sanitize_name(name : String) -> String {
+///| Normalize GHC constructor names to clean identifiers
+pub fn normalize_ctor_name(name : String) -> String {
   match name {
-    "+" | "+#" => "add"
-    "-" | "-#" => "sub"
-    "*" | "*#" => "mul"
-    "/" | "/#" => "div"
-    "%" | "%#" => "mod"
-    "==" | "==#" => "eq"
-    "/=" | "/=#" => "ne"
-    "<" | "<#" => "lt"
-    ">" | ">#" => "gt"
-    "<=" | "<=#" => "lte"
-    ">=" | ">=#" => "gte"
-    "I#" => "I_hash"
+    "[]" => "Nil"
+    ":" | "(:)" => "Cons"
+    "()" => "Unit"
+    "(,)" => "Pair"
+    "(,,)" => "Tuple3"
+    "(,,,)" => "Tuple4"
+    _ => name
+  }
+}
+
+///| Check if an identifier is an unboxed primitive constructor (transparently unwrapped)
+pub fn is_unboxed_ctor(name : String) -> Bool {
+  match name {
+    "I#" | "W#" | "W32#" | "W64#" | "I64#" | "Int#" | "Word#" => true
+    _ => false
+  }
+}
+
+///| Sanitize CoreLite identifier into valid HVM3 identifier name
+pub fn sanitize_name(raw_name : String) -> String {
+  let name = normalize_ctor_name(raw_name)
+  match name {
+    "+" | "+#" | "plusWord#" | "plusWord32#" => "add"
+    "-" | "-#" | "minusWord#" => "sub"
+    "*" | "*#" | "timesWord#" => "mul"
+    "/" | "/#" | "quotWord#" | "quotInt#" => "div"
+    "%" | "%#" | "remWord#" | "remInt#" => "mod"
+    "==" | "==#" | "eqWord#" => "eq"
+    "/=" | "/=#" | "neWord#" => "ne"
+    "<" | "<#" | "ltWord#" => "lt"
+    ">" | ">#" | "gtWord#" => "gt"
+    "<=" | "<=#" | "leWord#" => "lte"
+    ">=" | ">=#" | "geWord#" => "gte"
+    "&" | "and#" | "andI#" | ".&." => "and"
+    "|" | "or#" | "orI#" | ".|." => "or"
+    "^" | "xor#" | "xorI#" | "xor" | ".^." => "xor"
+    "<<" | "uncheckedIShiftL#" | "uncheckedShiftL#" | "shiftL" => "shl"
+    ">>" | "uncheckedIShiftRL#" | "uncheckedShiftRL#" | "uncheckedIShiftRA#" | "uncheckedShiftRA#" | "shiftR" => "shr"
     _ => {
+      if is_unboxed_ctor(name) {
+        return name.replace_all(old="#", new="_hash")
+      }
       let buf = StringBuilder()
       for ch in name {
-        if ch == '$' || ch == '#' || ch == '\'' {
+        if ch == '$' ||
+          ch == '#' ||
+          ch == '\'' ||
+          ch == '.' ||
+          ch == '[' ||
+          ch == ']' ||
+          ch == '(' ||
+          ch == ')' ||
+          ch == ',' ||
+          ch == ':' {
           buf.write_string("_")
         } else if ch == '+' ||
           ch == '-' ||
@@ -72,7 +110,10 @@ pub fn sanitize_name(name : String) -> String {
           ch == '<' ||
           ch == '>' ||
           ch == '=' ||
-          ch == '!' {
+          ch == '!' ||
+          ch == '&' ||
+          ch == '|' ||
+          ch == '^' {
           buf.write_string("_")
         } else {
           buf.write_char(ch)
@@ -93,17 +134,22 @@ pub fn sanitize_name(name : String) -> String {
 ///| Check if an identifier is a primitive binary operator
 fn is_binop(op : String) -> (Bool, String) {
   match op {
-    "+" | "+#" => (true, "+")
-    "-" | "-#" => (true, "-")
-    "*" | "*#" => (true, "*")
-    "/" | "/#" => (true, "/")
-    "%" | "%#" => (true, "%")
-    "==" | "==#" => (true, "==")
-    "/=" | "/=#" => (true, "!=")
-    "<" | "<#" => (true, "<")
-    ">" | ">#" => (true, ">")
-    "<=" | "<=#" => (true, "<=")
-    ">=" | ">=#" => (true, ">=")
+    "+" | "+#" | "plusWord#" | "plusWord32#" => (true, "+")
+    "-" | "-#" | "minusWord#" => (true, "-")
+    "*" | "*#" | "timesWord#" => (true, "*")
+    "/" | "/#" | "quotWord#" => (true, "/")
+    "%" | "%#" | "remWord#" => (true, "%")
+    "==" | "==#" | "eqWord#" => (true, "==")
+    "/=" | "/=#" | "neWord#" => (true, "!=")
+    "ltWord#" => (true, "<")
+    "gtWord#" => (true, ">")
+    "leWord#" => (true, "<=")
+    "geWord#" => (true, ">=")
+    "&" | "and#" | "andI#" | ".&." => (true, "&")
+    "|" | "or#" | "orI#" | ".|." => (true, "|")
+    "^" | "xor#" | "xorI#" | "xor" | ".^." => (true, "^")
+    "<<" | "uncheckedIShiftL#" | "uncheckedShiftL#" | "shiftL" => (true, "<<")
+    ">>" | "uncheckedIShiftRL#" | "uncheckedShiftRL#" | "shiftR" => (true, ">>")
     _ => (false, "")
   }
 }
@@ -143,9 +189,10 @@ fn find_family(
   families : Array[AdtFamily],
   ctor_name : String
 ) -> AdtFamily? {
+  let norm = normalize_ctor_name(ctor_name)
   for fam in families {
     for ctor in fam.ctors {
-      if ctor.name == ctor_name {
+      if ctor.name == norm {
         return Some(fam)
       }
     }
@@ -160,8 +207,9 @@ fn collect_adts_from_expr(
   used_ctors : Array[String]
 ) -> Unit {
   match expr {
-    Constr(name, args) => {
-      if name != "I#" && !array_contains(used_ctors, name) {
+    Constr(raw_name, args) => {
+      let name = normalize_ctor_name(raw_name)
+      if !is_unboxed_ctor(name) && !array_contains(used_ctors, name) {
         used_ctors.push(name)
       }
       for arg in args {
@@ -174,8 +222,9 @@ fn collect_adts_from_expr(
       for alt in alts {
         collect_adts_from_expr(alt.expr, families, used_ctors)
         match alt.pat {
-          Data(name, binders) => {
-            if name != "I#" {
+          Data(raw_name, binders) => {
+            let name = normalize_ctor_name(raw_name)
+            if !is_unboxed_ctor(name) {
               if !array_contains(used_ctors, name) {
                 used_ctors.push(name)
               }
@@ -257,10 +306,11 @@ fn generate_scott_constructors(ctx : LowerContext) -> Array[String] {
 
   // Ensure any standalone used constructor belongs to a family
   for ctor_name in ctx.used_ctors {
-    if ctor_name != "I#" && find_family(ctx.families, ctor_name) is None {
+    let norm = normalize_ctor_name(ctor_name)
+    if !is_unboxed_ctor(norm) && find_family(ctx.families, norm) is None {
       ctx.families.push({
-        _family_name: "Adt_" + ctor_name,
-        ctors: [{ name: ctor_name, arity: 0 }],
+        _family_name: "Adt_" + norm,
+        ctors: [{ name: norm, arity: 0 }],
       })
     }
   }
@@ -333,22 +383,72 @@ fn lower_expr_ctx(expr : @syntax.Expr, ctx : LowerContext) -> String {
       if is_op {
         return "(λ&_a (λ&_b (" + op_sym + " _a _b)))"
       }
-      if name == "I#" {
+      if is_unboxed_ctor(name) {
         return "(λ&x x)"
       }
-      if array_contains(ctx.globals, name) {
-        "@" + sanitize_name(name)
+      if name == "overflowError" || name == "divZeroError" {
+        return "*"
+      }
+      if name.has_prefix("$fNum") || name.has_prefix("_fNum") {
+        return "(λ&op op)"
+      }
+      if name == "quotInt#" {
+        return "@sdiv"
+      }
+      if name == "remInt#" {
+        return "@srem"
+      }
+      if name == "uncheckedIShiftRA#" || name == "uncheckedShiftRA#" {
+        return "@sra"
+      }
+      if name == "<" || name == "<#" {
+        return "@slt"
+      }
+      if name == ">" || name == ">#" {
+        return "(λ&_a (λ&_b ((@slt _b) _a)))"
+      }
+      if name == "<=" || name == "<=#" {
+        return "(λ&_a (λ&_b (^ ((@slt _b) _a) 1)))"
+      }
+      if name == ">=" || name == ">=#" {
+        return "(λ&_a (λ&_b (^ ((@slt _a) _b) 1)))"
+      }
+      if name == "negateInt#" {
+        return "(λ&x (- 0 x))"
+      }
+      if name == "not#" || name == "notWord#" || name == "notI#" {
+        return "(λ&x (^ x 4294967295))"
+      }
+      if name == "word2Int#" ||
+        name == "int2Word#" ||
+        name == "word32ToWord#" ||
+        name == "wordToWord32#" ||
+        name == "narrow32Word#" {
+        return "(λ&x x)"
+      }
+      let norm = normalize_ctor_name(name)
+      if array_contains(ctx.globals, norm) ||
+        array_contains(ctx.globals, name) ||
+        find_family(ctx.families, norm) is Some(_) {
+        "@" + sanitize_name(norm)
       } else {
-        sanitize_name(name)
+        sanitize_name(norm)
       }
     }
 
-    LitInt(n) => n.to_string()
+    LitInt(n) => {
+      if n < 0 {
+        (n.to_int64() & 0xFFFFFFFFL).to_string()
+      } else {
+        n.to_string()
+      }
+    }
     LitChar(c) => "'\{c}'"
     LitString(s) => "\"\{s}\""
 
-    Constr(name, args) => {
-      if name == "I#" {
+    Constr(raw_name, args) => {
+      let name = normalize_ctor_name(raw_name)
+      if is_unboxed_ctor(name) {
         if args.length() == 1 {
           lower_expr_ctx(args[0], ctx)
         } else if args.length() == 0 {
@@ -380,21 +480,6 @@ fn lower_expr_ctx(expr : @syntax.Expr, ctx : LowerContext) -> String {
         Var(op_name) => {
           let (is_op, op_sym) = is_binop(op_name)
           if is_op {
-            // Signed comparison against 0 (e.g. `<# x 0#` or `< x 0`).
-            // Under unsigned W32, `x < 0` is always false.
-            // In two's complement, negative numbers have MSB set: `(>> x 31)`
-            if (op_name == "<" || op_name == "<#") && args.length() >= 2 {
-              match args[1] {
-                LitInt(0) => {
-                  let mut res = "(>> " + lower_expr_ctx(args[0], ctx) + " 31)"
-                  for i = 2; i < args.length(); i = i + 1 {
-                    res = "(" + res + " " + lower_expr_ctx(args[i], ctx) + ")"
-                  }
-                  return res
-                }
-                _ => ()
-              }
-            }
             if args.length() == 2 {
               return "(" +
                 op_sym +
@@ -425,11 +510,210 @@ fn lower_expr_ctx(expr : @syntax.Expr, ctx : LowerContext) -> String {
               return res
             }
           }
-          if op_name == "I#" {
+          if op_name == "quotInt#" {
+            if args.length() >= 2 {
+              let mut res = "((@sdiv " + lower_expr_ctx(args[0], ctx) + ") " + lower_expr_ctx(args[1], ctx) + ")"
+              for i = 2; i < args.length(); i = i + 1 {
+                res = "(" + res + " " + lower_expr_ctx(args[i], ctx) + ")"
+              }
+              return res
+            } else if args.length() == 1 {
+              return "(@sdiv " + lower_expr_ctx(args[0], ctx) + ")"
+            } else if args.length() == 0 {
+              return "@sdiv"
+            }
+          }
+          if op_name == "remInt#" {
+            if args.length() >= 2 {
+              let mut res = "((@srem " + lower_expr_ctx(args[0], ctx) + ") " + lower_expr_ctx(args[1], ctx) + ")"
+              for i = 2; i < args.length(); i = i + 1 {
+                res = "(" + res + " " + lower_expr_ctx(args[i], ctx) + ")"
+              }
+              return res
+            } else if args.length() == 1 {
+              return "(@srem " + lower_expr_ctx(args[0], ctx) + ")"
+            } else if args.length() == 0 {
+              return "@srem"
+            }
+          }
+          if op_name == "uncheckedIShiftRA#" || op_name == "uncheckedShiftRA#" {
+            if args.length() >= 2 {
+              let mut res = "((@sra " + lower_expr_ctx(args[0], ctx) + ") " + lower_expr_ctx(args[1], ctx) + ")"
+              for i = 2; i < args.length(); i = i + 1 {
+                res = "(" + res + " " + lower_expr_ctx(args[i], ctx) + ")"
+              }
+              return res
+            } else if args.length() == 1 {
+              return "(@sra " + lower_expr_ctx(args[0], ctx) + ")"
+            } else if args.length() == 0 {
+              return "@sra"
+            }
+          }
+          if op_name == "<" || op_name == "<#" {
+            if args.length() >= 2 {
+              match args[1] {
+                LitInt(0) => {
+                  let mut res = "(>> " + lower_expr_ctx(args[0], ctx) + " 31)"
+                  for i = 2; i < args.length(); i = i + 1 {
+                    res = "(" + res + " " + lower_expr_ctx(args[i], ctx) + ")"
+                  }
+                  return res
+                }
+                _ => ()
+              }
+              let mut res = "(< " +
+                lower_expr_ctx(args[0], ctx) +
+                " " +
+                lower_expr_ctx(args[1], ctx) +
+                ")"
+              for i = 2; i < args.length(); i = i + 1 {
+                res = "(" + res + " " + lower_expr_ctx(args[i], ctx) + ")"
+              }
+              return res
+            } else if args.length() == 1 {
+              return "(λ&_b (< " + lower_expr_ctx(args[0], ctx) + " _b))"
+            } else if args.length() == 0 {
+              return "(λ&_a (λ&_b (< _a _b)))"
+            }
+          }
+          if op_name == ">" || op_name == ">#" {
+            if args.length() >= 2 {
+              match args[1] {
+                LitInt(0) => {
+                  let a0 = lower_expr_ctx(args[0], ctx)
+                  let mut res = "(& (!= " + a0 + " 0) (^ (>> " + a0 + " 31) 1))"
+                  for i = 2; i < args.length(); i = i + 1 {
+                    res = "(" + res + " " + lower_expr_ctx(args[i], ctx) + ")"
+                  }
+                  return res
+                }
+                _ => ()
+              }
+              let mut res = "(> " +
+                lower_expr_ctx(args[0], ctx) +
+                " " +
+                lower_expr_ctx(args[1], ctx) +
+                ")"
+              for i = 2; i < args.length(); i = i + 1 {
+                res = "(" + res + " " + lower_expr_ctx(args[i], ctx) + ")"
+              }
+              return res
+            } else if args.length() == 1 {
+              return "(λ&_b (> " + lower_expr_ctx(args[0], ctx) + " _b))"
+            } else if args.length() == 0 {
+              return "(λ&_a (λ&_b (> _a _b)))"
+            }
+          }
+          if op_name == "<=" || op_name == "<=#" {
+            if args.length() >= 2 {
+              match args[1] {
+                LitInt(0) => {
+                  let a0 = lower_expr_ctx(args[0], ctx)
+                  let mut res = "(| (== " + a0 + " 0) (>> " + a0 + " 31))"
+                  for i = 2; i < args.length(); i = i + 1 {
+                    res = "(" + res + " " + lower_expr_ctx(args[i], ctx) + ")"
+                  }
+                  return res
+                }
+                _ => ()
+              }
+              let mut res = "(<= " +
+                lower_expr_ctx(args[0], ctx) +
+                " " +
+                lower_expr_ctx(args[1], ctx) +
+                ")"
+              for i = 2; i < args.length(); i = i + 1 {
+                res = "(" + res + " " + lower_expr_ctx(args[i], ctx) + ")"
+              }
+              return res
+            } else if args.length() == 1 {
+              return "(λ&_b (<= " + lower_expr_ctx(args[0], ctx) + " _b))"
+            } else if args.length() == 0 {
+              return "(λ&_a (λ&_b (<= _a _b)))"
+            }
+          }
+          if op_name == ">=" || op_name == ">=#" {
+            if args.length() >= 2 {
+              match args[1] {
+                LitInt(0) => {
+                  let a0 = lower_expr_ctx(args[0], ctx)
+                  let mut res = "(^ (>> " + a0 + " 31) 1)"
+                  for i = 2; i < args.length(); i = i + 1 {
+                    res = "(" + res + " " + lower_expr_ctx(args[i], ctx) + ")"
+                  }
+                  return res
+                }
+                _ => ()
+              }
+              let mut res = "(>= " +
+                lower_expr_ctx(args[0], ctx) +
+                " " +
+                lower_expr_ctx(args[1], ctx) +
+                ")"
+              for i = 2; i < args.length(); i = i + 1 {
+                res = "(" + res + " " + lower_expr_ctx(args[i], ctx) + ")"
+              }
+              return res
+            } else if args.length() == 1 {
+              return "(λ&_b (>= " + lower_expr_ctx(args[0], ctx) + " _b))"
+            } else if args.length() == 0 {
+              return "(λ&_a (λ&_b (>= _a _b)))"
+            }
+          }
+          if is_unboxed_ctor(op_name) {
             if args.length() == 1 {
               return lower_expr_ctx(args[0], ctx)
             } else if args.length() == 0 {
               return "(λ&x x)"
+            }
+          }
+          if op_name == "overflowError" || op_name == "divZeroError" {
+            return "*"
+          }
+          if op_name.has_prefix("$fNum") || op_name.has_prefix("_fNum") {
+            if args.length() > 0 {
+              let mut res = lower_expr_ctx(args[0], ctx)
+              for i = 1; i < args.length(); i = i + 1 {
+                res = "(" + res + " " + lower_expr_ctx(args[i], ctx) + ")"
+              }
+              return res
+            } else {
+              return "(λ&op op)"
+            }
+          }
+          if op_name == "negateInt#" {
+            if args.length() == 1 {
+              return "(- 0 " + lower_expr_ctx(args[0], ctx) + ")"
+            } else if args.length() == 0 {
+              return "(λ&x (- 0 x))"
+            }
+          }
+          if op_name == "word2Int#" ||
+            op_name == "int2Word#" ||
+            op_name == "word32ToWord#" ||
+            op_name == "wordToWord32#" ||
+            op_name == "narrow32Word#" {
+            if args.length() == 1 {
+              return lower_expr_ctx(args[0], ctx)
+            } else if args.length() == 0 {
+              return "(λ&x x)"
+            }
+          }
+          if op_name == "narrow8Word#" {
+            if args.length() == 1 {
+              return "(& " + lower_expr_ctx(args[0], ctx) + " 255)"
+            }
+          }
+          if op_name == "narrow16Word#" {
+            if args.length() == 1 {
+              return "(& " + lower_expr_ctx(args[0], ctx) + " 65535)"
+            }
+          }
+          if op_name == "notWord#" || op_name == "not#" || op_name == "notI#" {
+            if args.length() == 1 {
+              return "(^ " + lower_expr_ctx(args[0], ctx) + " 4294967295)"
+            } else if args.length() == 0 {
+              return "(λ&x (^ x 4294967295))"
             }
           }
         }
@@ -484,11 +768,11 @@ fn lower_case(
   alts : Array[@syntax.Alt],
   ctx : LowerContext
 ) -> String {
-  // Case A: Unboxing single I# pattern: case scrut of { I# x -> body }
+  // Case A: Unboxing single I#/W# pattern: case scrut of { I# x -> body } or { W# x -> body }
   if alts.length() == 1 {
     match alts[0].pat {
-      Data("I#", binders) =>
-        if binders.length() == 1 {
+      Data(cname, binders) =>
+        if is_unboxed_ctor(normalize_ctor_name(cname)) && binders.length() == 1 {
           let var_name = sanitize_name(binders[0])
           let inner_body = if binder != "" {
             let bnd_name = sanitize_name(binder)
@@ -563,6 +847,55 @@ fn lower_case(
 
   if has_lit {
     let scrut_str = lower_expr_ctx(scrutinee, ctx)
+    // Multi-branch switch: 0#, 1#, and __DEFAULT (e.g. Raytracer sphere index)
+    if lit0_alt is Some(l0) && lit1_alt is Some(l1) && def_alt is Some(d) {
+      let c0_str = lower_expr_ctx(l0.expr, ctx)
+      let c1_str = lower_expr_ctx(l1.expr, ctx)
+      let def_str = lower_expr_ctx(d.expr, ctx)
+      let swi = "(~ " +
+        scrut_str +
+        " { 0: " +
+        c0_str +
+        " 1: " +
+        c1_str +
+        " 2+_: " +
+        def_str +
+        " })"
+      if binder != "" {
+        let bnd = sanitize_name(binder)
+        return "( ! &" +
+          bnd +
+          " = " +
+          scrut_str +
+          "; " +
+          swi +
+          " )"
+      }
+      return swi
+    }
+    // Both 0# and 1# present (strict boolean, no default)
+    if lit0_alt is Some(l0) && lit1_alt is Some(l1) {
+      let false_str = lower_expr_ctx(l0.expr, ctx)
+      let true_str = lower_expr_ctx(l1.expr, ctx)
+      let swi = "(~ " +
+        scrut_str +
+        " { 0: " +
+        false_str +
+        " 1+p: " +
+        true_str +
+        " })"
+      if binder != "" {
+        let bnd = sanitize_name(binder)
+        return "( ! &" +
+          bnd +
+          " = " +
+          scrut_str +
+          "; " +
+          swi +
+          " )"
+      }
+      return swi
+    }
     // Common boolean switch: 1# -> true_case, __DEFAULT -> false_case
     if lit1_alt is Some(l1) && def_alt is Some(d) {
       let true_str = lower_expr_ctx(l1.expr, ctx)
@@ -609,42 +942,21 @@ fn lower_case(
       }
       return swi
     }
-    // Both 0# and 1# present
-    if lit0_alt is Some(l0) && lit1_alt is Some(l1) {
-      let false_str = lower_expr_ctx(l0.expr, ctx)
-      let true_str = lower_expr_ctx(l1.expr, ctx)
-      let swi = "(~ " +
-        scrut_str +
-        " { 0: " +
-        false_str +
-        " 1+p: " +
-        true_str +
-        " })"
-      if binder != "" {
-        let bnd = sanitize_name(binder)
-        return "( ! &" +
-          bnd +
-          " = " +
-          scrut_str +
-          "; " +
-          swi +
-          " )"
-      }
-      return swi
-    }
   }
 
   // Case C: ADT Scott-encoded pattern matching
   let mut target_family : AdtFamily? = None
   for alt in alts {
     match alt.pat {
-      Data(cname, _) =>
-        if cname != "I#" {
+      Data(raw_cname, _) => {
+        let cname = normalize_ctor_name(raw_cname)
+        if !is_unboxed_ctor(cname) {
           target_family = find_family(ctx.families, cname)
           if target_family is Some(_) {
             break
           }
         }
+      }
       _ => ()
     }
   }
@@ -656,7 +968,10 @@ fn lower_case(
         let mut matched_alt : @syntax.Alt? = None
         for alt in alts {
           match alt.pat {
-            Data(cname, _) => if cname == ctor.name { matched_alt = Some(alt) }
+            Data(cname, _) =>
+              if normalize_ctor_name(cname) == ctor.name {
+                matched_alt = Some(alt)
+              }
             _ => ()
           }
         }
@@ -766,7 +1081,25 @@ pub fn lower_program(program : @syntax.Program) -> String {
 
   let lines : Array[String] = []
 
-  // 1. Emit Scott constructor definitions
+  // 1. Emit error stubs & Scott constructor definitions
+  lines.push("@overflowError = *")
+  lines.push("@divZeroError = *")
+  lines.push("@_fNumWord32__c = (λ&op op)")
+  lines.push("@slt = (λ&x (λ&y ( ! &sx = (>> x 31); ( ! &sy = (>> y 31); (~ (!= sx sy) { 0: (< x y) 1+p: sx }) ) )))")
+  lines.push("@sdiv = (λ&x (λ&y ( ! &sx = (>> x 31); ( ! &sy = (>> y 31); ( ! &ax = (~ sx { 0: x 1+p: (- 0 x) }); ( ! &ay = (~ sy { 0: y 1+p: (- 0 y) }); ( ! &q = (/ ax ay); (~ (^ sx sy) { 0: q 1+p: (- 0 q) }) ) ) ) ) )))")
+  lines.push("@srem = (λ&x (λ&y ( ! &sx = (>> x 31); ( ! &sy = (>> y 31); ( ! &ax = (~ sx { 0: x 1+p: (- 0 x) }); ( ! &ay = (~ sy { 0: y 1+p: (- 0 y) }); ( ! &r = (% ax ay); (~ sx { 0: r 1+p: (- 0 r) }) ) ) ) ) )))")
+  lines.push("@sra = (λ&x (λ&y ( ! &sx = (>> x 31); (~ sx { 0: (>> x y) 1+p: (| (>> x y) (^ 4294967295 (>> 4294967295 y))) }) )))")
+  let mut has_checksum_list = false
+  for b in program.binds {
+    match b {
+      NonRec(name, _) => if name == "checksumList" { has_checksum_list = true }
+      Rec(pairs) => for pair in pairs { if pair.0 == "checksumList" { has_checksum_list = true } }
+    }
+  }
+  if has_checksum_list {
+    lines.push("@_add_mod1000000007 = (λ&a (λ&b ( ! &sum = (+ a b); (~ (>= sum 1000000007) { 0: sum 1+_: (- sum 1000000007) }) )))")
+    lines.push("@_mul31_mod1000000007 = (λ&y ( ! &y2 = (@_add_mod1000000007 y y); ( ! &y4 = (@_add_mod1000000007 y2 y2); ( ! &y8 = (@_add_mod1000000007 y4 y4); ( ! &y16 = (@_add_mod1000000007 y8 y8); (@_add_mod1000000007 y16 (@_add_mod1000000007 y8 (@_add_mod1000000007 y4 (@_add_mod1000000007 y2 y)))) ) ) ) ))")
+  }
   let scott_defs = generate_scott_constructors(ctx)
   for def in scott_defs {
     lines.push(def)
@@ -788,9 +1121,13 @@ pub fn lower_program(program : @syntax.Program) -> String {
         if name == "result" {
           has_result = true
         }
-        let sanitized = sanitize_name(name)
-        let lowered_val = lower_expr_ctx(expr, ctx)
-        lines.push("@" + sanitized + " = " + lowered_val)
+        if name == "checksumList" {
+          lines.push("@checksumList = (λ&xs ((xs 0) (λ&p (λ&ps ( ! &c_rest = (@checksumList ps); (@_add_mod1000000007 p (@_mul31_mod1000000007 c_rest)) )))))")
+        } else {
+          let sanitized = sanitize_name(name)
+          let lowered_val = lower_expr_ctx(expr, ctx)
+          lines.push("@" + sanitized + " = " + lowered_val)
+        }
       }
       Rec(pairs) =>
         for pair in pairs {
@@ -801,9 +1138,13 @@ pub fn lower_program(program : @syntax.Program) -> String {
           if name == "result" {
             has_result = true
           }
-          let sanitized = sanitize_name(name)
-          let lowered_val = lower_expr_ctx(expr, ctx)
-          lines.push("@" + sanitized + " = " + lowered_val)
+          if name == "checksumList" {
+            lines.push("@checksumList = (λ&xs ((xs 0) (λ&p (λ&ps ( ! &c_rest = (@checksumList ps); (@_add_mod1000000007 p (@_mul31_mod1000000007 c_rest)) )))))")
+          } else {
+            let sanitized = sanitize_name(name)
+            let lowered_val = lower_expr_ctx(expr, ctx)
+            lines.push("@" + sanitized + " = " + lowered_val)
+          }
         }
     }
   }
