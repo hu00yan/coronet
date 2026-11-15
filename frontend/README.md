@@ -272,3 +272,39 @@ ghc -c -O -package ghc -fplugin=CoronetPlugin \
 cd tests/fixtures/multimodule && runghc Main.hs
 # Output: 12
 ```
+
+---
+
+## 9. Heavy Realistic Workload Suite (`tests/fixtures/heavy/`)
+
+Coronet provides two realistic heavy computational workloads to benchmark parallel graph reduction speedups on multi-core CPUs and GPUs:
+
+### 9.1 `Raytracer.hs` (3D Raytracer)
+
+- **Description**: Pure functional raytracer in Haskell. Constructs 3D vectors (`Vec3`), primary rays (`Ray`), spherical geometries (`Sphere`), and a point light source (`Light`). Computes quadratic ray-sphere intersections, surface normal vectors, and ambient/diffuse Lambertian illumination using fixed-point integer mathematics (scale = 1000).
+- **Workload**: Traces rays over a 16x16 grid (256 rays), accumulating pixel intensities into a polynomial checksum modulo $10^9 + 7$.
+- **Outputs & Baseline**:
+  * Reference (`runghc`): `697580120` (0.382s)
+  * Compiled (`ghc -O2`): `697580120` (0.01s user)
+- **Extracted Core**: `tests/fixtures/heavy/Raytracer.core` (20.6 KB)
+
+### 9.2 `Sha256.hs` (SHA-256 Cryptographic Hash)
+
+- **Description**: Full specification-compliant FIPS 180-4 SHA-256 cryptographic hash function in pure Haskell. Implements $\Sigma_0, \Sigma_1, \sigma_0, \sigma_1, Ch, Maj$ bitwise functions with 32-bit bitwise primitives (`and#`, `or#`, `xor#`, `rotr`, shifts).
+- **Workload**: Processes a benchmark message block through 64-word schedule expansion and 64 compression rounds with standard round constants $K_0 .. K_{63}$, computing the cumulative state word checksum.
+- **Outputs & Baseline**:
+  * Reference (`runghc`): `336861353` (0.353s)
+  * Compiled (`ghc -O2`): `336861353` (0.01s user)
+- **Extracted Core**: `tests/fixtures/heavy/Sha256.core` (17.2 KB)
+
+### 9.3 Extraction Command
+
+```bash
+ghc -c -O2 -package ghc -fplugin=CoronetPlugin \
+    -fplugin-opt=CoronetPlugin:out=tests/fixtures/heavy/Raytracer.core \
+    -ifrontend tests/fixtures/heavy/Raytracer.hs
+
+ghc -c -O2 -package ghc -fplugin=CoronetPlugin \
+    -fplugin-opt=CoronetPlugin:out=tests/fixtures/heavy/Sha256.core \
+    -ifrontend tests/fixtures/heavy/Sha256.hs
+```
