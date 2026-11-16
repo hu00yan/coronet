@@ -253,7 +253,9 @@ def build_c(book, tpc, timeout):
     """`hvm gen-c` the book and compile it at a fixed thread count."""
     stem = book.stem
     gen = book.parent / (stem + ".generated.c")
-    if not gen.exists():
+    # regen when the book changed: a cached gen older than its book made the
+    # scaling rows silently measure the previous compiler's net
+    if not gen.exists() or gen.stat().st_mtime < book.stat().st_mtime:
         rc, out, err, _ = run([HVM2_BIN, "gen-c", book], max(120, timeout))
         if rc != 0 or not out.strip():
             return None, (err or out).strip()[:300] or "gen-c produced nothing"

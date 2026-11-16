@@ -1,1019 +1,1021 @@
 {
-  "meta": {
-    "cpu": "Apple M1 Pro",
-    "machine": "arm64",
-    "physical_cores": "6",
-    "logical_cores": 8,
-    "reps": 5,
-    "threads": [
-      0,
-      1,
-      2,
-      3
-    ],
-    "hvm2": "hvm 2.0.22"
-  },
-  "rows": {
-    "01_arith": {
-      "input": "tests/fixtures/core/01_arith.core",
-      "core_kb": 0.2001953125,
-      "compile": {
-        "input": "/Users/huyan00/mycode/coronet/tests/fixtures/core/01_arith.core",
-        "target": "hvm2",
-        "repeat": 5,
-        "read_us": 0.051375,
-        "parse_us": 0.005708,
-        "link_us": 0.002333,
-        "mid_us": 0.003834,
-        "lower_us": 0.483958,
-        "prune_us": 0.113708,
-        "total_us": 0.6609160000000001,
-        "out_bytes": 10,
-        "out_defs": 1
-      },
-      "trace_matches_cli": true,
-      "rust": {
-        "itrs": 1,
-        "reported_eval_s": 0.0,
-        "reported_mips": 2.67,
-        "result": "48",
-        "wall_s": 0.004334499999999991,
-        "status": "ok",
-        "load_s": 0.004,
-        "eval_s": 0.0003
-      },
-      "c": {
-        "0": {
-          "status": "ok",
-          "threads": 1,
-          "itrs": 1,
-          "eval_s": 0.0001,
-          "load_s": 0.0035,
-          "wall_s": 0.0036,
-          "reported_eval_s": 0.0,
-          "mips": 0.01,
-          "result": "48"
-        },
-        "1": {
-          "status": "ok",
-          "threads": 2,
-          "itrs": 1,
-          "eval_s": 0.0,
-          "load_s": 0.004,
-          "wall_s": 0.0037,
-          "reported_eval_s": 0.0,
-          "mips": 1.0,
-          "result": "48"
-        },
-        "2": {
-          "status": "ok",
-          "threads": 4,
-          "itrs": 1,
-          "eval_s": 0.0,
-          "load_s": 0.0038,
-          "wall_s": 0.0038,
-          "reported_eval_s": 0.0,
-          "mips": 1.0,
-          "result": "48"
-        },
-        "3": {
-          "status": "ok",
-          "threads": 8,
-          "itrs": 1,
-          "eval_s": 0.0006,
-          "load_s": 0.0045,
-          "wall_s": 0.0051,
-          "reported_eval_s": 0.0,
-          "mips": 0.0,
-          "result": "48"
-        }
-      },
-      "hvm3": {
-        "status": "ok",
-        "itrs": 2,
-        "eval_s": 9.1e-05,
-        "wall_s": 0.044
-      }
+ "meta": {
+  "cpu": "Apple M1 Pro",
+  "machine": "arm64",
+  "physical_cores": "6",
+  "logical_cores": 8,
+  "reps": 5,
+  "threads": [
+   0,
+   1,
+   2,
+   3
+  ],
+  "hvm2": "hvm 2.0.22"
+ },
+ "rows": {
+  "01_arith": {
+   "input": "tests/fixtures/core/01_arith.core",
+   "core_kb": 0.2001953125,
+   "compile": {
+    "input": "/Users/huyan00/mycode/coronet-perf/tests/fixtures/core/01_arith.core",
+    "target": "hvm2",
+    "repeat": 5,
+    "read_us": 0.060375,
+    "parse_us": 0.005375,
+    "link_us": 0.00225,
+    "mid_us": 0.004542,
+    "lower_us": 0.501916,
+    "prune_us": 0.113833,
+    "total_us": 0.688291,
+    "out_bytes": 10,
+    "out_defs": 1
+   },
+   "trace_matches_cli": true,
+   "rust": {
+    "itrs": 1,
+    "reported_eval_s": 0.0,
+    "reported_mips": 1.85,
+    "result": "48",
+    "wall_s": 0.004440958000486717,
+    "status": "ok",
+    "load_s": 0.0044,
+    "eval_s": 0.0
+   },
+   "c": {
+    "0": {
+     "status": "ok",
+     "threads": 1,
+     "itrs": 1,
+     "eval_s": 0.0024,
+     "load_s": 0.0048,
+     "wall_s": 0.0073,
+     "reported_eval_s": 0.0,
+     "mips": 0.0,
+     "result": "48"
     },
-    "02_fib": {
-      "input": "tests/fixtures/core/02_fib.core",
-      "core_kb": 0.3896484375,
-      "compile": {
-        "input": "/Users/huyan00/mycode/coronet/tests/fixtures/core/02_fib.core",
-        "target": "hvm2",
-        "repeat": 5,
-        "read_us": 0.058209000000000004,
-        "parse_us": 0.008416,
-        "link_us": 0.0027080000000000003,
-        "mid_us": 0.011,
-        "lower_us": 0.541875,
-        "prune_us": 0.168583,
-        "total_us": 0.790791,
-        "out_bytes": 1079,
-        "out_defs": 8
-      },
-      "trace_matches_cli": true,
-      "rust": {
-        "itrs": 7080,
-        "reported_eval_s": 0.0,
-        "reported_mips": 45.1,
-        "result": "55",
-        "wall_s": 0.004627207999999605,
-        "status": "ok",
-        "load_s": 0.0047,
-        "eval_s": -0.0001
-      },
-      "c": {
-        "0": {
-          "status": "ok",
-          "threads": 1,
-          "itrs": 7080,
-          "eval_s": 0.0,
-          "load_s": 0.0035,
-          "wall_s": 0.003,
-          "reported_eval_s": 0.0,
-          "mips": 7080.0,
-          "result": "55"
-        },
-        "1": {
-          "status": "ok",
-          "threads": 2,
-          "itrs": 7080,
-          "eval_s": 0.0,
-          "load_s": 0.0039,
-          "wall_s": 0.0038,
-          "reported_eval_s": 0.0,
-          "mips": 7080.0,
-          "result": "55"
-        },
-        "2": {
-          "status": "ok",
-          "threads": 4,
-          "itrs": 7080,
-          "eval_s": 0.0,
-          "load_s": 0.0043,
-          "wall_s": 0.0042,
-          "reported_eval_s": 0.0,
-          "mips": 7080.0,
-          "result": "55"
-        },
-        "3": {
-          "status": "ok",
-          "threads": 8,
-          "itrs": 7080,
-          "eval_s": 0.0004,
-          "load_s": 0.0057,
-          "wall_s": 0.0061,
-          "reported_eval_s": 0.0,
-          "mips": 17.75,
-          "result": "55"
-        }
-      },
-      "hvm3": {
-        "status": "ok",
-        "itrs": 2212,
-        "eval_s": 0.000661,
-        "wall_s": 0.0332
-      }
+    "1": {
+     "status": "ok",
+     "threads": 2,
+     "itrs": 1,
+     "eval_s": 0.0,
+     "load_s": 0.0048,
+     "wall_s": 0.0045,
+     "reported_eval_s": 0.0,
+     "mips": 1.0,
+     "result": "48"
     },
-    "03_adt": {
-      "input": "tests/fixtures/core/03_adt.core",
-      "core_kb": 0.5439453125,
-      "compile": {
-        "input": "/Users/huyan00/mycode/coronet/tests/fixtures/core/03_adt.core",
-        "target": "hvm2",
-        "repeat": 5,
-        "read_us": 0.0575,
-        "parse_us": 0.008791,
-        "link_us": 0.004417,
-        "mid_us": 0.004958000000000001,
-        "lower_us": 0.48625,
-        "prune_us": 0.113917,
-        "total_us": 0.6758330000000001,
-        "out_bytes": 10,
-        "out_defs": 1
-      },
-      "trace_matches_cli": true,
-      "rust": {
-        "itrs": 1,
-        "reported_eval_s": 0.0,
-        "reported_mips": 2.4,
-        "result": "42",
-        "wall_s": 0.004417500000000629,
-        "status": "ok",
-        "load_s": 0.0037,
-        "eval_s": 0.0007
-      },
-      "c": {
-        "0": {
-          "status": "ok",
-          "threads": 1,
-          "itrs": 1,
-          "eval_s": 0.0,
-          "load_s": 0.0036,
-          "wall_s": 0.0032,
-          "reported_eval_s": 0.0,
-          "mips": 1.0,
-          "result": "42"
-        },
-        "1": {
-          "status": "ok",
-          "threads": 2,
-          "itrs": 1,
-          "eval_s": 0.0002,
-          "load_s": 0.0037,
-          "wall_s": 0.0039,
-          "reported_eval_s": 0.0,
-          "mips": 0.0,
-          "result": "42"
-        },
-        "2": {
-          "status": "ok",
-          "threads": 4,
-          "itrs": 1,
-          "eval_s": 0.0,
-          "load_s": 0.0037,
-          "wall_s": 0.0037,
-          "reported_eval_s": 0.0,
-          "mips": 0.07,
-          "result": "42"
-        },
-        "3": {
-          "status": "ok",
-          "threads": 8,
-          "itrs": 1,
-          "eval_s": 0.0005,
-          "load_s": 0.0051,
-          "wall_s": 0.0056,
-          "reported_eval_s": 0.0,
-          "mips": 0.0,
-          "result": "42"
-        }
-      },
-      "hvm3": {
-        "status": "ok",
-        "itrs": 2,
-        "eval_s": 7e-05,
-        "wall_s": 0.0316
-      }
+    "2": {
+     "status": "ok",
+     "threads": 4,
+     "itrs": 1,
+     "eval_s": 0.0004,
+     "load_s": 0.0049,
+     "wall_s": 0.0053,
+     "reported_eval_s": 0.0,
+     "mips": 0.0,
+     "result": "48"
     },
-    "04_higher_order": {
-      "input": "tests/fixtures/core/04_higher_order.core",
-      "core_kb": 0.673828125,
-      "compile": {
-        "input": "/Users/huyan00/mycode/coronet/tests/fixtures/core/04_higher_order.core",
-        "target": "hvm2",
-        "repeat": 5,
-        "read_us": 0.053125,
-        "parse_us": 0.013875,
-        "link_us": 0.007125,
-        "mid_us": 0.025625,
-        "lower_us": 0.59875,
-        "prune_us": 0.202667,
-        "total_us": 0.901167,
-        "out_bytes": 1669,
-        "out_defs": 17
-      },
-      "trace_matches_cli": true,
-      "rust": {
-        "itrs": 202,
-        "reported_eval_s": 0.0,
-        "reported_mips": 17.57,
-        "result": "24",
-        "wall_s": 0.0041439170000003855,
-        "status": "ok",
-        "load_s": 0.0043,
-        "eval_s": -0.0001
-      },
-      "c": {
-        "0": {
-          "status": "ok",
-          "threads": 1,
-          "itrs": 202,
-          "eval_s": 0.0001,
-          "load_s": 0.0032,
-          "wall_s": 0.0032,
-          "reported_eval_s": 0.0,
-          "mips": 2.39,
-          "result": "24"
-        },
-        "1": {
-          "status": "ok",
-          "threads": 2,
-          "itrs": 202,
-          "eval_s": 0.0006,
-          "load_s": 0.0032,
-          "wall_s": 0.0038,
-          "reported_eval_s": 0.0,
-          "mips": 0.34,
-          "result": "24"
-        },
-        "2": {
-          "status": "ok",
-          "threads": 4,
-          "itrs": 202,
-          "eval_s": 0.0002,
-          "load_s": 0.0037,
-          "wall_s": 0.0039,
-          "reported_eval_s": 0.0,
-          "mips": 1.16,
-          "result": "24"
-        },
-        "3": {
-          "status": "ok",
-          "threads": 8,
-          "itrs": 202,
-          "eval_s": 0.0,
-          "load_s": 0.0052,
-          "wall_s": 0.0045,
-          "reported_eval_s": 0.0,
-          "mips": 202.0,
-          "result": "24"
-        }
-      },
-      "hvm3": {
-        "status": "ok",
-        "itrs": 189,
-        "eval_s": 0.000184,
-        "wall_s": 0.032
-      }
-    },
-    "05_tree": {
-      "input": "tests/fixtures/core/05_tree.core",
-      "core_kb": 0.650390625,
-      "compile": {
-        "input": "/Users/huyan00/mycode/coronet/tests/fixtures/core/05_tree.core",
-        "target": "hvm2",
-        "repeat": 5,
-        "read_us": 0.066208,
-        "parse_us": 0.014958,
-        "link_us": 0.00525,
-        "mid_us": 0.019458000000000003,
-        "lower_us": 0.6094579999999999,
-        "prune_us": 0.209625,
-        "total_us": 0.924957,
-        "out_bytes": 1858,
-        "out_defs": 14
-      },
-      "trace_matches_cli": true,
-      "rust": {
-        "itrs": 837,
-        "reported_eval_s": 0.0,
-        "reported_mips": 30.48,
-        "result": "92",
-        "wall_s": 0.004605500000000262,
-        "status": "ok",
-        "load_s": 0.0042,
-        "eval_s": 0.0004
-      },
-      "c": {
-        "0": {
-          "status": "ok",
-          "threads": 1,
-          "itrs": 837,
-          "eval_s": 0.0,
-          "load_s": 0.0037,
-          "wall_s": 0.0035,
-          "reported_eval_s": 0.0,
-          "mips": 837.0,
-          "result": "92"
-        },
-        "1": {
-          "status": "ok",
-          "threads": 2,
-          "itrs": 837,
-          "eval_s": 0.0,
-          "load_s": 0.0035,
-          "wall_s": 0.0031,
-          "reported_eval_s": 0.0,
-          "mips": 837.0,
-          "result": "92"
-        },
-        "2": {
-          "status": "ok",
-          "threads": 4,
-          "itrs": 837,
-          "eval_s": 0.0,
-          "load_s": 0.0037,
-          "wall_s": 0.0035,
-          "reported_eval_s": 0.0,
-          "mips": 837.0,
-          "result": "92"
-        },
-        "3": {
-          "status": "ok",
-          "threads": 8,
-          "itrs": 837,
-          "eval_s": 0.0001,
-          "load_s": 0.0047,
-          "wall_s": 0.0047,
-          "reported_eval_s": 0.0,
-          "mips": 12.37,
-          "result": "92"
-        }
-      },
-      "hvm3": {
-        "status": "ok",
-        "itrs": 460,
-        "eval_s": 0.000272,
-        "wall_s": 0.0315
-      }
-    },
-    "06_lazy_stream": {
-      "input": "tests/fixtures/core/06_lazy_stream.core",
-      "core_kb": 0.7470703125,
-      "compile": {
-        "input": "/Users/huyan00/mycode/coronet/tests/fixtures/core/06_lazy_stream.core",
-        "target": "hvm2",
-        "repeat": 5,
-        "read_us": 0.056042,
-        "parse_us": 0.016333,
-        "link_us": 0.006375,
-        "mid_us": 0.020708,
-        "lower_us": 0.582083,
-        "prune_us": 0.22075,
-        "total_us": 0.9022910000000001,
-        "out_bytes": 1996,
-        "out_defs": 20
-      },
-      "trace_matches_cli": true,
-      "rust": {
-        "itrs": 747,
-        "reported_eval_s": 0.0,
-        "reported_mips": 27.5,
-        "result": "55",
-        "wall_s": 0.0045135000000016134,
-        "status": "ok",
-        "load_s": 0.0038,
-        "eval_s": 0.0007
-      },
-      "c": {
-        "0": {
-          "status": "ok",
-          "threads": 1,
-          "itrs": 747,
-          "eval_s": 0.0005,
-          "load_s": 0.0033,
-          "wall_s": 0.0038,
-          "reported_eval_s": 0.0,
-          "mips": 1.52,
-          "result": "55"
-        },
-        "1": {
-          "status": "ok",
-          "threads": 2,
-          "itrs": 747,
-          "eval_s": 0.0,
-          "load_s": 0.0037,
-          "wall_s": 0.0035,
-          "reported_eval_s": 0.0,
-          "mips": 747.0,
-          "result": "55"
-        },
-        "2": {
-          "status": "ok",
-          "threads": 4,
-          "itrs": 747,
-          "eval_s": 0.0,
-          "load_s": 0.0038,
-          "wall_s": 0.0035,
-          "reported_eval_s": 0.0,
-          "mips": 747.0,
-          "result": "55"
-        },
-        "3": {
-          "status": "ok",
-          "threads": 8,
-          "itrs": 747,
-          "eval_s": 0.0,
-          "load_s": 0.0063,
-          "wall_s": 0.0059,
-          "reported_eval_s": 0.0,
-          "mips": 747.0,
-          "result": "55"
-        }
-      },
-      "hvm3": {
-        "status": "ok",
-        "itrs": 411,
-        "eval_s": 0.000231,
-        "wall_s": 0.0314
-      }
-    },
-    "07_nqueens": {
-      "input": "tests/fixtures/core/07_nqueens.core",
-      "core_kb": 2.416015625,
-      "compile": {
-        "input": "/Users/huyan00/mycode/coronet/tests/fixtures/core/07_nqueens.core",
-        "target": "hvm2",
-        "repeat": 5,
-        "read_us": 0.051791000000000004,
-        "parse_us": 0.039875,
-        "link_us": 0.014083,
-        "mid_us": 0.058792000000000004,
-        "lower_us": 0.824375,
-        "prune_us": 0.9684170000000001,
-        "total_us": 1.957333,
-        "out_bytes": 5199,
-        "out_defs": 39
-      },
-      "trace_matches_cli": true,
-      "rust": {
-        "itrs": 4478739,
-        "reported_eval_s": 0.1,
-        "reported_mips": 46.65,
-        "result": "92",
-        "wall_s": 0.10207358299999925,
-        "status": "ok",
-        "load_s": 0.0042,
-        "eval_s": 0.0979
-      },
-      "c": {
-        "0": {
-          "status": "ok",
-          "threads": 1,
-          "itrs": 4478739,
-          "eval_s": 0.0483,
-          "load_s": 0.0035,
-          "wall_s": 0.0517,
-          "reported_eval_s": 0.05,
-          "mips": 92.81,
-          "result": "92"
-        },
-        "1": {
-          "status": "ok",
-          "threads": 2,
-          "itrs": 4478739,
-          "eval_s": 0.0483,
-          "load_s": 0.0036,
-          "wall_s": 0.0519,
-          "reported_eval_s": 0.05,
-          "mips": 92.64,
-          "result": "92"
-        },
-        "2": {
-          "status": "ok",
-          "threads": 4,
-          "itrs": 4478739,
-          "eval_s": 0.0198,
-          "load_s": 0.0035,
-          "wall_s": 0.0233,
-          "reported_eval_s": 0.02,
-          "mips": 226.56,
-          "result": "92"
-        },
-        "3": {
-          "status": "ok",
-          "threads": 8,
-          "itrs": 4478739,
-          "eval_s": 0.0224,
-          "load_s": 0.0049,
-          "wall_s": 0.0272,
-          "reported_eval_s": 0.02,
-          "mips": 200.29,
-          "result": "92"
-        }
-      },
-      "hvm3": {
-        "status": "timeout",
-        "wall_s": 30.022
-      }
-    },
-    "08_mergesort": {
-      "input": "tests/fixtures/core/08_mergesort.core",
-      "core_kb": 2.736328125,
-      "compile": {
-        "input": "/Users/huyan00/mycode/coronet/tests/fixtures/core/08_mergesort.core",
-        "target": "hvm2",
-        "repeat": 5,
-        "read_us": 0.059708,
-        "parse_us": 0.043291,
-        "link_us": 0.024958,
-        "mid_us": 0.083417,
-        "lower_us": 0.864209,
-        "prune_us": 0.992125,
-        "total_us": 2.067708,
-        "out_bytes": 8009,
-        "out_defs": 52
-      },
-      "trace_matches_cli": true,
-      "rust": {
-        "itrs": 11458,
-        "reported_eval_s": 0.0,
-        "reported_mips": 40.46,
-        "result": "(28 11291991)",
-        "wall_s": 0.00520249999999578,
-        "status": "ok",
-        "load_s": 0.0043,
-        "eval_s": 0.0009
-      },
-      "c": {
-        "0": {
-          "status": "ok",
-          "threads": 1,
-          "itrs": 11458,
-          "eval_s": 0.0001,
-          "load_s": 0.0038,
-          "wall_s": 0.0038,
-          "reported_eval_s": 0.0,
-          "mips": 153.89,
-          "result": "(28 11291991)"
-        },
-        "1": {
-          "status": "ok",
-          "threads": 2,
-          "itrs": 11458,
-          "eval_s": 0.0009,
-          "load_s": 0.0032,
-          "wall_s": 0.0041,
-          "reported_eval_s": 0.0,
-          "mips": 12.82,
-          "result": "(28 11291991)"
-        },
-        "2": {
-          "status": "ok",
-          "threads": 4,
-          "itrs": 11458,
-          "eval_s": 0.0015,
-          "load_s": 0.0038,
-          "wall_s": 0.0054,
-          "reported_eval_s": 0.0,
-          "mips": 7.47,
-          "result": "(28 11291991)"
-        },
-        "3": {
-          "status": "ok",
-          "threads": 8,
-          "itrs": 11458,
-          "eval_s": 0.001,
-          "load_s": 0.0053,
-          "wall_s": 0.0063,
-          "reported_eval_s": 0.0,
-          "mips": 11.74,
-          "result": "(28 11291991)"
-        }
-      },
-      "hvm3": {
-        "status": "ok",
-        "itrs": 10811,
-        "eval_s": 0.001544,
-        "wall_s": 0.0465
-      }
-    },
-    "bytestring_core": {
-      "input": "tests/packages/bytestring_core.core",
-      "core_kb": 1.3671875,
-      "compile": {
-        "input": "/Users/huyan00/mycode/coronet/tests/packages/bytestring_core.core",
-        "target": "hvm2",
-        "repeat": 5,
-        "read_us": 0.069042,
-        "parse_us": 0.021333,
-        "link_us": 0.00875,
-        "mid_us": 0.027875,
-        "lower_us": 0.629625,
-        "prune_us": 0.547625,
-        "total_us": 1.3042500000000001,
-        "out_bytes": 3795,
-        "out_defs": 24
-      },
-      "trace_matches_cli": true,
-      "rust": {
-        "itrs": 33229,
-        "reported_eval_s": 0.0,
-        "reported_mips": 48.84,
-        "result": "(57 4162284)",
-        "wall_s": 0.00521354200000701,
-        "status": "ok",
-        "load_s": 0.0039,
-        "eval_s": 0.0014
-      },
-      "c": {
-        "0": {
-          "status": "ok",
-          "threads": 1,
-          "itrs": 33229,
-          "eval_s": 0.0005,
-          "load_s": 0.003,
-          "wall_s": 0.0035,
-          "reported_eval_s": 0.0,
-          "mips": 64.35,
-          "result": "(57 4162284)"
-        },
-        "1": {
-          "status": "ok",
-          "threads": 2,
-          "itrs": 33229,
-          "eval_s": 0.0,
-          "load_s": 0.0038,
-          "wall_s": 0.0036,
-          "reported_eval_s": 0.0,
-          "mips": 33229.0,
-          "result": "(57 4162284)"
-        },
-        "2": {
-          "status": "ok",
-          "threads": 4,
-          "itrs": 33229,
-          "eval_s": 0.001,
-          "load_s": 0.0032,
-          "wall_s": 0.0042,
-          "reported_eval_s": 0.0,
-          "mips": 31.88,
-          "result": "(57 4162284)"
-        },
-        "3": {
-          "status": "ok",
-          "threads": 8,
-          "itrs": 33229,
-          "eval_s": 0.0007,
-          "load_s": 0.0053,
-          "wall_s": 0.006,
-          "reported_eval_s": 0.0,
-          "mips": 47.8,
-          "result": "(57 4162284)"
-        }
-      },
-      "hvm3": {
-        "status": "ok",
-        "itrs": 9834,
-        "eval_s": 0.002418,
-        "wall_s": 0.0464
-      }
-    },
-    "map_core": {
-      "input": "tests/packages/map_core.core",
-      "core_kb": 10.57421875,
-      "compile": {
-        "input": "/Users/huyan00/mycode/coronet/tests/packages/map_core.core",
-        "target": "hvm2",
-        "repeat": 5,
-        "read_us": 0.083667,
-        "parse_us": 0.154209,
-        "link_us": 0.05504100000000001,
-        "mid_us": 0.27283300000000005,
-        "lower_us": 2.865417,
-        "prune_us": 2.8235419999999998,
-        "total_us": 6.254709,
-        "out_bytes": 25780,
-        "out_defs": 83
-      },
-      "trace_matches_cli": true,
-      "rust": {
-        "itrs": 10999753,
-        "reported_eval_s": 0.26,
-        "reported_mips": 42.67,
-        "result": "10570",
-        "wall_s": 0.2656192919999967,
-        "status": "ok",
-        "load_s": 0.0055,
-        "eval_s": 0.2602
-      },
-      "c": {
-        "0": {
-          "status": "ok",
-          "threads": 1,
-          "itrs": 10999753,
-          "eval_s": 0.1296,
-          "load_s": 0.0034,
-          "wall_s": 0.1329,
-          "reported_eval_s": 0.13,
-          "mips": 84.88,
-          "result": "10570"
-        },
-        "1": {
-          "status": "ok",
-          "threads": 2,
-          "itrs": 10999753,
-          "eval_s": 0.0668,
-          "load_s": 0.0042,
-          "wall_s": 0.071,
-          "reported_eval_s": 0.07,
-          "mips": 164.78,
-          "result": "10570"
-        },
-        "2": {
-          "status": "ok",
-          "threads": 4,
-          "itrs": 10999753,
-          "eval_s": 0.0444,
-          "load_s": 0.0037,
-          "wall_s": 0.0481,
-          "reported_eval_s": 0.04,
-          "mips": 247.46,
-          "result": "10570"
-        },
-        "3": {
-          "status": "ok",
-          "threads": 8,
-          "itrs": 10999753,
-          "eval_s": 0.0455,
-          "load_s": 0.006,
-          "wall_s": 0.0514,
-          "reported_eval_s": 0.04,
-          "mips": 242.02,
-          "result": "10570"
-        }
-      },
-      "hvm3": {
-        "status": "ok",
-        "itrs": 21209666,
-        "eval_s": 11.771982,
-        "wall_s": 11.8285
-      }
-    },
-    "GhcCompiler": {
-      "input": "tests/packages/ghc/GhcCompiler.core",
-      "core_kb": 53.9736328125,
-      "compile": {
-        "input": "/Users/huyan00/mycode/coronet/tests/packages/ghc/GhcCompiler.core",
-        "target": "hvm2",
-        "repeat": 5,
-        "read_us": 0.154375,
-        "parse_us": 0.596333,
-        "link_us": 1.5322920000000002,
-        "mid_us": 1.663,
-        "lower_us": 10.045125,
-        "prune_us": 22.301958,
-        "total_us": 36.293082999999996,
-        "out_bytes": 108994,
-        "out_defs": 667
-      },
-      "trace_matches_cli": false,
-      "rust": {
-        "status": "timeout",
-        "wall_s": 30.126
-      },
-      "c": {
-        "0": {
-          "status": "timeout",
-          "wall_s": 30.105
-        }
-      },
-      "hvm3": {
-        "status": "ok",
-        "itrs": 970205,
-        "eval_s": 0.14964,
-        "wall_s": 0.215
-      }
-    },
-    "nqueens9": {
-      "input": "tests/e2e/perf/inputs/nqueens9.core",
-      "core_kb": 2.416015625,
-      "compile": {
-        "input": "/Users/huyan00/mycode/coronet/tests/e2e/perf/inputs/nqueens9.core",
-        "target": "hvm2",
-        "repeat": 5,
-        "read_us": 0.067417,
-        "parse_us": 0.039375,
-        "link_us": 0.014166999999999999,
-        "mid_us": 0.058084000000000004,
-        "lower_us": 0.784459,
-        "prune_us": 0.9202079999999999,
-        "total_us": 1.88371,
-        "out_bytes": 5199,
-        "out_defs": 39
-      },
-      "trace_matches_cli": true,
-      "rust": {
-        "itrs": 22884287,
-        "reported_eval_s": 0.51,
-        "reported_mips": 44.77,
-        "result": "352",
-        "wall_s": 0.5207039580000128,
-        "status": "ok",
-        "load_s": 0.0042,
-        "eval_s": 0.5165
-      },
-      "c": {
-        "0": {
-          "status": "ok",
-          "threads": 1,
-          "itrs": 22884287,
-          "eval_s": 0.2605,
-          "load_s": 0.0036,
-          "wall_s": 0.2641,
-          "reported_eval_s": 0.26,
-          "mips": 87.84,
-          "result": "352"
-        },
-        "1": {
-          "status": "ok",
-          "threads": 2,
-          "itrs": 22884287,
-          "eval_s": 0.21,
-          "load_s": 0.0035,
-          "wall_s": 0.2135,
-          "reported_eval_s": 0.21,
-          "mips": 108.99,
-          "result": "352"
-        },
-        "2": {
-          "status": "ok",
-          "threads": 4,
-          "itrs": 22884287,
-          "eval_s": 0.2627,
-          "load_s": 0.0037,
-          "wall_s": 0.2664,
-          "reported_eval_s": 0.26,
-          "mips": 87.11,
-          "result": "352"
-        },
-        "3": {
-          "status": "ok",
-          "threads": 8,
-          "itrs": 22884287,
-          "eval_s": 0.0643,
-          "load_s": 0.0064,
-          "wall_s": 0.0707,
-          "reported_eval_s": 0.06,
-          "mips": 355.93,
-          "result": "352"
-        }
-      },
-      "hvm3": {
-        "status": "timeout",
-        "wall_s": 30.022
-      }
-    },
-    "map300": {
-      "input": "tests/e2e/perf/inputs/map300.core",
-      "core_kb": 10.57421875,
-      "compile": {
-        "input": "/Users/huyan00/mycode/coronet/tests/e2e/perf/inputs/map300.core",
-        "target": "hvm2",
-        "repeat": 5,
-        "read_us": 0.066792,
-        "parse_us": 0.145041,
-        "link_us": 0.0535,
-        "mid_us": 0.26704200000000006,
-        "lower_us": 2.8285,
-        "prune_us": 2.765083,
-        "total_us": 6.125958000000001,
-        "out_bytes": 25780,
-        "out_defs": 83
-      },
-      "trace_matches_cli": true,
-      "rust": {
-        "itrs": 135290287,
-        "reported_eval_s": 3.17,
-        "reported_mips": 42.74,
-        "result": "91400",
-        "wall_s": 3.2139912499999923,
-        "status": "ok",
-        "load_s": 0.005,
-        "eval_s": 3.2089
-      },
-      "c": {
-        "0": {
-          "status": "ok",
-          "threads": 1,
-          "itrs": 135290287,
-          "eval_s": 1.5452,
-          "load_s": 0.0038,
-          "wall_s": 1.549,
-          "reported_eval_s": 1.52,
-          "mips": 87.56,
-          "result": "91400"
-        },
-        "1": {
-          "status": "ok",
-          "threads": 2,
-          "itrs": 135290287,
-          "eval_s": 0.7986,
-          "load_s": 0.0038,
-          "wall_s": 0.8023,
-          "reported_eval_s": 0.77,
-          "mips": 169.42,
-          "result": "91400"
-        },
-        "2": {
-          "status": "ok",
-          "threads": 4,
-          "itrs": 135290287,
-          "eval_s": 0.5357,
-          "load_s": 0.0035,
-          "wall_s": 0.5391,
-          "reported_eval_s": 0.5,
-          "mips": 252.57,
-          "result": "91400"
-        },
-        "3": {
-          "status": "ok",
-          "threads": 8,
-          "itrs": 135290287,
-          "eval_s": 0.5145,
-          "load_s": 0.0054,
-          "wall_s": 0.5199,
-          "reported_eval_s": 0.48,
-          "mips": 262.97,
-          "result": "91400"
-        }
-      },
-      "hvm3": {
-        "status": "timeout",
-        "wall_s": 30.044
-      }
+    "3": {
+     "status": "ok",
+     "threads": 8,
+     "itrs": 1,
+     "eval_s": 0.0,
+     "load_s": 0.0081,
+     "wall_s": 0.0081,
+     "reported_eval_s": 0.0,
+     "mips": 0.07,
+     "result": "48"
     }
+   },
+   "hvm3": {
+    "status": "ok",
+    "itrs": 2,
+    "eval_s": 7.2e-05,
+    "wall_s": 0.0356
+   }
+  },
+  "02_fib": {
+   "input": "tests/fixtures/core/02_fib.core",
+   "core_kb": 0.3896484375,
+   "compile": {
+    "input": "/Users/huyan00/mycode/coronet-perf/tests/fixtures/core/02_fib.core",
+    "target": "hvm2",
+    "repeat": 5,
+    "read_us": 0.05475,
+    "parse_us": 0.007791,
+    "link_us": 0.0024590000000000002,
+    "mid_us": 0.012333,
+    "lower_us": 0.5225,
+    "prune_us": 0.16725,
+    "total_us": 0.767083,
+    "out_bytes": 1079,
+    "out_defs": 8
+   },
+   "trace_matches_cli": true,
+   "rust": {
+    "itrs": 7080,
+    "reported_eval_s": 0.0,
+    "reported_mips": 41.86,
+    "result": "55",
+    "wall_s": 0.004673500006902032,
+    "status": "ok",
+    "load_s": 0.0049,
+    "eval_s": -0.0002
+   },
+   "c": {
+    "0": {
+     "status": "ok",
+     "threads": 1,
+     "itrs": 7080,
+     "eval_s": 0.0005,
+     "load_s": 0.003,
+     "wall_s": 0.0035,
+     "reported_eval_s": 0.0,
+     "mips": 15.12,
+     "result": "55"
+    },
+    "1": {
+     "status": "ok",
+     "threads": 2,
+     "itrs": 7080,
+     "eval_s": 0.0,
+     "load_s": 0.0033,
+     "wall_s": 0.0033,
+     "reported_eval_s": 0.0,
+     "mips": 987.86,
+     "result": "55"
+    },
+    "2": {
+     "status": "ok",
+     "threads": 4,
+     "itrs": 7080,
+     "eval_s": 0.0004,
+     "load_s": 0.0032,
+     "wall_s": 0.0035,
+     "reported_eval_s": 0.0,
+     "mips": 20.06,
+     "result": "55"
+    },
+    "3": {
+     "status": "ok",
+     "threads": 8,
+     "itrs": 7080,
+     "eval_s": 0.0001,
+     "load_s": 0.0047,
+     "wall_s": 0.0048,
+     "reported_eval_s": 0.0,
+     "mips": 57.06,
+     "result": "55"
+    }
+   },
+   "hvm3": {
+    "status": "ok",
+    "itrs": 2212,
+    "eval_s": 0.000571,
+    "wall_s": 0.0366
+   }
+  },
+  "03_adt": {
+   "input": "tests/fixtures/core/03_adt.core",
+   "core_kb": 0.5439453125,
+   "compile": {
+    "input": "/Users/huyan00/mycode/coronet-perf/tests/fixtures/core/03_adt.core",
+    "target": "hvm2",
+    "repeat": 5,
+    "read_us": 0.057707999999999995,
+    "parse_us": 0.008875,
+    "link_us": 0.004416000000000001,
+    "mid_us": 0.005584,
+    "lower_us": 0.503042,
+    "prune_us": 0.114584,
+    "total_us": 0.694209,
+    "out_bytes": 10,
+    "out_defs": 1
+   },
+   "trace_matches_cli": true,
+   "rust": {
+    "itrs": 1,
+    "reported_eval_s": 0.0,
+    "reported_mips": 2.67,
+    "result": "42",
+    "wall_s": 0.004025040994747542,
+    "status": "ok",
+    "load_s": 0.0038,
+    "eval_s": 0.0003
+   },
+   "c": {
+    "0": {
+     "status": "ok",
+     "threads": 1,
+     "itrs": 1,
+     "eval_s": 0.0003,
+     "load_s": 0.0031,
+     "wall_s": 0.0033,
+     "reported_eval_s": 0.0,
+     "mips": 0.0,
+     "result": "42"
+    },
+    "1": {
+     "status": "ok",
+     "threads": 2,
+     "itrs": 1,
+     "eval_s": 0.0,
+     "load_s": 0.0034,
+     "wall_s": 0.0029,
+     "reported_eval_s": 0.0,
+     "mips": 1.0,
+     "result": "42"
+    },
+    "2": {
+     "status": "ok",
+     "threads": 4,
+     "itrs": 1,
+     "eval_s": 0.0001,
+     "load_s": 0.0033,
+     "wall_s": 0.0034,
+     "reported_eval_s": 0.0,
+     "mips": 0.02,
+     "result": "42"
+    },
+    "3": {
+     "status": "ok",
+     "threads": 8,
+     "itrs": 1,
+     "eval_s": 0.0009,
+     "load_s": 0.0048,
+     "wall_s": 0.0057,
+     "reported_eval_s": 0.0,
+     "mips": 0.0,
+     "result": "42"
+    }
+   },
+   "hvm3": {
+    "status": "ok",
+    "itrs": 2,
+    "eval_s": 6.7e-05,
+    "wall_s": 0.0377
+   }
+  },
+  "04_higher_order": {
+   "input": "tests/fixtures/core/04_higher_order.core",
+   "core_kb": 0.673828125,
+   "compile": {
+    "input": "/Users/huyan00/mycode/coronet-perf/tests/fixtures/core/04_higher_order.core",
+    "target": "hvm2",
+    "repeat": 5,
+    "read_us": 0.078709,
+    "parse_us": 0.016,
+    "link_us": 0.00825,
+    "mid_us": 0.035917000000000004,
+    "lower_us": 0.613583,
+    "prune_us": 0.209291,
+    "total_us": 0.96175,
+    "out_bytes": 1669,
+    "out_defs": 17
+   },
+   "trace_matches_cli": true,
+   "rust": {
+    "itrs": 202,
+    "reported_eval_s": 0.0,
+    "reported_mips": 18.29,
+    "result": "24",
+    "wall_s": 0.004286583993234672,
+    "status": "ok",
+    "load_s": 0.0039,
+    "eval_s": 0.0003
+   },
+   "c": {
+    "0": {
+     "status": "ok",
+     "threads": 1,
+     "itrs": 202,
+     "eval_s": 0.0001,
+     "load_s": 0.0039,
+     "wall_s": 0.004,
+     "reported_eval_s": 0.0,
+     "mips": 2.34,
+     "result": "24"
+    },
+    "1": {
+     "status": "ok",
+     "threads": 2,
+     "itrs": 202,
+     "eval_s": 0.0007,
+     "load_s": 0.0033,
+     "wall_s": 0.004,
+     "reported_eval_s": 0.0,
+     "mips": 0.29,
+     "result": "24"
+    },
+    "2": {
+     "status": "ok",
+     "threads": 4,
+     "itrs": 202,
+     "eval_s": 0.0001,
+     "load_s": 0.0046,
+     "wall_s": 0.0048,
+     "reported_eval_s": 0.0,
+     "mips": 1.59,
+     "result": "24"
+    },
+    "3": {
+     "status": "ok",
+     "threads": 8,
+     "itrs": 202,
+     "eval_s": 0.0,
+     "load_s": 0.0056,
+     "wall_s": 0.0047,
+     "reported_eval_s": 0.0,
+     "mips": 202.0,
+     "result": "24"
+    }
+   },
+   "hvm3": {
+    "status": "ok",
+    "itrs": 189,
+    "eval_s": 0.000149,
+    "wall_s": 0.0362
+   }
+  },
+  "05_tree": {
+   "input": "tests/fixtures/core/05_tree.core",
+   "core_kb": 0.650390625,
+   "compile": {
+    "input": "/Users/huyan00/mycode/coronet-perf/tests/fixtures/core/05_tree.core",
+    "target": "hvm2",
+    "repeat": 5,
+    "read_us": 0.058167,
+    "parse_us": 0.013833,
+    "link_us": 0.0049169999999999995,
+    "mid_us": 0.023333000000000003,
+    "lower_us": 0.599708,
+    "prune_us": 0.207875,
+    "total_us": 0.9078330000000001,
+    "out_bytes": 1858,
+    "out_defs": 14
+   },
+   "trace_matches_cli": true,
+   "rust": {
+    "itrs": 837,
+    "reported_eval_s": 0.0,
+    "reported_mips": 31.94,
+    "result": "92",
+    "wall_s": 0.004091875001904555,
+    "status": "ok",
+    "load_s": 0.004,
+    "eval_s": 0.0001
+   },
+   "c": {
+    "0": {
+     "status": "ok",
+     "threads": 1,
+     "itrs": 837,
+     "eval_s": 0.0003,
+     "load_s": 0.003,
+     "wall_s": 0.0032,
+     "reported_eval_s": 0.0,
+     "mips": 3.31,
+     "result": "92"
+    },
+    "1": {
+     "status": "ok",
+     "threads": 2,
+     "itrs": 837,
+     "eval_s": 0.0003,
+     "load_s": 0.0031,
+     "wall_s": 0.0034,
+     "reported_eval_s": 0.0,
+     "mips": 2.59,
+     "result": "92"
+    },
+    "2": {
+     "status": "ok",
+     "threads": 4,
+     "itrs": 837,
+     "eval_s": 0.0003,
+     "load_s": 0.0033,
+     "wall_s": 0.0036,
+     "reported_eval_s": 0.0,
+     "mips": 2.65,
+     "result": "92"
+    },
+    "3": {
+     "status": "ok",
+     "threads": 8,
+     "itrs": 837,
+     "eval_s": 0.0,
+     "load_s": 0.0048,
+     "wall_s": 0.0047,
+     "reported_eval_s": 0.0,
+     "mips": 837.0,
+     "result": "92"
+    }
+   },
+   "hvm3": {
+    "status": "ok",
+    "itrs": 460,
+    "eval_s": 0.00024,
+    "wall_s": 0.0367
+   }
+  },
+  "06_lazy_stream": {
+   "input": "tests/fixtures/core/06_lazy_stream.core",
+   "core_kb": 0.7470703125,
+   "compile": {
+    "input": "/Users/huyan00/mycode/coronet-perf/tests/fixtures/core/06_lazy_stream.core",
+    "target": "hvm2",
+    "repeat": 5,
+    "read_us": 0.050042,
+    "parse_us": 0.016666,
+    "link_us": 0.006375,
+    "mid_us": 0.027125,
+    "lower_us": 0.6233329999999999,
+    "prune_us": 0.223625,
+    "total_us": 0.9471659999999998,
+    "out_bytes": 1996,
+    "out_defs": 20
+   },
+   "trace_matches_cli": true,
+   "rust": {
+    "itrs": 747,
+    "reported_eval_s": 0.0,
+    "reported_mips": 30.13,
+    "result": "55",
+    "wall_s": 0.004380958998808637,
+    "status": "ok",
+    "load_s": 0.0041,
+    "eval_s": 0.0003
+   },
+   "c": {
+    "0": {
+     "status": "ok",
+     "threads": 1,
+     "itrs": 747,
+     "eval_s": 0.0,
+     "load_s": 0.0036,
+     "wall_s": 0.0032,
+     "reported_eval_s": 0.0,
+     "mips": 747.0,
+     "result": "55"
+    },
+    "1": {
+     "status": "ok",
+     "threads": 2,
+     "itrs": 747,
+     "eval_s": 0.0001,
+     "load_s": 0.0036,
+     "wall_s": 0.0037,
+     "reported_eval_s": 0.0,
+     "mips": 5.81,
+     "result": "55"
+    },
+    "2": {
+     "status": "ok",
+     "threads": 4,
+     "itrs": 747,
+     "eval_s": 0.0003,
+     "load_s": 0.0037,
+     "wall_s": 0.004,
+     "reported_eval_s": 0.0,
+     "mips": 2.26,
+     "result": "55"
+    },
+    "3": {
+     "status": "ok",
+     "threads": 8,
+     "itrs": 747,
+     "eval_s": 0.0,
+     "load_s": 0.0055,
+     "wall_s": 0.0052,
+     "reported_eval_s": 0.0,
+     "mips": 747.0,
+     "result": "55"
+    }
+   },
+   "hvm3": {
+    "status": "ok",
+    "itrs": 411,
+    "eval_s": 0.000246,
+    "wall_s": 0.0393
+   }
+  },
+  "07_nqueens": {
+   "input": "tests/fixtures/core/07_nqueens.core",
+   "core_kb": 2.416015625,
+   "compile": {
+    "input": "/Users/huyan00/mycode/coronet-perf/tests/fixtures/core/07_nqueens.core",
+    "target": "hvm2",
+    "repeat": 5,
+    "read_us": 0.103625,
+    "parse_us": 0.041917,
+    "link_us": 0.014583,
+    "mid_us": 0.079125,
+    "lower_us": 0.802333,
+    "prune_us": 0.929791,
+    "total_us": 1.971374,
+    "out_bytes": 5199,
+    "out_defs": 39
+   },
+   "trace_matches_cli": true,
+   "rust": {
+    "itrs": 4478739,
+    "reported_eval_s": 0.1,
+    "reported_mips": 46.55,
+    "result": "92",
+    "wall_s": 0.1022569999913685,
+    "status": "ok",
+    "load_s": 0.0042,
+    "eval_s": 0.098
+   },
+   "c": {
+    "0": {
+     "status": "ok",
+     "threads": 1,
+     "itrs": 4478739,
+     "eval_s": 0.054,
+     "load_s": 0.0034,
+     "wall_s": 0.0574,
+     "reported_eval_s": 0.05,
+     "mips": 82.96,
+     "result": "92"
+    },
+    "1": {
+     "status": "ok",
+     "threads": 2,
+     "itrs": 4478739,
+     "eval_s": 0.0416,
+     "load_s": 0.0037,
+     "wall_s": 0.0453,
+     "reported_eval_s": 0.04,
+     "mips": 107.56,
+     "result": "92"
+    },
+    "2": {
+     "status": "ok",
+     "threads": 4,
+     "itrs": 4478739,
+     "eval_s": 0.0556,
+     "load_s": 0.0034,
+     "wall_s": 0.059,
+     "reported_eval_s": 0.05,
+     "mips": 80.48,
+     "result": "92"
+    },
+    "3": {
+     "status": "ok",
+     "threads": 8,
+     "itrs": 4478739,
+     "eval_s": 0.0502,
+     "load_s": 0.0051,
+     "wall_s": 0.0553,
+     "reported_eval_s": 0.05,
+     "mips": 89.26,
+     "result": "92"
+    }
+   },
+   "hvm3": {
+    "status": "timeout",
+    "wall_s": 120.027
+   }
+  },
+  "08_mergesort": {
+   "input": "tests/fixtures/core/08_mergesort.core",
+   "core_kb": 2.736328125,
+   "compile": {
+    "input": "/Users/huyan00/mycode/coronet-perf/tests/fixtures/core/08_mergesort.core",
+    "target": "hvm2",
+    "repeat": 5,
+    "read_us": 0.059208,
+    "parse_us": 0.041666,
+    "link_us": 0.024375,
+    "mid_us": 0.116542,
+    "lower_us": 0.842208,
+    "prune_us": 1.00025,
+    "total_us": 2.084249,
+    "out_bytes": 8009,
+    "out_defs": 52
+   },
+   "trace_matches_cli": true,
+   "rust": {
+    "itrs": 11458,
+    "reported_eval_s": 0.0,
+    "reported_mips": 42.58,
+    "result": "(28 11291991)",
+    "wall_s": 0.004591416000039317,
+    "status": "ok",
+    "load_s": 0.0048,
+    "eval_s": -0.0002
+   },
+   "c": {
+    "0": {
+     "status": "ok",
+     "threads": 1,
+     "itrs": 11458,
+     "eval_s": 0.0001,
+     "load_s": 0.0039,
+     "wall_s": 0.0041,
+     "reported_eval_s": 0.0,
+     "mips": 83.43,
+     "result": "(28 11291991)"
+    },
+    "1": {
+     "status": "ok",
+     "threads": 2,
+     "itrs": 11458,
+     "eval_s": 0.0,
+     "load_s": 0.0036,
+     "wall_s": 0.0035,
+     "reported_eval_s": 0.0,
+     "mips": 11458.0,
+     "result": "(28 11291991)"
+    },
+    "2": {
+     "status": "ok",
+     "threads": 4,
+     "itrs": 11458,
+     "eval_s": 0.0007,
+     "load_s": 0.0034,
+     "wall_s": 0.0041,
+     "reported_eval_s": 0.0,
+     "mips": 16.21,
+     "result": "(28 11291991)"
+    },
+    "3": {
+     "status": "ok",
+     "threads": 8,
+     "itrs": 11458,
+     "eval_s": 0.0,
+     "load_s": 0.0056,
+     "wall_s": 0.0051,
+     "reported_eval_s": 0.0,
+     "mips": 11458.0,
+     "result": "(28 11291991)"
+    }
+   },
+   "hvm3": {
+    "status": "ok",
+    "itrs": 10811,
+    "eval_s": 0.001625,
+    "wall_s": 0.0381
+   }
+  },
+  "bytestring_core": {
+   "input": "tests/packages/bytestring_core.core",
+   "core_kb": 1.3671875,
+   "compile": {
+    "input": "/Users/huyan00/mycode/coronet-perf/tests/packages/bytestring_core.core",
+    "target": "hvm2",
+    "repeat": 5,
+    "read_us": 0.05575,
+    "parse_us": 0.020792,
+    "link_us": 0.008333,
+    "mid_us": 0.028208,
+    "lower_us": 0.610875,
+    "prune_us": 0.544834,
+    "total_us": 1.268792,
+    "out_bytes": 3795,
+    "out_defs": 24
+   },
+   "trace_matches_cli": true,
+   "rust": {
+    "itrs": 33229,
+    "reported_eval_s": 0.0,
+    "reported_mips": 48.98,
+    "result": "(57 4162284)",
+    "wall_s": 0.0048614580009598285,
+    "status": "ok",
+    "load_s": 0.0041,
+    "eval_s": 0.0007
+   },
+   "c": {
+    "0": {
+     "status": "ok",
+     "threads": 1,
+     "itrs": 33229,
+     "eval_s": 0.0007,
+     "load_s": 0.0032,
+     "wall_s": 0.0039,
+     "reported_eval_s": 0.0,
+     "mips": 46.74,
+     "result": "(57 4162284)"
+    },
+    "1": {
+     "status": "ok",
+     "threads": 2,
+     "itrs": 33229,
+     "eval_s": 0.0004,
+     "load_s": 0.0039,
+     "wall_s": 0.0043,
+     "reported_eval_s": 0.0,
+     "mips": 87.69,
+     "result": "(57 4162284)"
+    },
+    "2": {
+     "status": "ok",
+     "threads": 4,
+     "itrs": 33229,
+     "eval_s": 0.0012,
+     "load_s": 0.0032,
+     "wall_s": 0.0045,
+     "reported_eval_s": 0.0,
+     "mips": 26.82,
+     "result": "(57 4162284)"
+    },
+    "3": {
+     "status": "ok",
+     "threads": 8,
+     "itrs": 33229,
+     "eval_s": 0.0,
+     "load_s": 0.0059,
+     "wall_s": 0.0055,
+     "reported_eval_s": 0.0,
+     "mips": 33229.0,
+     "result": "(57 4162284)"
+    }
+   },
+   "hvm3": {
+    "status": "ok",
+    "itrs": 9834,
+    "eval_s": 0.002327,
+    "wall_s": 0.0383
+   }
+  },
+  "map_core": {
+   "input": "tests/packages/map_core.core",
+   "core_kb": 10.57421875,
+   "compile": {
+    "input": "/Users/huyan00/mycode/coronet-perf/tests/packages/map_core.core",
+    "target": "hvm2",
+    "repeat": 5,
+    "read_us": 0.065208,
+    "parse_us": 0.148958,
+    "link_us": 0.053667,
+    "mid_us": 0.408875,
+    "lower_us": 2.898625,
+    "prune_us": 2.825958,
+    "total_us": 6.4012910000000005,
+    "out_bytes": 25858,
+    "out_defs": 83
+   },
+   "trace_matches_cli": true,
+   "rust": {
+    "itrs": 317025,
+    "reported_eval_s": 0.01,
+    "reported_mips": 47.52,
+    "result": "10570",
+    "wall_s": 0.011828583999886177,
+    "status": "ok",
+    "load_s": 0.0051,
+    "eval_s": 0.0067
+   },
+   "c": {
+    "0": {
+     "status": "ok",
+     "threads": 1,
+     "itrs": 317025,
+     "eval_s": 0.0037,
+     "load_s": 0.0041,
+     "wall_s": 0.0078,
+     "reported_eval_s": 0.0,
+     "mips": 85.96,
+     "result": "10570"
+    },
+    "1": {
+     "status": "ok",
+     "threads": 2,
+     "itrs": 317025,
+     "eval_s": 0.0054,
+     "load_s": 0.0037,
+     "wall_s": 0.0091,
+     "reported_eval_s": 0.0,
+     "mips": 58.75,
+     "result": "10570"
+    },
+    "2": {
+     "status": "ok",
+     "threads": 4,
+     "itrs": 317025,
+     "eval_s": 0.0033,
+     "load_s": 0.0055,
+     "wall_s": 0.0088,
+     "reported_eval_s": 0.0,
+     "mips": 94.75,
+     "result": "10570"
+    },
+    "3": {
+     "status": "ok",
+     "threads": 8,
+     "itrs": 317025,
+     "eval_s": 0.0056,
+     "load_s": 0.006,
+     "wall_s": 0.0116,
+     "reported_eval_s": 0.01,
+     "mips": 56.49,
+     "result": "10570"
+    }
+   },
+   "hvm3": {
+    "status": "ok",
+    "itrs": 605227,
+    "eval_s": 0.135198,
+    "wall_s": 0.1886
+   }
+  },
+  "GhcCompiler": {
+   "input": "tests/packages/ghc/GhcCompiler.core",
+   "core_kb": 53.9736328125,
+   "compile": {
+    "input": "/Users/huyan00/mycode/coronet-perf/tests/packages/ghc/GhcCompiler.core",
+    "target": "hvm2",
+    "repeat": 5,
+    "read_us": 0.159875,
+    "parse_us": 0.639458,
+    "link_us": 1.564541,
+    "mid_us": 4.828375,
+    "lower_us": 13.106958,
+    "prune_us": 26.052,
+    "total_us": 46.351207,
+    "out_bytes": 132166,
+    "out_defs": 678
+   },
+   "trace_matches_cli": false,
+   "rust": {
+    "status": "timeout",
+    "wall_s": 120.368
+   },
+   "c": {
+    "0": {
+     "status": "timeout",
+     "wall_s": 120.125
+    }
+   },
+   "hvm3": {
+    "status": "ok",
+    "itrs": 1010790,
+    "eval_s": 0.3022,
+    "wall_s": 0.3841
+   }
+  },
+  "nqueens9": {
+   "input": "tests/e2e/perf/inputs/nqueens9.core",
+   "core_kb": 2.416015625,
+   "compile": {
+    "input": "/Users/huyan00/mycode/coronet-perf/tests/e2e/perf/inputs/nqueens9.core",
+    "target": "hvm2",
+    "repeat": 5,
+    "read_us": 0.051916000000000004,
+    "parse_us": 0.041832999999999995,
+    "link_us": 0.014917,
+    "mid_us": 0.082167,
+    "lower_us": 0.813375,
+    "prune_us": 0.93625,
+    "total_us": 1.940458,
+    "out_bytes": 5199,
+    "out_defs": 39
+   },
+   "trace_matches_cli": true,
+   "rust": {
+    "itrs": 22884287,
+    "reported_eval_s": 0.48,
+    "reported_mips": 47.2,
+    "result": "352",
+    "wall_s": 0.4932542499882402,
+    "status": "ok",
+    "load_s": 0.004,
+    "eval_s": 0.4892
+   },
+   "c": {
+    "0": {
+     "status": "ok",
+     "threads": 1,
+     "itrs": 22884287,
+     "eval_s": 0.2654,
+     "load_s": 0.0028,
+     "wall_s": 0.2683,
+     "reported_eval_s": 0.26,
+     "mips": 86.22,
+     "result": "352"
+    },
+    "1": {
+     "status": "ok",
+     "threads": 2,
+     "itrs": 22884287,
+     "eval_s": 0.1702,
+     "load_s": 0.0032,
+     "wall_s": 0.1734,
+     "reported_eval_s": 0.17,
+     "mips": 134.46,
+     "result": "352"
+    },
+    "2": {
+     "status": "ok",
+     "threads": 4,
+     "itrs": 22884287,
+     "eval_s": 0.116,
+     "load_s": 0.0037,
+     "wall_s": 0.1197,
+     "reported_eval_s": 0.11,
+     "mips": 197.32,
+     "result": "352"
+    },
+    "3": {
+     "status": "ok",
+     "threads": 8,
+     "itrs": 22884287,
+     "eval_s": 0.1707,
+     "load_s": 0.0047,
+     "wall_s": 0.1754,
+     "reported_eval_s": 0.17,
+     "mips": 134.08,
+     "result": "352"
+    }
+   },
+   "hvm3": {
+    "status": "timeout",
+    "wall_s": 120.025
+   }
+  },
+  "map300": {
+   "input": "tests/e2e/perf/inputs/map300.core",
+   "core_kb": 10.57421875,
+   "compile": {
+    "input": "/Users/huyan00/mycode/coronet-perf/tests/e2e/perf/inputs/map300.core",
+    "target": "hvm2",
+    "repeat": 5,
+    "read_us": 0.056583,
+    "parse_us": 0.145583,
+    "link_us": 0.052,
+    "mid_us": 0.395625,
+    "lower_us": 2.826333,
+    "prune_us": 2.744958,
+    "total_us": 6.221082,
+    "out_bytes": 25858,
+    "out_defs": 83
+   },
+   "trace_matches_cli": true,
+   "rust": {
+    "itrs": 2134946,
+    "reported_eval_s": 0.04,
+    "reported_mips": 51.98,
+    "result": "91400",
+    "wall_s": 0.04679675000079442,
+    "status": "ok",
+    "load_s": 0.0044,
+    "eval_s": 0.0424
+   },
+   "c": {
+    "0": {
+     "status": "ok",
+     "threads": 1,
+     "itrs": 2134946,
+     "eval_s": 0.0254,
+     "load_s": 0.0057,
+     "wall_s": 0.031,
+     "reported_eval_s": 0.03,
+     "mips": 84.2,
+     "result": "91400"
+    },
+    "1": {
+     "status": "ok",
+     "threads": 2,
+     "itrs": 2134946,
+     "eval_s": 0.0255,
+     "load_s": 0.006,
+     "wall_s": 0.0315,
+     "reported_eval_s": 0.03,
+     "mips": 83.88,
+     "result": "91400"
+    },
+    "2": {
+     "status": "ok",
+     "threads": 4,
+     "itrs": 2134946,
+     "eval_s": 0.0217,
+     "load_s": 0.0063,
+     "wall_s": 0.028,
+     "reported_eval_s": 0.02,
+     "mips": 98.37,
+     "result": "91400"
+    },
+    "3": {
+     "status": "ok",
+     "threads": 8,
+     "itrs": 2134946,
+     "eval_s": 0.0228,
+     "load_s": 0.0066,
+     "wall_s": 0.0294,
+     "reported_eval_s": 0.02,
+     "mips": 93.6,
+     "result": "91400"
+    }
+   },
+   "hvm3": {
+    "status": "ok",
+    "itrs": 5272217,
+    "eval_s": 0.614391,
+    "wall_s": 0.6507
+   }
   }
+ }
 }
