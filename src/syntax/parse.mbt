@@ -29,6 +29,8 @@ pub enum Token {
   DoubleColon
   Comma
   Underscore
+  LUnboxedTuple
+  RUnboxedTuple
   EOF
 }
 
@@ -63,6 +65,8 @@ pub impl Show for Token with output(self, logger) {
     DoubleColon => logger.write_string("::")
     Comma => logger.write_string(",")
     Underscore => logger.write_string("_")
+    LUnboxedTuple => logger.write_string("(#")
+    RUnboxedTuple => logger.write_string("#)")
     EOF => logger.write_string("<EOF>")
   }
 }
@@ -302,6 +306,33 @@ fn Lexer::next_token(self : Lexer) -> Result[Token, String] {
     self.pos = self.pos + 2
     return Ok(Token::Ident("[]"))
   }
+  if self.starts_with("#)") {
+    self.pos = self.pos + 2
+    return Ok(Token::RUnboxedTuple)
+  }
+  if self.starts_with("(#") {
+    if self.starts_with("(##)") {
+      self.pos = self.pos + 4
+      return Ok(Token::Ident("(##)"))
+    }
+    if self.starts_with("(# #)") {
+      self.pos = self.pos + 5
+      return Ok(Token::Ident("(##)"))
+    }
+    if self.pos + 2 < self.src.length() && self.char_at(self.pos + 2) == ',' {
+      let mut i = self.pos + 2
+      while i < self.src.length() && self.char_at(i) == ',' {
+        i = i + 1
+      }
+      if i + 1 < self.src.length() && self.char_at(i) == '#' && self.char_at(i + 1) == ')' {
+        let tup_con = self.src[self.pos : i + 2].to_owned()
+        self.pos = i + 2
+        return Ok(Token::Ident(tup_con))
+      }
+    }
+    self.pos = self.pos + 2
+    return Ok(Token::LUnboxedTuple)
+  }
   // Check parenthesized operator or tuple constructor: (op) or (,) or (:)
   if self.char_at(self.pos) == '(' {
     if self.starts_with("(:)") {
@@ -445,7 +476,7 @@ fn Lexer::next_token(self : Lexer) -> Result[Token, String] {
     if self.pos < self.src.length() && self.char_at(self.pos) == '"' {
       self.pos = self.pos + 1
     }
-    if self.pos < self.src.length() && self.char_at(self.pos) == '#' {
+    while self.pos < self.src.length() && self.char_at(self.pos) == '#' {
       self.pos = self.pos + 1
     }
     return Ok(Token::StringLit(buf.to_string()))
@@ -635,6 +666,12 @@ fn Lexer::next_token(self : Lexer) -> Result[Token, String] {
     }
     let op = self.src[start:self.pos].to_owned()
     return Ok(Token::Ident(op))
+  }
+
+  // Operator primops like *H#
+  if self.starts_with("*H#") {
+    self.pos = self.pos + 3
+    return Ok(Token::Ident("*H#"))
   }
 
   // Operators: +, -, *, /, <, >, ==, etc.
@@ -867,22 +904,75 @@ fn Parser::parse_lam(self : Parser) -> Result[Expr, String] {
       }
       Token::LParen => {
         let _ = self.next()
-        match self.peek() {
-          Token::Ident(p) => {
-            let _ = self.next()
-            params.push(p)
-            if self.match_token(Token::DoubleColon) {
-              let mut depth = 1
-              while self.peek() != Token::EOF && depth > 0 {
-                if self.peek() == Token::LParen { depth = depth + 1 }
-                else if self.peek() == Token::RParen { depth = depth - 1 }
-                let _ = self.next()
+        if self.match_token(Token::RParen) {
+          params.push("_")
+        } else {
+          match self.peek() {
+            Token::Ident(p) => {
+              let _ = self.next()
+              params.push(p)
+              if self.match_token(Token::DoubleColon) {
+                let mut depth = 1
+                while self.peek() != Token::EOF && depth > 0 {
+                  if self.peek() == Token::LParen { depth = depth + 1 }
+                  else if self.peek() == Token::RParen { depth = depth - 1 }
+                  let _ = self.next()
+                }
+              } else if self.peek() == Token::Comma {
+                while self.match_token(Token::Comma) {
+                  match self.peek() {
+                    Token::Ident(q) => {
+                      let _ = self.next()
+                      params.push(q)
+                    }
+                    Token::Underscore => {
+                      let _ = self.next()
+                      params.push("_")
+                    }
+                    _ => ()
+                  }
+                }
+                let _ = self.match_token(Token::RParen)
+              } else {
+                let _ = self.match_token(Token::RParen)
               }
-            } else {
-              let _ = self.match_token(Token::RParen)
             }
+            Token::Underscore => {
+              let _ = self.next()
+              params.push("_")
+              if self.match_token(Token::DoubleColon) {
+                let mut depth = 1
+                while self.peek() != Token::EOF && depth > 0 {
+                  if self.peek() == Token::LParen { depth = depth + 1 }
+                  else if self.peek() == Token::RParen { depth = depth - 1 }
+                  let _ = self.next()
+                }
+              } else {
+                let _ = self.match_token(Token::RParen)
+              }
+            }
+            _ => return Err("Expected identifier inside parenthesized lambda parameter")
           }
-          _ => return Err("Expected identifier inside parenthesized lambda parameter")
+        }
+      }
+      Token::Underscore => {
+        let _ = self.next()
+        params.push("_")
+      }
+      Token::LUnboxedTuple => {
+        let _ = self.next()
+        let vars : Array[String] = []
+        while self.peek() != Token::RUnboxedTuple && self.peek() != Token::EOF {
+          if self.match_token(Token::Comma) { continue }
+          match self.next() {
+            Token::Ident(p) => vars.push(p)
+            Token::Underscore => vars.push("_")
+            _ => ()
+          }
+        }
+        let _ = self.match_token(Token::RUnboxedTuple)
+        for v in vars {
+          params.push(v)
         }
       }
       Token::Ident(p) => {
@@ -1025,9 +1115,68 @@ fn Parser::parse_alt(self : Parser) -> Result[Alt, String] {
       let _ = self.next()
       Pat::Lit(n)
     }
+    Token::CharLit(c) => {
+      let _ = self.next()
+      Pat::Lit(c.to_int())
+    }
     Token::FloatLit(d) => {
       let _ = self.next()
       Pat::Lit(d.to_int())
+    }
+    Token::LUnboxedTuple => {
+      let _ = self.next()
+      let vars : Array[String] = []
+      while self.peek() != Token::RUnboxedTuple && self.peek() != Token::EOF {
+        if self.match_token(Token::Comma) { continue }
+        match self.next() {
+          Token::Ident(name) => vars.push(name)
+          Token::Underscore => vars.push("_")
+          tok => return Err("Expected variable name in unboxed tuple pattern, got \{tok}")
+        }
+      }
+      if !self.match_token(Token::RUnboxedTuple) {
+        return Err("Expected '#)' closing unboxed tuple pattern")
+      }
+      let cname = if vars.length() == 0 {
+        "(##)"
+      } else if vars.length() == 1 {
+        "(# #)"
+      } else {
+        let buf = StringBuilder()
+        buf.write_string("(#")
+        for _ in 1..<vars.length() {
+          buf.write_string(",")
+        }
+        buf.write_string("#)")
+        buf.to_string()
+      }
+      Pat::Data(cname, vars)
+    }
+    Token::LParen => {
+      let _ = self.next()
+      if self.match_token(Token::RParen) {
+        Pat::Data("()", [])
+      } else {
+        let vars : Array[String] = []
+        while self.peek() != Token::RParen && self.peek() != Token::EOF {
+          if self.match_token(Token::Comma) { continue }
+          match self.next() {
+            Token::Ident(name) => vars.push(name)
+            Token::Underscore => vars.push("_")
+            tok => return Err("Expected variable in tuple pattern, got \{tok}")
+          }
+        }
+        if !self.match_token(Token::RParen) {
+          return Err("Expected ')' closing tuple pattern")
+        }
+        let buf = StringBuilder()
+        buf.write_string("(")
+        for _ in 1..<vars.length() {
+          buf.write_string(",")
+        }
+        buf.write_string(")")
+        Pat::Data(buf.to_string(), vars)
+      }
     }
     Token::Ident(name) => {
       if is_constructor_name(name) {
@@ -1072,12 +1221,16 @@ fn Parser::can_start_atom(self : Parser) -> Bool {
     }
     Token::TypeVar(_) => true
     Token::LParen => true
+    Token::LUnboxedTuple => true
     Token::LBracket => true
     _ => false
   }
 }
 
 fn Parser::parse_app(self : Parser) -> Result[Expr, String] {
+  while self.peek() is Token::TypeVar(_) {
+    let _ = self.next()
+  }
   let mut head = match self.parse_atom() {
     Ok(a) => a
     Err(e) => return Err(e)
@@ -1125,16 +1278,68 @@ fn Parser::parse_atom(self : Parser) -> Result[Expr, String] {
         Ok(Expr::Var(name))
       }
     }
+    Token::LUnboxedTuple => {
+      let _ = self.next()
+      let elements : Array[Expr] = []
+      while self.peek() != Token::RUnboxedTuple && self.peek() != Token::EOF {
+        if self.match_token(Token::Comma) { continue }
+        let elem = match self.parse_expr() {
+          Ok(e) => e
+          Err(e) => return Err(e)
+        }
+        elements.push(elem)
+      }
+      if !self.match_token(Token::RUnboxedTuple) {
+        return Err("Expected '#)' closing unboxed tuple expression")
+      }
+      let cname = if elements.length() == 0 {
+        "(##)"
+      } else if elements.length() == 1 {
+        "(# #)"
+      } else {
+        let buf = StringBuilder()
+        buf.write_string("(#")
+        for _ in 1..<elements.length() {
+          buf.write_string(",")
+        }
+        buf.write_string("#)")
+        buf.to_string()
+      }
+      Ok(Expr::Constr(cname, elements))
+    }
     Token::LParen => {
       let _ = self.next()
-      let expr = match self.parse_expr() {
+      if self.match_token(Token::RParen) {
+        return Ok(Expr::Constr("()", []))
+      }
+      let first_expr = match self.parse_expr() {
         Ok(e) => e
         Err(e) => return Err(e)
+      }
+      if self.peek() == Token::Comma {
+        let elements = [first_expr]
+        while self.match_token(Token::Comma) {
+          let elem = match self.parse_expr() {
+            Ok(e) => e
+            Err(e) => return Err(e)
+          }
+          elements.push(elem)
+        }
+        if !self.match_token(Token::RParen) {
+          return Err("Expected ')' closing tuple expression")
+        }
+        let buf = StringBuilder()
+        buf.write_string("(")
+        for _ in 1..<elements.length() {
+          buf.write_string(",")
+        }
+        buf.write_string(")")
+        return Ok(Expr::Constr(buf.to_string(), elements))
       }
       if !self.match_token(Token::RParen) {
         return Err("Expected ')' closing parenthesized expression")
       }
-      Ok(expr)
+      Ok(first_expr)
     }
     Token::LBracket => {
       let _ = self.next()

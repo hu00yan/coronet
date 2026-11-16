@@ -953,4 +953,335 @@ test "parse Sha256 Core pattern with schedule expansion and bitwise compression"
   assert_true(prog.lookup("rotr") is Some(_))
 }
 
+test "parse unboxed tuple expressions and prefix constructors" {
+  let e1 = @syntax.parse_expr("(# 1#, 2# #)").unwrap()
+  assert_eq(e1, @syntax.Expr::Constr("(#,#)", [@syntax.Expr::LitInt(1), @syntax.Expr::LitInt(2)]))
+
+  let e2 = @syntax.parse_expr("(# a, b, c #)").unwrap()
+  assert_eq(e2, @syntax.Expr::Constr("(#,,#)", [@syntax.Expr::Var("a"), @syntax.Expr::Var("b"), @syntax.Expr::Var("c")]))
+
+  let e3 = @syntax.parse_expr("(# #)").unwrap()
+  assert_eq(e3, @syntax.Expr::Constr("(##)", []))
+
+  let e4 = @syntax.parse_expr("(# x #)").unwrap()
+  assert_eq(e4, @syntax.Expr::Constr("(# #)", [@syntax.Expr::Var("x")]))
+
+  let e5 = @syntax.parse_expr("(#,#) 10# 20#").unwrap()
+  assert_eq(e5, @syntax.Expr::Constr("(#,#)", [@syntax.Expr::LitInt(10), @syntax.Expr::LitInt(20)]))
+
+  let e6 = @syntax.parse_expr("(#,,#) a b c").unwrap()
+  assert_eq(e6, @syntax.Expr::Constr("(#,,#)", [@syntax.Expr::Var("a"), @syntax.Expr::Var("b"), @syntax.Expr::Var("c")]))
+}
+
+test "parse boxed tuple expressions and unit" {
+  let e1 = @syntax.parse_expr("(1#, 2#)").unwrap()
+  assert_eq(e1, @syntax.Expr::Constr("(,)", [@syntax.Expr::LitInt(1), @syntax.Expr::LitInt(2)]))
+
+  let e2 = @syntax.parse_expr("(a, b, c)").unwrap()
+  assert_eq(e2, @syntax.Expr::Constr("(,,)", [@syntax.Expr::Var("a"), @syntax.Expr::Var("b"), @syntax.Expr::Var("c")]))
+
+  let e3 = @syntax.parse_expr("()").unwrap()
+  assert_eq(e3, @syntax.Expr::Constr("()", []))
+
+  let e4 = @syntax.parse_expr("(42#)").unwrap()
+  assert_eq(e4, @syntax.Expr::LitInt(42))
+}
+
+test "parse unboxed and boxed tuple pattern matching in case" {
+  let src =
+    #|testCase = \ p ->
+    #|  case p of {
+    #|    (# a, b #) -> +# a b;
+    #|    (# x, y, z #) -> +# (+# x y) z;
+    #|    (u, v) -> *# u v;
+    #|    (# #) -> 0#
+    #|  }
+  let prog = @syntax.parse_program(src).unwrap()
+  assert_true(prog.lookup("testCase") is Some(_))
+}
+
+test "parse lambda with unboxed tuple and typed parameters" {
+  let src =
+    #|unboxedLam = \ (# a, b #) -> +# a b
+    #|stateLam = \ (s :: State# RealWorld) -> (# s, 42# #)
+  let prog = @syntax.parse_program(src).unwrap()
+  assert_true(prog.lookup("unboxedLam") is Some(_))
+  assert_true(prog.lookup("stateLam") is Some(_))
+}
+
+test "parse GHC Core IO and State primop patterns" {
+  let src =
+    #|writeByteArray = \ (s :: State# RealWorld) (ba :: ByteArray#) ->
+    #|  case realWorld# of s1 {
+    #|    __DEFAULT -> (# s1, () #)
+    #|  }
+    #|
+    #|runIO = \ ioAction ->
+    #|  case ioAction realWorld# of {
+    #|    (# s2, res #) -> res
+    #|  }
+  let prog = @syntax.parse_program(src).unwrap()
+  assert_true(prog.lookup("writeByteArray") is Some(_))
+  assert_true(prog.lookup("runIO") is Some(_))
+}
+
+test "parse tests/fixtures/primops/01_unboxed_tuple.core" {
+  let src =
+    #|divModPrim
+    #|  = \ a_aD4 b_aD5 ->
+    #|      (# quotInt# a_aD4 b_aD5, remInt# a_aD4 b_aD5 #)
+    #|
+    #|compute
+    #|  = \ a_aD6 b_aD7 ->
+    #|      case divModPrim a_aD6 b_aD7 of ds_dZ4 {
+    #|        (# ipv_sZ9, ipv_sZa #) -> +# (*# ipv_sZ9 10#) ipv_sZa
+    #|      }
+    #|
+    #|result
+    #|  = case divModPrim 123# 10# of ds_dZ4 {
+    #|        (# ipv_sZ9, ipv_sZa #) -> I# (+# (*# ipv_sZ9 10#) ipv_sZa)
+    #|      }
+    #|
+    #|main = result
+  let prog = @syntax.parse_program(src).unwrap()
+  assert_true(prog.lookup("divModPrim") is Some(_))
+  assert_true(prog.lookup("compute") is Some(_))
+  assert_true(prog.lookup("result") is Some(_))
+  assert_true(prog.lookup("main") is Some(_))
+}
+
+test "parse tests/fixtures/primops/02_io_state.core" {
+  let src =
+    #|computeWithState
+    #|  = \ n_aD3 ->
+    #|      runRW# (\ s0_aDl ->
+    #|      case newByteArray# 16# s0_aDl of ds_dZy {
+    #|        (# ipv_sZV, ipv_sZW #) -> case writeIntArray# ipv_sZW 0# n_aD3 ipv_sZV of s2_aDo {
+    #|        __DEFAULT -> case writeIntArray# ipv_sZW 1# (*# n_aD3 2#) s2_aDo of s3_aDp {
+    #|        __DEFAULT -> case readIntArray# ipv_sZW 0# s3_aDp of ds_dZD {
+    #|        (# ipv_sZY, ipv_sZZ #) -> case readIntArray# ipv_sZW 1# ipv_sZY of ds_dZF {
+    #|        (# ipv_s101, ipv_s102 #) -> +# ipv_sZZ ipv_s102
+    #|      }
+    #|      }
+    #|      }
+    #|      }
+    #|      })
+    #|
+    #|result
+    #|  = runRW# (\ s0_aDl ->
+    #|      case newByteArray# 16# s0_aDl of ds_dZy {
+    #|        (# ipv_sZV, ipv_sZW #) -> case writeIntArray# ipv_sZW 0# 21# ipv_sZV of s2_aDo {
+    #|        __DEFAULT -> case writeIntArray# ipv_sZW 1# 42# s2_aDo of s3_aDp {
+    #|        __DEFAULT -> case readIntArray# ipv_sZW 0# s3_aDp of ds_dZD {
+    #|        (# ipv_sZY, ipv_sZZ #) -> case readIntArray# ipv_sZW 1# ipv_sZY of ds_dZF {
+    #|        (# ipv_s101, ipv_s102 #) -> I# (+# ipv_sZZ ipv_s102)
+    #|      }
+    #|      }
+    #|      }
+    #|      }
+    #|      })
+    #|
+    #|main = result
+  let prog = @syntax.parse_program(src).unwrap()
+  assert_true(prog.lookup("computeWithState") is Some(_))
+  assert_true(prog.lookup("result") is Some(_))
+  assert_true(prog.lookup("main") is Some(_))
+}
+
+test "parse Addr# string literal and *H# high multiplication primop" {
+  let e1 = @syntax.parse_expr("\"Hello, World!\"#").unwrap()
+  assert_eq(e1, @syntax.Expr::LitString("Hello, World!"))
+
+  let e2 = @syntax.parse_expr("unpackCString# \"test\"#").unwrap()
+  assert_eq(
+    e2,
+    @syntax.Expr::App(@syntax.Expr::Var("unpackCString#"), @syntax.Expr::LitString("test"))
+  )
+
+  let e3 = @syntax.parse_expr("*H# 12345# 67890#").unwrap()
+  assert_eq(
+    e3,
+    @syntax.Expr::App(
+      @syntax.Expr::App(@syntax.Expr::Var("*H#"), @syntax.Expr::LitInt(12345)),
+      @syntax.Expr::LitInt(67890)
+    )
+  )
+}
+
+test "parse comprehensive GHC primops table" {
+  let src =
+    #|-- Arithmetic and Bitwise
+    #|testArith = \ a b ->
+    #|  let r1 = +# a b in
+    #|  let r2 = -# a b in
+    #|  let r3 = *# a b in
+    #|  let r4 = *H# a b in
+    #|  let r5 = negateInt# a in
+    #|  let r6 = quotInt# a b in
+    #|  let r7 = remInt# a b in
+    #|  let r8 = ==# a b in
+    #|  let r9 = /=# a b in
+    #|  let r10 = <# a b in
+    #|  let r11 = <=# a b in
+    #|  let r12 = ># a b in
+    #|  let r13 = >=# a b in
+    #|  let r14 = and# a b in
+    #|  let r15 = or# a b in
+    #|  let r16 = xor# a b in
+    #|  let r17 = not# a in
+    #|  let r18 = uncheckedShiftL# a b in
+    #|  let r19 = uncheckedShiftRL# a b in
+    #|  let r20 = uncheckedIShiftL# a b in
+    #|  let r21 = uncheckedIShiftRA# a b in
+    #|  let r22 = uncheckedIShiftRL# a b in
+    #|  r1
+    #|
+    #|-- Word operations
+    #|testWord = \ w1 w2 ->
+    #|  let w3 = plusWord# w1 w2 in
+    #|  let w4 = minusWord# w1 w2 in
+    #|  let w5 = timesWord# w1 w2 in
+    #|  let w6 = quotWord# w1 w2 in
+    #|  let w7 = remWord# w1 w2 in
+    #|  let w8 = eqWord# w1 w2 in
+    #|  let w9 = neWord# w1 w2 in
+    #|  let w10 = ltWord# w1 w2 in
+    #|  let w11 = leWord# w1 w2 in
+    #|  let w12 = gtWord# w1 w2 in
+    #|  let w13 = geWord# w1 w2 in
+    #|  w3
+    #|
+    #|-- Word / Int conversions
+    #|testConv = \ x ->
+    #|  let c1 = int2Word# x in
+    #|  let c2 = word2Int# c1 in
+    #|  let c3 = narrow8Int# x in
+    #|  let c4 = narrow16Int# x in
+    #|  let c5 = narrow8Word# c1 in
+    #|  let c6 = narrow16Word# c1 in
+    #|  let c7 = chr# x in
+    #|  let c8 = ord# c7 in
+    #|  c8
+    #|
+    #|-- Addr# and CString
+    #|testCString = \ () ->
+    #|  let s1 = unpackCString# "hello"# in
+    #|  let s2 = unpackCStringUtf8# "world"# in
+    #|  s1
+    #|
+    #|-- ByteArray# and MutableByteArray#
+    #|testByteArray = \ s ->
+    #|  case newByteArray# 64# s of {
+    #|    (# s1, mba #) ->
+    #|      case writeWord8Array# mba 0# 42# s1 of s2 {
+    #|        __DEFAULT ->
+    #|          case readWord8Array# mba 0# s2 of {
+    #|            (# s3, w8 #) ->
+    #|              case writeIntArray# mba 1# 123# s3 of s4 {
+    #|                __DEFAULT ->
+    #|                  case readIntArray# mba 1# s4 of {
+    #|                    (# s5, val #) ->
+    #|                      let sz = sizeofByteArray# mba in
+    #|                      let w = indexWord8Array# mba 0# in
+    #|                      let i = indexIntArray# mba 1# in
+    #|                      case copyByteArray# mba 0# mba 16# 8# s5 of s6 {
+    #|                        __DEFAULT -> (# s6, val #)
+    #|                      }
+    #|                  }
+    #|              }
+    #|          }
+    #|      }
+    #|  }
+    #|
+    #|-- MutVar# and State#
+    #|testMutVar = \ s ->
+    #|  case newMutVar# 99# s of {
+    #|    (# s1, mv #) ->
+    #|      case writeMutVar# mv 100# s1 of s2 {
+    #|        __DEFAULT ->
+    #|          case readMutVar# mv s2 of {
+    #|            (# s3, val #) -> (# s3, val #)
+    #|          }
+    #|      }
+    #|  }
+    #|
+    #|-- Raise and error
+    #|testRaise = \ err ->
+    #|  let x = raise# err in
+    #|  let y = raiseIO# err in
+    #|  x
+    #|
+    #|main = testCString ()
+  let prog = @syntax.parse_program(src).unwrap()
+  assert_true(prog.lookup("testArith") is Some(_))
+  assert_true(prog.lookup("testWord") is Some(_))
+  assert_true(prog.lookup("testConv") is Some(_))
+  assert_true(prog.lookup("testCString") is Some(_))
+  assert_true(prog.lookup("testByteArray") is Some(_))
+  assert_true(prog.lookup("testMutVar") is Some(_))
+  assert_true(prog.lookup("testRaise") is Some(_))
+  assert_true(prog.lookup("main") is Some(_))
+}
+
+test "parse char literal in case pattern" {
+  let src =
+    #|testCharPattern = \ c ->
+    #|  case c of {
+    #|    'a' -> 1#;
+    #|    'b' -> 2#;
+    #|    __DEFAULT -> 0#
+    #|  }
+  let prog = @syntax.parse_program(src).unwrap()
+  assert_true(prog.lookup("testCharPattern") is Some(_))
+}
+
+test "parse tests/packages/bytestring_core.core" {
+  let src =
+    #|addr#_a2v9
+    #|  = "Coronet Implicit Parallel Graph Reduction"#
+    #|
+    #|testBS
+    #|  = BS addr#_a2v9 FinalPtr 41#
+    #|
+    #|lvl_s2uP
+    #|  = I# 0#
+    #|
+    #|calcChecksum
+    #|  = \ bs_aQ2 ->
+    #|      case bs_aQ2 of wild_a1Iv {
+    #|        BS bx_a1KX bx1_a1KY bx2_a1KZ -> let end_s2uA = plusAddr# bx_a1KX bx2_a1KZ in let Rec { $wgo_s2wQ = \ ww_s2wI ww_s2wM ww_s2wN eta_s2wP ->
+    #|      case eqAddr# ww_s2wM end_s2uA of lwild_a1L9 {
+    #|        __DEFAULT -> case readWord8OffAddr# ww_s2wM 0# eta_s2wP of ds2_a1Lb {
+    #|        (# ipv2_a1Lc, ipv3_a1Ld #) -> case touch# ww_s2wN ipv2_a1Lc of s'_a1Lf {
+    #|        __DEFAULT -> $wgo_s2wQ (remInt# (+# (*# ww_s2wI 31#) (word2Int# (word8ToWord# ipv3_a1Ld))) 1000000007#) (plusAddr# ww_s2wM 1#) ww_s2wN s'_a1Lf
+    #|      }
+    #|      };
+    #|        1# -> I# ww_s2wI
+    #|      } end Rec } in $wgo_s2wQ 0# bx_a1KX bx1_a1KY realWorld#
+    #|      }
+    #|
+    #|result
+    #|  = let end_s2uA = plusAddr# addr#_a2v9 41# in let Rec { $wgo_s2xc = \ ww_s2x4 ww_s2x8 ww_s2x9 eta_s2xb ->
+    #|      case eqAddr# ww_s2x8 end_s2uA of lwild_a1L9 {
+    #|        __DEFAULT -> case readWord8OffAddr# ww_s2x8 0# eta_s2xb of ds2_a1Lb {
+    #|        (# ipv2_a1Lc, ipv3_a1Ld #) -> case touch# ww_s2x9 ipv2_a1Lc of s'_a1Lf {
+    #|        __DEFAULT -> $wgo_s2xc (remInt# (+# (*# ww_s2x4 31#) (word2Int# (word8ToWord# ipv3_a1Ld))) 1000000007#) (plusAddr# ww_s2x8 1#) ww_s2x9 s'_a1Lf
+    #|      }
+    #|      };
+    #|        1# -> I# ww_s2x4
+    #|      } end Rec } in $wgo_s2xc 0# addr#_a2v9 FinalPtr realWorld#
+    #|
+    #|main = result
+  let prog = @syntax.parse_program(src).unwrap()
+  assert_true(prog.lookup("addr#_a2v9") is Some(_))
+  assert_true(prog.lookup("testBS") is Some(_))
+  assert_true(prog.lookup("calcChecksum") is Some(_))
+  assert_true(prog.lookup("result") is Some(_))
+  assert_true(prog.lookup("main") is Some(_))
+}
+
+
+
+
+
 

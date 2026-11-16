@@ -10,20 +10,26 @@ struct CliArgs {
 ///|
 fn print_usage() -> Unit {
   let usage = (
-    #|Coronet: GHC Core -> HVM2/3/GPU Parallel Compiler
+    #|Coronet: GHC Core -> HVM2/3/GPU/Metal/CUDA/HIP Parallel Compiler
     #|
-    #|Usage: coronet <input.core ...> --target <hvm2|hvm3|gpu> [-o <output_file>]
-    #|       coronet <input.core ...> --gpu [-o <output_file>]
+    #|Usage: coronet <input.core ...> --target <hvm2|hvm3|gpu|metal|cuda|hip> [-o <output_file>]
+    #|       coronet <input.core ...> [--gpu|--metal|--cuda|--hip] [-o <output_file>]
     #|
     #|Arguments:
     #|  <input.core ...>             One or more input CoreLite source files to compile and link
     #|
     #|Options:
-    #|  --target <hvm2|hvm3|gpu>     Target backend:
-    #|                                 hvm2 (Interaction Nets)
-    #|                                 hvm3 (Interaction Calculus)
-    #|                                 gpu  (HVM2 CUDA / Colab GPU)
+    #|  --target <backend>           Target backend:
+    #|                                 hvm2  (Interaction Nets CPU)
+    #|                                 hvm3  (Interaction Calculus CPU)
+    #|                                 gpu   (HVM2 CUDA / Colab GPU)
+    #|                                 metal (Apple Silicon Metal GPU)
+    #|                                 cuda  (NVIDIA CUDA GPU)
+    #|                                 hip   (AMD HIP GPU)
     #|  --gpu                        Shortcut for --target gpu
+    #|  --metal                      Shortcut for --target metal
+    #|  --cuda                       Shortcut for --target cuda
+    #|  --hip                        Shortcut for --target hip
     #|  -o, --output <file>          Output destination file (default: stdout / execute)
     #|  -h, --help                   Show this help message and exit
   )
@@ -43,10 +49,16 @@ fn parse_cli_args(args : Array[String]) -> CliArgs {
       @env.exit(0)
     } else if arg == "--gpu" {
       target = Some("gpu")
+    } else if arg == "--metal" {
+      target = Some("metal")
+    } else if arg == "--cuda" {
+      target = Some("cuda")
+    } else if arg == "--hip" {
+      target = Some("hip")
     } else if arg == "--target" {
       i = i + 1
       if i >= args.length() {
-        println("Error: --target requires an argument ('hvm2', 'hvm3', or 'gpu')")
+        println("Error: --target requires an argument ('hvm2', 'hvm3', 'gpu', 'metal', 'cuda', 'hip')")
         print_usage()
         @env.exit(1)
       }
@@ -83,21 +95,53 @@ fn parse_cli_args(args : Array[String]) -> CliArgs {
 
   let tgt = match target {
     Some(t) => {
-      if t != "hvm2" && t != "hvm3" && t != "gpu" {
-        println("Error: Invalid target '\{t}'. Must be 'hvm2', 'hvm3', or 'gpu'.")
+      if t != "hvm2" && t != "hvm3" && t != "gpu" && t != "metal" && t != "cuda" && t != "hip" {
+        println("Error: Invalid target '\{t}'. Must be 'hvm2', 'hvm3', 'gpu', 'metal', 'cuda', or 'hip'.")
         print_usage()
         @env.exit(1)
       }
       t
     }
     None => {
-      println("Error: Missing --target option ('hvm2', 'hvm3', or 'gpu')")
+      println("Error: Missing --target option ('hvm2', 'hvm3', 'gpu', 'metal', 'cuda', or 'hip')")
       print_usage()
       @env.exit(1)
     }
   }
 
   { input_files, target: tgt, output_file }
+}
+
+///|
+async fn handle_metal_target(program : @syntax.Program, output_file : String?) -> Unit {
+  let hvm2_code = @lower_hvm2.lower(program)
+  let tmp_dir = "_build/metal"
+  if !(@fs.exists(tmp_dir)) {
+    let _ = @process.run("mkdir", ["-p", tmp_dir][:])
+  }
+  let tmp_hvm = "_build/metal/temp.hvm"
+  @fs.write_text(tmp_hvm, hvm2_code)
+
+  match output_file {
+    Some(out_path) => {
+      @fs.write_text(out_path, hvm2_code)
+    }
+    None => {
+      if @fs.exists("bin/coronet_metal") {
+        let runner = @process.run(
+          "bin/coronet_metal",
+          [][:],
+          stdout=Inherit,
+          stderr=Inherit,
+        )
+        if runner.exit_code != 0 {
+          @env.exit(runner.exit_code)
+        }
+      } else {
+        println(hvm2_code)
+      }
+    }
+  }
 }
 
 ///|
@@ -111,17 +155,28 @@ async fn handle_gpu_target(program : @syntax.Program, output_file : String?) -> 
   let tmp_cu = "_build/gpu/temp.cu"
   @fs.write_text(tmp_hvm, hvm2_code)
 
-  // Generate CUDA code via hvm gen-cu
-  let gen_res = @process.run(
-    "vendor/HVM2/target/release/hvm",
-    ["gen-cu", tmp_hvm][:],
-    stdout=Collect,
-    stderr=Collect,
-  )
-  if gen_res.exit_code != 0 {
-    println("Warning: 'hvm gen-cu' exited with code \{gen_res.exit_code}")
+  let hvm_bin = if @fs.exists("vendor/HVM2/target/release/hvm") {
+    "vendor/HVM2/target/release/hvm"
+  } else {
+    "hvm"
   }
-  let cu_code = try { gen_res.stdout_text() } catch { _ => "" }
+
+  // Generate CUDA code via hvm gen-cu
+  let mut cu_code = ""
+  try {
+    let gen_res = @process.run(
+      hvm_bin,
+      ["gen-cu", tmp_hvm][:],
+      stdout=Collect,
+      stderr=Collect,
+    )
+    if gen_res.exit_code != 0 {
+      println("Warning: 'hvm gen-cu' exited with code \{gen_res.exit_code}")
+    }
+    cu_code = gen_res.stdout_text()
+  } catch {
+    _ => ()
+  }
   if cu_code.length() > 0 {
     @fs.write_text(tmp_cu, cu_code)
   }
@@ -184,8 +239,13 @@ async fn main {
 
   let program = @syntax.link_programs(programs)
 
-  if cli.target == "gpu" {
+  if cli.target == "gpu" || cli.target == "cuda" || cli.target == "hip" {
     handle_gpu_target(program, cli.output_file)
+    return
+  }
+
+  if cli.target == "metal" {
+    handle_metal_target(program, cli.output_file)
     return
   }
 

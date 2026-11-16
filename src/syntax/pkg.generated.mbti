@@ -37,6 +37,7 @@ pub fn Alt::not_equal(Self, Self) -> Bool
 pub fn Alt::output(Self, &Logger) -> Unit
 pub fn Alt::to_repr(Self) -> @debug.Repr
 pub fn Alt::to_string(Self) -> String
+pub fn Alt::unboxed_tuple(Array[String], Expr) -> Self
 pub impl Show for Alt
 
 #derive(Eq, @debug.Debug)
@@ -79,6 +80,8 @@ pub fn Expr::not_equal(Self, Self) -> Bool
 pub fn Expr::output(Self, &Logger) -> Unit
 pub fn Expr::to_repr(Self) -> @debug.Repr
 pub fn Expr::to_string(Self) -> String
+pub fn Expr::tuple(Array[Self]) -> Self
+pub fn Expr::unboxed_tuple(Array[Self]) -> Self
 pub fn Expr::unwind_app(Self) -> (Self, Array[Self])
 pub fn Expr::var_(String) -> Self
 pub fn Expr::variable(String) -> Self
@@ -95,6 +98,7 @@ pub fn Pat::not_equal(Self, Self) -> Bool
 pub fn Pat::output(Self, &Logger) -> Unit
 pub fn Pat::to_repr(Self) -> @debug.Repr
 pub fn Pat::to_string(Self) -> String
+pub fn Pat::unboxed_tuple(Array[String]) -> Self
 pub impl Show for Pat
 
 #derive(Eq, @debug.Debug)
@@ -140,6 +144,8 @@ pub enum Token {
   DoubleColon
   Comma
   Underscore
+  LUnboxedTuple
+  RUnboxedTuple
   EOF
 }
 pub fn Token::equal(Self, Self) -> Bool

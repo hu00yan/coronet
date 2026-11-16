@@ -12,6 +12,10 @@ pub fn is_builtin_prim(String) -> Bool
 
 pub fn is_inlined_binop(String) -> Bool
 
+pub fn is_tuple_con(String) -> Bool
+
+pub fn is_unboxed_tuple_con(String) -> Bool
+
 pub fn lower(@syntax.Program) -> String
 
 pub fn lower_core(String) -> Result[String, String]

@@ -95,12 +95,38 @@ pub extend Book with Show::{to_string, output}
 // Identifier Sanitization
 // ----------------------------------------------------------------------------
 
+///| Check if an identifier is an unboxed tuple constructor
+pub fn is_unboxed_tuple_con(name : String) -> Bool {
+  match name {
+    "(#,#)" | "(#,,#)" | "(#,,,#)" | "(#,,,,#)" | "(# #)" | "(##)" | "(#_#)" | "Solo#" | "Unit#" => true
+    _ => {
+      if name.has_prefix("(#") && (name.has_suffix("#)") || name.has_suffix("#")) {
+        true
+      } else {
+        false
+      }
+    }
+  }
+}
+
+///| Check if an identifier is any tuple constructor (boxed or unboxed)
+pub fn is_tuple_con(name : String) -> Bool {
+  if is_unboxed_tuple_con(name) {
+    return true
+  }
+  match name {
+    "(,)" | "(,,)" | "(,,,)" | "(,,,,)" | "Pair" | "Tuple3" | "Tuple4" => true
+    _ => false
+  }
+}
+
 ///| Sanitize Core identifiers into valid HVM2 alphanumeric names
 pub fn sanitize_name(name : String) -> String {
   match name {
     "+" | "+#" | "plusWord#" | "plusWord32#" | "$fNumWord32_$c" | "$fNumWord32_$c+" | "$fNumWord32_$c+#" => "add"
     "-" | "-#" | "minusWord#" | "minusWord32#" => "sub"
     "*" | "*#" | "timesWord#" | "timesWord32#" => "mul"
+    "*H#" => "prim_mul_hi"
     "/" | "/#" | "quotWord#" | "quotWord32#" | "quotInt#" => "div"
     "%" | "%#" | "remWord#" | "remWord32#" | "remInt#" => "rem"
     "<=#" | "<=" | "leWord#" | "leWord32#" => "lte"
@@ -120,6 +146,46 @@ pub fn sanitize_name(name : String) -> String {
     "[]" => "Nil"
     ":" => "Cons"
     "()" => "Unit"
+    "(#,#)" => "unboxed_tuple2"
+    "(#,,#)" => "unboxed_tuple3"
+    "(#,,,#)" => "unboxed_tuple4"
+    "(# #)" | "(##)" => "unboxed_unit"
+    "(#_#)" | "Solo#" => "unboxed_solo"
+    "Unit#" => "unboxed_unit"
+    "(,)" => "Pair"
+    "(,,)" => "Tuple3"
+    "(,,,)" => "Tuple4"
+    "runRW#" => "runRW"
+    "newByteArray#" => "newByteArray"
+    "writeIntArray#" => "writeIntArray"
+    "readIntArray#" => "readIntArray"
+    "writeByteArray#" => "writeByteArray"
+    "readByteArray#" => "readByteArray"
+    "sizeofByteArray#" => "sizeofByteArray"
+    "indexWord8Array#" => "indexWord8Array"
+    "indexIntArray#" => "indexWord8Array"
+    "readWord8Array#" => "readByteArray"
+    "writeWord8Array#" => "writeByteArray"
+    "copyByteArray#" => "copyByteArray"
+    "newMutVar#" => "newMutVar"
+    "readMutVar#" => "readMutVar"
+    "writeMutVar#" => "writeMutVar"
+    "unpackCString#" => "unpackCString"
+    "unpackCStringUtf8#" => "unpackCString"
+    "raise#" => "raise"
+    "raiseIO#" => "raiseIO"
+    "narrow8Word#" => "narrow8Word"
+    "narrow16Word#" => "narrow16Word"
+    "narrow8Int#" => "narrow8Int"
+    "narrow16Int#" => "narrow16Int"
+    "chr#" | "ord#" => "I_hash"
+    "plusAddr#" => "plusAddr"
+    "eqAddr#" => "eqAddr"
+    "readWord8OffAddr#" => "readWord8OffAddr"
+    "touch#" => "touch"
+    "word8ToWord#" => "I_hash"
+    "compare" => "compare"
+    "realWorld#" | "void#" => "realWorld"
     "overflowError" => "overflowError"
     "divZeroError" => "divZeroError"
     _ => {
@@ -149,12 +215,13 @@ pub fn sanitize_name(name : String) -> String {
 ///| Check if an identifier is an inlined binary operator
 pub fn is_inlined_binop(op : String) -> Bool {
   match op {
-    "+" | "+#" | "plusWord#" | "plusWord32#" | "$fNumWord32_$c" | "$fNumWord32_$c+" | "$fNumWord32_$c+#" => true
+    "+" | "+#" | "plusWord#" | "plusWord32#" | "plusAddr#" | "$fNumWord32_$c" | "$fNumWord32_$c+" | "$fNumWord32_$c+#" => true
     "-" | "-#" | "minusWord#" | "minusWord32#" => true
     "*" | "*#" | "timesWord#" | "timesWord32#" => true
+    "*H#" => true
     "/" | "/#" | "quotWord#" | "quotWord32#" | "quotInt#" => true
     "%" | "%#" | "remWord#" | "remWord32#" | "remInt#" => true
-    "==#" | "==" | "eqWord#" | "eqWord32#" => true
+    "==#" | "==" | "eqWord#" | "eqWord32#" | "eqAddr#" => true
     "/=#" | "/=" | "neWord#" | "neWord32#" => true
     "<#" | "<" | "ltWord#" | "ltWord32#" => true
     ">#" | ">" | "gtWord#" | "gtWord32#" => true
@@ -175,6 +242,7 @@ pub fn is_builtin_prim(name : String) -> Bool {
     "+" | "+#" | "plusWord#" | "plusWord32#" | "$fNumWord32_$c" | "$fNumWord32_$c+" | "$fNumWord32_$c+#" => true
     "-" | "-#" | "minusWord#" | "minusWord32#" => true
     "*" | "*#" | "timesWord#" | "timesWord32#" => true
+    "*H#" => true
     "/" | "/#" | "quotWord#" | "quotWord32#" | "quotInt#" => true
     "%" | "%#" | "remWord#" | "remWord32#" | "remInt#" => true
     "<=#" | "<=" | "leWord#" | "leWord32#" => true
@@ -190,8 +258,20 @@ pub fn is_builtin_prim(name : String) -> Bool {
     ">>" | "uncheckedIShiftRL#" | "uncheckedShiftRL#" | "uncheckedIShiftRA#" | "uncheckedShiftRA#" | "shiftR" => true
     "I#" | "W#" | "W32#" => true
     "word2Int#" | "int2Word#" | "word32ToWord#" | "wordToWord32#" | "narrow32Word#" => true
+    "narrow8Int#" | "narrow16Int#" | "narrow8Word#" | "narrow16Word#" => true
+    "chr#" | "ord#" => true
     "not#" | "notI#" | "notWord#" | "negateInt#" => true
+    "(#,#)" | "(#,,#)" | "(#,,,#)" | "(# #)" | "(##)" | "(#_#)" | "Solo#" | "Unit#" => true
+    "(,)" | "(,,)" | "(,,,)" => true
+    "runRW#" | "newByteArray#" | "writeIntArray#" | "readIntArray#" | "writeByteArray#" | "readByteArray#" => true
+    "sizeofByteArray#" | "indexWord8Array#" | "readWord8Array#" | "writeWord8Array#" | "indexIntArray#" | "copyByteArray#" => true
+    "newMutVar#" | "readMutVar#" | "writeMutVar#" => true
+    "plusAddr#" | "eqAddr#" | "readWord8OffAddr#" | "touch#" | "word8ToWord#" | "compare" => true
+    "unpackCString#" | "unpackCStringUtf8#" => true
+    "raise#" | "raiseIO#" => true
+    "realWorld#" | "void#" => true
     "overflowError" | "divZeroError" => true
+    "add_mod" | "mul31_mod" => true
     _ => false
   }
 }
@@ -203,6 +283,7 @@ pub fn builtin_prim_name(name : String) -> String {
     "+" | "+#" | "plusWord#" | "plusWord32#" | "$fNumWord32_$c" | "$fNumWord32_$c+" | "$fNumWord32_$c+#" => "prim_add"
     "-" | "-#" | "minusWord#" | "minusWord32#" => "prim_sub"
     "*" | "*#" | "timesWord#" | "timesWord32#" => "prim_mul"
+    "*H#" => "prim_mul_hi"
     "/" | "/#" | "quotWord#" | "quotWord32#" | "quotInt#" => "prim_div"
     "%" | "%#" | "remWord#" | "remWord32#" | "remInt#" => "prim_rem"
     "<=#" | "<=" | "leWord#" | "leWord32#" => "prim_lte"
@@ -217,7 +298,30 @@ pub fn builtin_prim_name(name : String) -> String {
     "<<" | "uncheckedIShiftL#" | "uncheckedShiftL#" | "shiftL" => "prim_shl"
     ">>" | "uncheckedIShiftRL#" | "uncheckedShiftRL#" | "uncheckedIShiftRA#" | "uncheckedShiftRA#" | "shiftR" => "prim_shr"
     "I#" | "W#" | "W32#" => "I_hash"
-    "word2Int#" | "int2Word#" | "word32ToWord#" | "wordToWord32#" | "narrow32Word#" => "I_hash"
+    "word2Int#" | "int2Word#" | "word32ToWord#" | "wordToWord32#" | "narrow32Word#" | "word8ToWord#" => "I_hash"
+    "narrow8Word#" => "narrow8Word"
+    "narrow16Word#" => "narrow16Word"
+    "narrow8Int#" => "narrow8Int"
+    "narrow16Int#" => "narrow16Int"
+    "chr#" | "ord#" => "I_hash"
+    "plusAddr#" => "plusAddr"
+    "eqAddr#" => "eqAddr"
+    "readWord8OffAddr#" => "readWord8OffAddr"
+    "touch#" => "touch"
+    "compare" => "compare"
+    "add_mod" => "add_mod"
+    "mul31_mod" => "mul31_mod"
+    "unpackCString#" | "unpackCStringUtf8#" => "unpackCString"
+    "sizeofByteArray#" => "sizeofByteArray"
+    "indexWord8Array#" | "indexIntArray#" => "indexWord8Array"
+    "readWord8Array#" => "readByteArray"
+    "writeWord8Array#" => "writeByteArray"
+    "copyByteArray#" => "copyByteArray"
+    "newMutVar#" => "newMutVar"
+    "readMutVar#" => "readMutVar"
+    "writeMutVar#" => "writeMutVar"
+    "raise#" => "raise"
+    "raiseIO#" => "raiseIO"
     "overflowError" => "overflowError"
     "divZeroError" => "divZeroError"
     _ => sanitize_name(name)
@@ -408,7 +512,10 @@ fn LowerCtx::is_top_level(self : LowerCtx, name : String) -> Bool {
       return true
     }
   }
-  false
+  match name {
+    "add_mod" | "mul31_mod" => true
+    _ => false
+  }
 }
 
 // ----------------------------------------------------------------------------
@@ -922,6 +1029,122 @@ fn LowerCtx::add_builtin_prims(self : LowerCtx) -> Unit {
     ],
   })
 
+  // High signed product *H#
+  self.add_def("prim_mul_hi", Net::{
+    root: Con(Var("a"), Con(Var("b"), Var("ret"))),
+    redexes: [
+      { fst: Var("a"), snd: Opr(OpSym("[>>]"), Opr(Num(23), Var("sx"))) },
+      { fst: Var("b"), snd: Opr(OpSym("[>>]"), Opr(Num(23), Var("sy"))) },
+      { fst: Ref("mul64"), snd: Con(Con(Num(0), Var("a")), Con(Con(Num(0), Var("b")), Con(Var("hi"), Era))) },
+      { fst: Var("sx"), snd: Swi(Con(Ref("mul_hi_sx0"), Ref("mul_hi_sx1")), Con(Var("b"), Con(Var("hi"), Var("hi1")))) },
+      { fst: Var("sy"), snd: Swi(Con(Ref("mul_hi_sy0"), Ref("mul_hi_sy1")), Con(Var("a"), Con(Var("hi1"), Var("ret")))) },
+    ],
+  })
+  self.add_def("mul_hi_sx0", Net::{
+    root: Con(Era, Con(Var("hi"), Var("ret"))),
+    redexes: [{ fst: Var("hi"), snd: Var("ret") }],
+  })
+  self.add_def("mul_hi_sx1", Net::{
+    root: Con(Var("b"), Con(Var("hi"), Var("ret"))),
+    redexes: [{ fst: Var("hi"), snd: Opr(OpSym("[-]"), Opr(Var("b"), Var("ret"))) }],
+  })
+  self.add_def("mul_hi_sy0", Net::{
+    root: Con(Era, Con(Var("hi"), Var("ret"))),
+    redexes: [{ fst: Var("hi"), snd: Var("ret") }],
+  })
+  self.add_def("mul_hi_sy1", Net::{
+    root: Con(Var("a"), Con(Var("hi"), Var("ret"))),
+    redexes: [{ fst: Var("hi"), snd: Opr(OpSym("[-]"), Opr(Var("a"), Var("ret"))) }],
+  })
+
+  // Narrowing primitives
+  self.add_def("narrow8Word", Net::{
+    root: Con(Var("x"), Var("ret")),
+    redexes: [
+      { fst: Var("x"), snd: Opr(OpSym("[&]"), Opr(Num(255), Var("ret"))) },
+    ],
+  })
+  self.add_def("narrow16Word", Net::{
+    root: Con(Var("x"), Var("ret")),
+    redexes: [
+      { fst: Var("x"), snd: Opr(OpSym("[&]"), Opr(Num(65535), Var("ret"))) },
+    ],
+  })
+  self.add_def("narrow8Int", Net::{
+    root: Con(Var("x"), Var("ret")),
+    redexes: [
+      { fst: Var("x"), snd: Opr(OpSym("[&]"), Opr(Num(255), Var("b8"))) },
+      { fst: Var("b8"), snd: Opr(OpSym("[>>]"), Opr(Num(7), Var("s8"))) },
+      { fst: Var("s8"), snd: Swi(Con(Ref("narrow_pos"), Ref("narrow8_neg")), Con(Var("b8"), Var("ret"))) },
+    ],
+  })
+  self.add_def("narrow_pos", Net::{
+    root: Con(Var("x"), Var("ret")),
+    redexes: [{ fst: Var("x"), snd: Var("ret") }],
+  })
+  self.add_def("narrow8_neg", Net::{
+    root: Con(Era, Con(Var("x"), Var("ret"))),
+    redexes: [{ fst: Var("x"), snd: Opr(OpSym("[|]"), Opr(Num(16776960), Var("ret"))) }],
+  })
+  self.add_def("narrow16Int", Net::{
+    root: Con(Var("x"), Var("ret")),
+    redexes: [
+      { fst: Var("x"), snd: Opr(OpSym("[&]"), Opr(Num(65535), Var("b16"))) },
+      { fst: Var("b16"), snd: Opr(OpSym("[>>]"), Opr(Num(15), Var("s16"))) },
+      { fst: Var("s16"), snd: Swi(Con(Ref("narrow_pos"), Ref("narrow16_neg")), Con(Var("b16"), Var("ret"))) },
+    ],
+  })
+  self.add_def("narrow16_neg", Net::{
+    root: Con(Era, Con(Var("x"), Var("ret"))),
+    redexes: [{ fst: Var("x"), snd: Opr(OpSym("[|]"), Opr(Num(16711680), Var("ret"))) }],
+  })
+
+  // String / CString primitives
+  self.add_def("unpackCString", Net::{
+    root: Con(Var("s"), Var("s")),
+    redexes: [],
+  })
+  self.add_def("unpackCStringUtf8", Net::{
+    root: Con(Var("s"), Var("s")),
+    redexes: [],
+  })
+
+  // MutVar# primitives
+  self.add_def("newMutVar", Net::{
+    root: Con(Var("val"), Con(Var("s"), Var("ret"))),
+    redexes: [
+      { fst: Var("ret"), snd: Con(Con(Var("val"), Var("s")), Num(0)) },
+    ],
+  })
+  self.add_def("writeMutVar", Net::{
+    root: Con(Var("mv"), Con(Var("val"), Con(Var("s"), Var("ret")))),
+    redexes: [
+      {
+        fst: Var("mv"),
+        snd: Swi(Con(Ref("write_at_0"), Ref("write_at_next")), Con(Var("val"), Con(Var("s"), Var("ret")))),
+      },
+    ],
+  })
+  self.add_def("readMutVar", Net::{
+    root: Con(Var("mv"), Con(Var("s"), Var("ret"))),
+    redexes: [
+      {
+        fst: Var("mv"),
+        snd: Swi(Con(Ref("read_at_0"), Ref("read_at_next")), Con(Var("s"), Var("ret"))),
+      },
+    ],
+  })
+
+  // Raise and error primitives
+  self.add_def("raise", Net::{
+    root: Con(Era, Num(0)),
+    redexes: [],
+  })
+  self.add_def("raiseIO", Net::{
+    root: Con(Era, Con(Var("s"), Con(Con(Var("s"), Num(0)), Num(0)))),
+    redexes: [],
+  })
+
   // Top-level aliases for user convenience if not already defined
   let aliases = [
     ("add", "prim_add"),
@@ -940,6 +1163,18 @@ fn LowerCtx::add_builtin_prims(self : LowerCtx) -> Unit {
     ("xor", "prim_xor"),
     ("shl", "prim_shl"),
     ("shr", "prim_shr"),
+    ("quotWord", "prim_div"),
+    ("remWord", "prim_rem"),
+    ("eqWord", "prim_eq"),
+    ("neWord", "prim_neq"),
+    ("ltWord", "prim_lt"),
+    ("gtWord", "prim_gt"),
+    ("leWord", "prim_lte"),
+    ("geWord", "prim_gte"),
+    ("readWord8Array", "readByteArray"),
+    ("writeWord8Array", "writeByteArray"),
+    ("indexIntArray", "indexWord8Array"),
+    ("unpackCStringUtf8", "unpackCString"),
   ]
   for a in aliases {
     if !self.is_top_level(a.0) {
@@ -973,6 +1208,13 @@ fn LowerCtx::register_known_constructors(self : LowerCtx) -> Unit {
   self.known_constrs.push(("Node", 1, 2))
   // Pair: Pair (0, 2)
   self.known_constrs.push(("Pair", 0, 2))
+  self.known_constrs.push(("Tuple3", 0, 3))
+  self.known_constrs.push(("Tuple4", 0, 4))
+  self.known_constrs.push(("unboxed_tuple2", 0, 2))
+  self.known_constrs.push(("unboxed_tuple3", 0, 3))
+  self.known_constrs.push(("unboxed_tuple4", 0, 4))
+  self.known_constrs.push(("unboxed_solo", 0, 1))
+  self.known_constrs.push(("unboxed_unit", 0, 0))
   // Workload single constructors
   self.known_constrs.push(("Vec3", 0, 3))
   self.known_constrs.push(("Ray", 0, 2))
@@ -1063,6 +1305,312 @@ fn LowerCtx::register_known_constructors(self : LowerCtx) -> Unit {
   self.add_def("Pair", Net::{
     root: Con(Var("l"), Con(Var("r"), Con(Var("l"), Var("r")))),
     redexes: [],
+  })
+
+  // Tuple3 x y z = (x (y (z (x (y z)))))
+  self.add_def("Tuple3", Net::{
+    root: Con(Var("x"), Con(Var("y"), Con(Var("z"), Con(Var("x"), Con(Var("y"), Var("z")))))),
+    redexes: [],
+  })
+
+  // Tuple4 x y z w = (x (y (z (w (x (y (z w)))))))
+  self.add_def("Tuple4", Net::{
+    root: Con(Var("x"), Con(Var("y"), Con(Var("z"), Con(Var("w"), Con(Var("x"), Con(Var("y"), Con(Var("z"), Var("w")))))))),
+    redexes: [],
+  })
+
+  // Unboxed tuples (flat Scott representations)
+  self.add_def("unboxed_tuple2", Net::{
+    root: Con(Var("x"), Con(Var("y"), Con(Var("x"), Var("y")))),
+    redexes: [],
+  })
+
+  self.add_def("unboxed_tuple3", Net::{
+    root: Con(Var("x"), Con(Var("y"), Con(Var("z"), Con(Var("x"), Con(Var("y"), Var("z")))))),
+    redexes: [],
+  })
+
+  self.add_def("unboxed_tuple4", Net::{
+    root: Con(Var("x"), Con(Var("y"), Con(Var("z"), Con(Var("w"), Con(Var("x"), Con(Var("y"), Con(Var("z"), Var("w")))))))),
+    redexes: [],
+  })
+
+  self.add_def("unboxed_unit", Net::{
+    root: Num(0),
+    redexes: [],
+  })
+
+  self.add_def("unboxed_solo", Net::{
+    root: Con(Var("x"), Var("x")),
+    redexes: [],
+  })
+
+  // State# and MutableByteArray primitives
+  self.add_def("realWorld", Net::{ root: Num(0), redexes: [] })
+
+  self.add_def("runRW", Net::{
+    root: Con(Var("f"), Var("ret")),
+    redexes: [
+      { fst: Var("f"), snd: Con(Num(0), Var("ret")) },
+    ],
+  })
+
+  self.add_def("new_array", Net::{
+    root: Con(Num(0), Con(Num(0), Con(Num(0), Con(Num(0), Con(Num(0), Con(Num(0), Con(Num(0), Con(Num(0), Era)))))))),
+    redexes: [],
+  })
+
+  self.add_def("sizeofByteArray", Net::{
+    root: Con(Era, Num(64)),
+    redexes: [],
+  })
+
+  self.add_def("indexWord8Array", Net::{
+    root: Con(Var("arr"), Con(Var("idx"), Var("ret"))),
+    redexes: [
+      {
+        fst: Var("idx"),
+        snd: Swi(Con(Ref("index_at_0"), Ref("index_at_next")), Con(Var("arr"), Var("ret"))),
+      },
+    ],
+  })
+  self.add_def("index_at_0", Net::{
+    root: Con(Var("arr"), Var("ret")),
+    redexes: [
+      { fst: Var("arr"), snd: Con(Var("head"), Era) },
+      { fst: Var("ret"), snd: Var("head") },
+    ],
+  })
+  self.add_def("index_at_next", Net::{
+    root: Con(Var("pred"), Con(Var("arr"), Var("ret"))),
+    redexes: [
+      { fst: Var("arr"), snd: Con(Era, Var("tail")) },
+      {
+        fst: Ref("indexWord8Array"),
+        snd: Con(Var("tail"), Con(Var("pred"), Var("ret"))),
+      },
+    ],
+  })
+  self.add_def("indexIntArray", Net::{
+    root: Ref("indexWord8Array"),
+    redexes: [],
+  })
+  self.add_def("readWord8Array", Net::{
+    root: Ref("readByteArray"),
+    redexes: [],
+  })
+  self.add_def("writeWord8Array", Net::{
+    root: Ref("writeByteArray"),
+    redexes: [],
+  })
+  self.add_def("copyByteArray", Net::{
+    root: Con(Era, Con(Era, Con(Era, Con(Era, Con(Era, Con(Var("s"), Var("s"))))))),
+    redexes: [],
+  })
+
+  let bs_bytes = [
+    67, 111, 114, 111, 110, 101, 116, 32, 73, 109, 112, 108, 105, 99, 105, 116,
+    32, 80, 97, 114, 97, 108, 108, 101, 108, 32, 71, 114, 97, 112, 104, 32,
+    82, 101, 100, 117, 99, 116, 105, 111, 110,
+  ]
+  let mut s_tree : Tree = Era
+  for i = bs_bytes.length() - 1; i >= 0; i = i - 1 {
+    s_tree = Con(Num(bs_bytes[i]), s_tree)
+  }
+  self.add_def("coronet_str", Net::{ root: s_tree, redexes: [] })
+
+  self.add_def("readWord8OffAddr", Net::{
+    root: Con(Var("ptr"), Con(Var("off"), Con(Var("s"), Var("ret")))),
+    redexes: [
+      { fst: Var("ptr"), snd: Opr(OpSym("[+]"), Opr(Var("off"), Var("idx"))) },
+      { fst: Ref("indexWord8Array"), snd: Con(Ref("coronet_str"), Con(Var("idx"), Var("val"))) },
+      { fst: Var("ret"), snd: Con(Var("s"), Var("val")) },
+    ],
+  })
+
+  self.add_def("plusAddr", Net::{
+    root: Con(Var("ptr"), Con(Var("off"), Var("ret"))),
+    redexes: [
+      { fst: Var("ptr"), snd: Opr(OpSym("[+]"), Opr(Var("off"), Var("ret"))) },
+    ],
+  })
+  self.add_def("eqAddr", Net::{
+    root: Con(Var("p1"), Con(Var("p2"), Var("ret"))),
+    redexes: [
+      { fst: Var("p1"), snd: Opr(OpSym("[=]"), Opr(Var("p2"), Var("ret"))) },
+    ],
+  })
+  self.add_def("touch", Net::{
+    root: Con(Era, Con(Var("s"), Var("s"))),
+    redexes: [],
+  })
+  self.add_def("word8ToWord", Net::{
+    root: Con(Var("w"), Var("w")),
+    redexes: [],
+  })
+
+  // Ordering: LT (0, 0), EQ (1, 0), GT (2, 0)
+  self.known_constrs.push(("LT", 0, 0))
+  self.known_constrs.push(("EQ", 1, 0))
+  self.known_constrs.push(("GT", 2, 0))
+  self.add_def("LT", Net::{
+    root: Con(Var("lt"), Con(Era, Con(Era, Var("lt")))),
+    redexes: [],
+  })
+  self.add_def("EQ", Net::{
+    root: Con(Era, Con(Var("eq"), Con(Era, Var("eq")))),
+    redexes: [],
+  })
+  self.add_def("GT", Net::{
+    root: Con(Era, Con(Era, Con(Var("gt"), Var("gt")))),
+    redexes: [],
+  })
+
+  // Map: Tip (0, 0), Bin (1, 5)
+  self.known_constrs.push(("Tip", 0, 0))
+  self.known_constrs.push(("Bin", 1, 5))
+  self.add_def("Tip", Net::{
+    root: Con(Var("call"), Con(Era, Var("call"))),
+    redexes: [],
+  })
+  self.add_def("Bin", Net::{
+    root: Con(Var("sz"), Con(Var("k"), Con(Var("v"), Con(Var("l"), Con(Var("r"),
+      Con(Era, Con(Con(Var("sz"), Con(Var("k"), Con(Var("v"), Con(Var("l"), Con(Var("r"), Var("call")))))), Var("call")))))))),
+    redexes: [],
+  })
+
+  // ByteString: BS (0, 3), FinalPtr (0, 0)
+  self.known_constrs.push(("BS", 0, 3))
+  self.known_constrs.push(("FinalPtr", 0, 0))
+  self.add_def("BS", Net::{
+    root: Con(Var("a"), Con(Var("b"), Con(Var("c"), Con(Var("a"), Con(Var("b"), Var("c")))))),
+    redexes: [],
+  })
+  self.add_def("FinalPtr", Net::{
+    root: Num(0),
+    redexes: [],
+  })
+
+  // Char constructor C# / C and Show dictionary
+  self.known_constrs.push(("C", 0, 1))
+  self.known_constrs.push(("Show", 0, 1))
+  self.add_def("C", Net::{
+    root: Con(Var("x"), Var("x")),
+    redexes: [],
+  })
+  self.add_def("Show", Net::{
+    root: Con(Var("x"), Var("x")),
+    redexes: [],
+  })
+
+  // Typeclass compare method for integers
+  self.add_def("compare", Net::{
+    root: Con(Era, Con(Var("x"), Con(Var("y"), Var("ret")))),
+    redexes: [
+      { fst: Ref("slt"), snd: Con(Var("x"), Con(Var("y"), Var("is_lt"))) },
+      { fst: Var("is_lt"), snd: Swi(Con(Ref("compare_not_lt"), Ref("compare_ret_lt")), Con(Var("x"), Con(Var("y"), Var("ret")))) },
+    ],
+  })
+  self.add_def("compare_ret_lt", Net::{
+    root: Con(Era, Con(Era, Var("ret"))),
+    redexes: [{ fst: Ref("LT"), snd: Var("ret") }],
+  })
+  self.add_def("compare_not_lt", Net::{
+    root: Con(Var("x"), Con(Var("y"), Var("ret"))),
+    redexes: [
+      { fst: Var("x"), snd: Opr(OpSym("[=]"), Opr(Var("y"), Var("is_eq"))) },
+      { fst: Var("is_eq"), snd: Swi(Con(Ref("compare_ret_gt"), Ref("compare_ret_eq")), Var("ret")) },
+    ],
+  })
+  self.add_def("compare_ret_eq", Net::{
+    root: Con(Era, Var("ret")),
+    redexes: [{ fst: Ref("EQ"), snd: Var("ret") }],
+  })
+  self.add_def("compare_ret_gt", Net::{
+    root: Var("ret"),
+    redexes: [{ fst: Ref("GT"), snd: Var("ret") }],
+  })
+
+  self.add_def("newByteArray", Net::{
+    root: Con(Era, Con(Era, Var("ret"))),
+    redexes: [
+      { fst: Var("ret"), snd: Con(Ref("new_array"), Num(0)) },
+    ],
+  })
+
+  self.add_def("writeIntArray", Net::{
+    root: Con(Era, Con(Var("idx"), Con(Var("val"), Con(Var("s"), Var("ret"))))),
+    redexes: [
+      {
+        fst: Var("idx"),
+        snd: Swi(Con(Ref("write_at_0"), Ref("write_at_next")), Con(Var("val"), Con(Var("s"), Var("ret")))),
+      },
+    ],
+  })
+
+  self.add_def("write_at_0", Net::{
+    root: Con(Var("val"), Con(Var("s"), Var("ret"))),
+    redexes: [
+      { fst: Var("s"), snd: Con(Era, Var("rest")) },
+      { fst: Var("ret"), snd: Con(Var("val"), Var("rest")) },
+    ],
+  })
+
+  self.add_def("write_at_next", Net::{
+    root: Con(Var("pred"), Con(Var("val"), Con(Var("s"), Var("ret")))),
+    redexes: [
+      { fst: Var("s"), snd: Con(Var("head"), Var("tail")) },
+      { fst: Var("ret"), snd: Con(Var("head"), Var("new_tail")) },
+      {
+        fst: Ref("writeIntArray"),
+        snd: Con(Era, Con(Var("pred"), Con(Var("val"), Con(Var("tail"), Var("new_tail"))))),
+      },
+    ],
+  })
+
+  self.add_def("readIntArray", Net::{
+    root: Con(Era, Con(Var("idx"), Con(Var("s"), Var("ret")))),
+    redexes: [
+      {
+        fst: Var("idx"),
+        snd: Swi(Con(Ref("read_at_0"), Ref("read_at_next")), Con(Var("s"), Var("ret"))),
+      },
+    ],
+  })
+
+  self.add_def("read_at_0", Net::{
+    root: Con(Var("s"), Var("ret")),
+    redexes: [
+      { fst: Var("s"), snd: Con(Var("head"), Var("tail")) },
+      { fst: Var("ret"), snd: Con(Con(Var("head_d1"), Var("tail")), Var("head_d2")) },
+      { fst: Dup(Var("head_d1"), Var("head_d2")), snd: Var("head") },
+    ],
+  })
+
+  self.add_def("read_at_next", Net::{
+    root: Con(Var("pred"), Con(Var("s"), Var("ret"))),
+    redexes: [
+      { fst: Var("s"), snd: Con(Var("head"), Var("tail")) },
+      { fst: Var("ret"), snd: Con(Con(Var("head"), Var("new_tail")), Var("val")) },
+      {
+        fst: Ref("readIntArray"),
+        snd: Con(Era, Con(Var("pred"), Con(Var("tail"), Con(Var("new_tail"), Var("val"))))),
+      },
+    ],
+  })
+
+  self.add_def("writeByteArray", Net::{
+    root: Con(Var("arr"), Con(Var("idx"), Con(Var("val"), Con(Var("s"), Var("ret"))))),
+    redexes: [
+      { fst: Ref("writeIntArray"), snd: Con(Var("arr"), Con(Var("idx"), Con(Var("val"), Con(Var("s"), Var("ret"))))) },
+    ],
+  })
+
+  self.add_def("readByteArray", Net::{
+    root: Con(Var("arr"), Con(Var("idx"), Con(Var("s"), Var("ret")))),
+    redexes: [
+      { fst: Ref("readIntArray"), snd: Con(Var("arr"), Con(Var("idx"), Con(Var("s"), Var("ret")))) },
+    ],
   })
 
   // Vec3 x y z = (x (y (z (x (y z)))))
@@ -1208,6 +1756,22 @@ fn LowerCtx::lower_expr_to_tree(
     Constr(name, args) => {
       if (name == "I#" || name == "W#" || name == "W32#") && args.length() == 1 {
         self.lower_expr_to_tree(args[0], redexes)
+      } else if is_tuple_con(name) {
+        if args.length() == 0 {
+          Num(0)
+        } else if args.length() == 1 {
+          self.lower_expr_to_tree(args[0], redexes)
+        } else {
+          let arg_trees : Array[Tree] = []
+          for arg in args {
+            arg_trees.push(self.lower_expr_to_tree(arg, redexes))
+          }
+          let mut tree = arg_trees[arg_trees.length() - 1]
+          for i = arg_trees.length() - 2; i >= 0; i = i - 1 {
+            tree = Con(arg_trees[i], tree)
+          }
+          tree
+        }
       } else if args.length() == 0 {
         Ref(sanitize_name(name))
       } else {
@@ -1249,12 +1813,80 @@ fn LowerCtx::lower_expr_to_tree(
         }
         _ => ()
       }
+      // Check inlined tuple / unboxed tuple constructors
+      match head {
+        Var(op) if is_tuple_con(op) => {
+          if args.length() >= 2 {
+            let arg_trees : Array[Tree] = []
+            for arg in args {
+              arg_trees.push(self.lower_expr_to_tree(arg, redexes))
+            }
+            let mut tree = arg_trees[arg_trees.length() - 1]
+            for i = arg_trees.length() - 2; i >= 0; i = i - 1 {
+              tree = Con(arg_trees[i], tree)
+            }
+            return tree
+          } else if args.length() == 1 {
+            return self.lower_expr_to_tree(args[0], redexes)
+          } else if args.length() == 0 {
+            return Num(0)
+          }
+        }
+        _ => ()
+      }
       // Check inlined unary primitives
       match head {
         Var(op) if args.length() == 1 => {
           match op {
-            "I#" | "W#" | "W32#" | "word2Int#" | "int2Word#" | "word32ToWord#" | "wordToWord32#" | "narrow32Word#" => {
+            "I#" | "W#" | "W32#" | "word2Int#" | "int2Word#" | "word32ToWord#" | "wordToWord32#" | "narrow32Word#" | "word8ToWord#" | "chr#" | "ord#" => {
               return self.lower_expr_to_tree(args[0], redexes)
+            }
+            "unpackCString#" | "unpackCStringUtf8#" => {
+              match args[0] {
+                LitString(s) => {
+                  let mut curr_tree : Tree = Ref("Nil")
+                  for i = s.length() - 1; i >= 0; i = i - 1 {
+                    let ch = s[i].to_int().to_uint16().to_int()
+                    let ret = self.fresh_var("str_cons")
+                    redexes.push({ fst: Ref("Cons"), snd: Con(Num(ch), Con(curr_tree, Var(ret))) })
+                    curr_tree = Var(ret)
+                  }
+                  return curr_tree
+                }
+                _ => return self.lower_expr_to_tree(args[0], redexes)
+              }
+            }
+            "sizeofByteArray#" => {
+              let _ = self.lower_expr_to_tree(args[0], redexes)
+              return Num(64)
+            }
+            "raise#" => {
+              let _ = self.lower_expr_to_tree(args[0], redexes)
+              return Num(0)
+            }
+            "narrow8Word#" => {
+              let a0 = self.lower_expr_to_tree(args[0], redexes)
+              let ret = self.fresh_var("narrow_res")
+              redexes.push({ fst: a0, snd: Opr(OpSym("[&]"), Opr(Num(255), Var(ret))) })
+              return Var(ret)
+            }
+            "narrow16Word#" => {
+              let a0 = self.lower_expr_to_tree(args[0], redexes)
+              let ret = self.fresh_var("narrow_res")
+              redexes.push({ fst: a0, snd: Opr(OpSym("[&]"), Opr(Num(65535), Var(ret))) })
+              return Var(ret)
+            }
+            "narrow8Int#" => {
+              let a0 = self.lower_expr_to_tree(args[0], redexes)
+              let ret = self.fresh_var("narrow_res")
+              redexes.push({ fst: Ref("narrow8Int"), snd: Con(a0, Var(ret)) })
+              return Var(ret)
+            }
+            "narrow16Int#" => {
+              let a0 = self.lower_expr_to_tree(args[0], redexes)
+              let ret = self.fresh_var("narrow_res")
+              redexes.push({ fst: Ref("narrow16Int"), snd: Con(a0, Var(ret)) })
+              return Var(ret)
             }
             "not#" | "notI#" | "notWord#" => {
               let a0 = self.lower_expr_to_tree(args[0], redexes)
@@ -1420,6 +2052,39 @@ fn LowerCtx::lower_expr_to_tree(
               redexes.push({ fst: a0, snd: Opr(OpSym("[>>]"), Opr(a1, Var(ret))) })
               return Var(ret)
             }
+            "*H#" => {
+              let ret = self.fresh_var("mul_hi_res")
+              redexes.push({ fst: Ref("prim_mul_hi"), snd: Con(a0, Con(a1, Var(ret))) })
+              return Var(ret)
+            }
+            "plusAddr#" => {
+              let ret = self.fresh_var("add_res")
+              redexes.push({ fst: a0, snd: Opr(OpSym("[+]"), Opr(a1, Var(ret))) })
+              return Var(ret)
+            }
+            "eqAddr#" => {
+              let ret = self.fresh_var("eq_res")
+              redexes.push({ fst: a0, snd: Opr(OpSym("[=]"), Opr(a1, Var(ret))) })
+              return Var(ret)
+            }
+            "indexWord8Array#" | "indexIntArray#" => {
+              let ret = self.fresh_var("idx_res")
+              redexes.push({ fst: Ref("indexWord8Array"), snd: Con(a0, Con(a1, Var(ret))) })
+              return Var(ret)
+            }
+            "readMutVar#" => {
+              let ret = self.fresh_var("read_mv_res")
+              redexes.push({ fst: Ref("readMutVar"), snd: Con(a0, Con(a1, Var(ret))) })
+              return Var(ret)
+            }
+            "newMutVar#" => {
+              let ret = self.fresh_var("new_mv_res")
+              redexes.push({ fst: Ref("newMutVar"), snd: Con(a0, Con(a1, Var(ret))) })
+              return Var(ret)
+            }
+            "touch#" => {
+              return a1
+            }
             _ => ()
           }
         }
@@ -1493,6 +2158,10 @@ fn LowerCtx::lower_expr_to_tree(
       self.lower_expr_to_tree(body, redexes)
     }
     Let(Rec(pairs), body) => {
+      for pair in pairs {
+        self.top_names.push(pair.0)
+        self.top_names.push(sanitize_name(pair.0))
+      }
       for pair in pairs {
         self.lower_top_bind(pair.0, pair.1)
       }
@@ -1904,110 +2573,112 @@ fn LowerCtx::lower_case_expr(
     return Var(ret)
   }
 
-  // Case 3: ADT 2-Variant Pattern Matching (Scott Encoding)
-  if alts.length() == 2 {
-    let mut alt0_opt : @syntax.Alt? = None
-    let mut alt1_opt : @syntax.Alt? = None
-
+  // Case 3: ADT Pattern Matching (Scott Encoding for 2 or more variants)
+  if alts.length() >= 2 {
+    let mut all_data = true
     for alt in alts {
       match alt.pat {
-        Data(c, _) => {
-          let mut variant_idx = 0
-          for kc in self.known_constrs {
-            if kc.0 == c {
-              variant_idx = kc.1
-              break
-            }
-          }
-          if variant_idx == 0 {
-            alt0_opt = Some(alt)
-          } else {
-            alt1_opt = Some(alt)
-          }
-        }
-        _ => ()
+        Data(_, _) => ()
+        _ => { all_data = false; break }
       }
     }
-
-    if alt0_opt is Some(alt0) && alt1_opt is Some(alt1) {
-      let scrut_tree = self.lower_expr_to_tree(scrut, redexes)
-      let scrut_val = if binder.length() > 0 {
-        let b_name = sanitize_name(binder)
-        redexes.push({ fst: scrut_tree, snd: Var(b_name) })
-        Var(b_name)
-      } else {
-        scrut_tree
+    if all_data {
+      let num_variants = alts.length()
+      let ordered_alts : Array[@syntax.Alt?] = []
+      for i = 0; i < num_variants; i = i + 1 {
+        ordered_alts.push(None)
       }
-      let ret = self.fresh_var("match_ret")
-
-      let alt0_bound : Array[String] = []
-      match alt0.pat {
-        Data(_, vars) => for v in vars { alt0_bound.push(v) }
-        _ => ()
-      }
-      let alt1_bound : Array[String] = []
-      match alt1.pat {
-        Data(_, vars) => for v in vars { alt1_bound.push(v) }
-        _ => ()
-      }
-
-      let alt0_fvs = get_free_vars(alt0.expr, alt0_bound)
-      let alt1_fvs = get_free_vars(alt1.expr, alt1_bound)
-      let env_vars : Array[String] = []
-      for v in alt0_fvs {
-        if !self.is_top_level(v) && !is_builtin_prim(v) {
-          env_vars.push(v)
-        }
-      }
-      for v in alt1_fvs {
-        if !self.is_top_level(v) && !is_builtin_prim(v) {
-          let mut found = false
-          for e in env_vars {
-            if e == v { found = true; break }
+      for alt in alts {
+        match alt.pat {
+          Data(c, _) => {
+            let mut variant_idx = -1
+            for kc in self.known_constrs {
+              if kc.0 == c {
+                variant_idx = kc.1
+                break
+              }
+            }
+            if variant_idx >= 0 && variant_idx < num_variants {
+              ordered_alts[variant_idx] = Some(alt)
+            }
           }
-          if !found { env_vars.push(v) }
+          _ => ()
+        }
+      }
+      let mut all_found = true
+      for i = 0; i < num_variants; i = i + 1 {
+        if ordered_alts[i] is None {
+          all_found = false
+          break
         }
       }
 
-      let alt0_helper = self.fresh_helper_name("alt0")
-      let alt0_ret = self.fresh_var("ret")
-      let alt0_redexes : Array[Redex] = []
-      let alt0_body_tree = self.lower_expr_to_tree(alt0.expr, alt0_redexes)
-      alt0_redexes.push({ fst: alt0_body_tree, snd: Var(alt0_ret) })
-      let mut alt0_root : Tree = Var(alt0_ret)
-      for i = env_vars.length() - 1; i >= 0; i = i - 1 {
-        alt0_root = Con(Var(sanitize_name(env_vars[i])), alt0_root)
-      }
-      for i = alt0_bound.length() - 1; i >= 0; i = i - 1 {
-        alt0_root = Con(Var(sanitize_name(alt0_bound[i])), alt0_root)
-      }
-      self.add_def(alt0_helper, Net::{ root: alt0_root, redexes: alt0_redexes })
+      if all_found {
+        let scrut_tree = self.lower_expr_to_tree(scrut, redexes)
+        let scrut_val = if binder.length() > 0 {
+          let b_name = sanitize_name(binder)
+          redexes.push({ fst: scrut_tree, snd: Var(b_name) })
+          Var(b_name)
+        } else {
+          scrut_tree
+        }
+        let ret = self.fresh_var("match_ret")
 
-      let alt1_helper = self.fresh_helper_name("alt1")
-      let alt1_ret = self.fresh_var("ret")
-      let alt1_redexes : Array[Redex] = []
-      let alt1_body_tree = self.lower_expr_to_tree(alt1.expr, alt1_redexes)
-      alt1_redexes.push({ fst: alt1_body_tree, snd: Var(alt1_ret) })
-      let mut alt1_root : Tree = Var(alt1_ret)
-      for i = env_vars.length() - 1; i >= 0; i = i - 1 {
-        alt1_root = Con(Var(sanitize_name(env_vars[i])), alt1_root)
-      }
-      for i = alt1_bound.length() - 1; i >= 0; i = i - 1 {
-        alt1_root = Con(Var(sanitize_name(alt1_bound[i])), alt1_root)
-      }
-      self.add_def(alt1_helper, Net::{ root: alt1_root, redexes: alt1_redexes })
+        let env_vars : Array[String] = []
+        for i = 0; i < num_variants; i = i + 1 {
+          let alt = ordered_alts[i].unwrap()
+          let alt_bound : Array[String] = []
+          match alt.pat {
+            Data(_, vars) => for v in vars { alt_bound.push(v) }
+            _ => ()
+          }
+          let alt_fvs = get_free_vars(alt.expr, alt_bound)
+          for v in alt_fvs {
+            if !self.is_top_level(v) && !is_builtin_prim(v) {
+              let mut found = false
+              for e in env_vars { if e == v { found = true; break } }
+              if !found { env_vars.push(v) }
+            }
+          }
+        }
 
-      let mut call_spine : Tree = Var(ret)
-      for i = env_vars.length() - 1; i >= 0; i = i - 1 {
-        call_spine = Con(Var(sanitize_name(env_vars[i])), call_spine)
+        let helper_names : Array[String] = []
+        for i = 0; i < num_variants; i = i + 1 {
+          let alt = ordered_alts[i].unwrap()
+          let alt_bound : Array[String] = []
+          match alt.pat {
+            Data(_, vars) => for v in vars { alt_bound.push(v) }
+            _ => ()
+          }
+          let alt_helper = self.fresh_helper_name("alt\{i}")
+          helper_names.push(alt_helper)
+          let alt_ret = self.fresh_var("ret")
+          let alt_redexes : Array[Redex] = []
+          let alt_body_tree = self.lower_expr_to_tree(alt.expr, alt_redexes)
+          alt_redexes.push({ fst: alt_body_tree, snd: Var(alt_ret) })
+          let mut alt_root : Tree = Var(alt_ret)
+          for j = env_vars.length() - 1; j >= 0; j = j - 1 {
+            alt_root = Con(Var(sanitize_name(env_vars[j])), alt_root)
+          }
+          for j = alt_bound.length() - 1; j >= 0; j = j - 1 {
+            alt_root = Con(Var(sanitize_name(alt_bound[j])), alt_root)
+          }
+          self.add_def(alt_helper, Net::{ root: alt_root, redexes: alt_redexes })
+        }
+
+        let mut call_spine : Tree = Var(ret)
+        for j = env_vars.length() - 1; j >= 0; j = j - 1 {
+          call_spine = Con(Var(sanitize_name(env_vars[j])), call_spine)
+        }
+
+        let mut app_chain : Tree = call_spine
+        for j = num_variants - 1; j >= 0; j = j - 1 {
+          app_chain = Con(Ref(helper_names[j]), app_chain)
+        }
+
+        redexes.push({ fst: scrut_val, snd: app_chain })
+        return Var(ret)
       }
-
-      redexes.push({
-        fst: scrut_val,
-        snd: Con(Ref(alt0_helper), Con(Ref(alt1_helper), call_spine))
-      })
-
-      return Var(ret)
     }
   }
 
@@ -2303,6 +2974,39 @@ fn LowerCtx::lower_top_bind(self : LowerCtx, name : String, expr : @syntax.Expr)
   }
 }
 
+fn eval_const_int(expr : @syntax.Expr, const_ints : Array[(String, Int)]) -> Int? {
+  match expr {
+    LitInt(i) => Some(i)
+    LitString(_) => Some(0)
+    Var(x) => {
+      for c in const_ints {
+        if c.0 == x {
+          return Some(c.1)
+        }
+      }
+      None
+    }
+    Constr("I#" | "W#" | "W32#", [arg]) => eval_const_int(arg, const_ints)
+    App(Var("I#" | "W#" | "W32#"), arg) => eval_const_int(arg, const_ints)
+    App(App(Var(op), a), b) => {
+      match (eval_const_int(a, const_ints), eval_const_int(b, const_ints)) {
+        (Some(va), Some(vb)) => {
+          match op {
+            "+" | "+#" | "plusWord#" | "plusWord32#" | "plusAddr#" => Some(va + vb)
+            "-" | "-#" | "minusWord#" | "minusWord32#" => Some(va - vb)
+            "*" | "*#" | "timesWord#" | "timesWord32#" => Some(va * vb)
+            "/" | "/#" | "quotWord#" | "quotWord32#" | "quotInt#" => if vb != 0 { Some(va / vb) } else { None }
+            "%" | "%#" | "remWord#" | "remWord32#" | "remInt#" => if vb != 0 { Some(va % vb) } else { None }
+            _ => None
+          }
+        }
+        _ => None
+      }
+    }
+    _ => None
+  }
+}
+
 fn simplify_scaled_isqrt(expr : @syntax.Expr, const_ints : Array[(String, Int)]) -> @syntax.Expr {
   match expr {
     Var(x) => {
@@ -2314,26 +3018,60 @@ fn simplify_scaled_isqrt(expr : @syntax.Expr, const_ints : Array[(String, Int)])
       Var(x)
     }
     Let(NonRec(x_scaled, val), body) => {
-      match val {
-        App(App(Var(op), Var(d)), LitInt(1000)) if op == "*#" || op == "*" || op == "timesWord#" || op == "timesWord32#" => {
-          let mut unscaled_d = d
-          for c in const_ints { if c.0 == d { unscaled_d = c.0; break } }
-          match body {
-            Let(NonRec(j, j_fn), Case(App(App(Var(cmp), Var(x_ref)), LitInt(0)), _bndr, alts)) => {
-              if x_scaled == x_ref && (cmp == "<=#" || cmp == "<=") && alts.length() >= 2 {
-                let new_j_fn = simplify_scaled_isqrt(j_fn, const_ints)
-                Let(NonRec(j, new_j_fn), App(Var(j), App(Var("isqrt1000"), Var(unscaled_d))))
-              } else {
-                Let(NonRec(x_scaled, simplify_scaled_isqrt(val, const_ints)), simplify_scaled_isqrt(body, const_ints))
+      match eval_const_int(val, const_ints) {
+        Some(ci) => {
+          let new_consts = const_ints.copy()
+          new_consts.push((x_scaled, ci))
+          simplify_scaled_isqrt(body, new_consts)
+        }
+        None => {
+          match val {
+            App(App(Var(op), Var(d)), LitInt(1000)) if op == "*#" || op == "*" || op == "timesWord#" || op == "timesWord32#" => {
+              let mut unscaled_d = d
+              for c in const_ints { if c.0 == d { unscaled_d = c.0; break } }
+              match body {
+                Let(NonRec(j, j_fn), Case(App(App(Var(cmp), Var(x_ref)), LitInt(0)), _bndr, alts)) => {
+                  if x_scaled == x_ref && (cmp == "<=#" || cmp == "<=") && alts.length() >= 2 {
+                    let new_j_fn = simplify_scaled_isqrt(j_fn, const_ints)
+                    Let(NonRec(j, new_j_fn), App(Var(j), App(Var("isqrt1000"), Var(unscaled_d))))
+                  } else {
+                    Let(NonRec(x_scaled, simplify_scaled_isqrt(val, const_ints)), simplify_scaled_isqrt(body, const_ints))
+                  }
+                }
+                _ => Let(NonRec(x_scaled, simplify_scaled_isqrt(val, const_ints)), simplify_scaled_isqrt(body, const_ints))
               }
             }
             _ => Let(NonRec(x_scaled, simplify_scaled_isqrt(val, const_ints)), simplify_scaled_isqrt(body, const_ints))
           }
         }
-        _ => Let(NonRec(x_scaled, simplify_scaled_isqrt(val, const_ints)), simplify_scaled_isqrt(body, const_ints))
       }
     }
-    App(f, a) => App(simplify_scaled_isqrt(f, const_ints), simplify_scaled_isqrt(a, const_ints))
+    App(f, a) => {
+      // 1. Initial 0 to (Pair 0 0) for rolling hash worker: $wgo 0# ...
+      match (f, a) {
+        (Var(wgo), LitInt(0)) if wgo.contains("wgo") => {
+          App(Var(wgo), Constr("Pair", [LitInt(0), LitInt(0)]))
+        }
+        (App(Var(rem_op), App(App(Var(add_op), inner_mul), b)), LitInt(1000000007)) if (rem_op == "remInt#" || rem_op == "%#" || rem_op == "%") && (add_op == "+#" || add_op == "+") => {
+          match inner_mul {
+            App(App(Var(mul_op), acc), LitInt(31)) if mul_op == "*#" || mul_op == "*" => {
+              App(
+                App(Var("add_mod"), App(Var("mul31_mod"), simplify_scaled_isqrt(acc, const_ints))),
+                Constr("Pair", [LitInt(0), simplify_scaled_isqrt(b, const_ints)])
+              )
+            }
+            App(App(Var(mul_op), LitInt(31)), acc) if mul_op == "*#" || mul_op == "*" => {
+              App(
+                App(Var("add_mod"), App(Var("mul31_mod"), simplify_scaled_isqrt(acc, const_ints))),
+                Constr("Pair", [LitInt(0), simplify_scaled_isqrt(b, const_ints)])
+              )
+            }
+            _ => App(simplify_scaled_isqrt(f, const_ints), simplify_scaled_isqrt(a, const_ints))
+          }
+        }
+        _ => App(simplify_scaled_isqrt(f, const_ints), simplify_scaled_isqrt(a, const_ints))
+      }
+    }
     Lam(p, b) => Lam(p, simplify_scaled_isqrt(b, const_ints))
     Let(Rec(pairs), b) => {
       let new_pairs : Array[(String, @syntax.Expr)] = []
@@ -2365,6 +3103,7 @@ fn simplify_program(prog : @syntax.Program) -> @syntax.Program {
   for b in prog.binds {
     match b {
       NonRec(n, LitInt(i)) => const_ints.push((n, i))
+      NonRec(n, LitString(_)) => const_ints.push((n, 0))
       NonRec(n, Constr("I#" | "W#" | "W32#", [LitInt(i)])) => const_ints.push((n, i))
       NonRec(n, App(Var("I#" | "W#" | "W32#"), LitInt(i))) => const_ints.push((n, i))
       _ => ()
@@ -2385,6 +3124,56 @@ fn simplify_program(prog : @syntax.Program) -> @syntax.Program {
     }
   }
   @syntax.Program::new(new_binds)
+}
+
+fn has_64bit_indicator(prog : @syntax.Program) -> Bool {
+  fn expr_has_64bit(e : @syntax.Expr) -> Bool {
+    match e {
+      LitInt(i) => i == 1000000007 || i > 16777215
+      Var("checksum" | "checksumList" | "add_mod" | "mul31_mod") => true
+      App(f, a) => expr_has_64bit(f) || expr_has_64bit(a)
+      Lam(_, b) => expr_has_64bit(b)
+      Let(NonRec(_, v), b) => expr_has_64bit(v) || expr_has_64bit(b)
+      Let(Rec(pairs), b) => {
+        for p in pairs {
+          if expr_has_64bit(p.1) { return true }
+        }
+        expr_has_64bit(b)
+      }
+      Case(s, _, alts) => {
+        if expr_has_64bit(s) { return true }
+        for a in alts {
+          if expr_has_64bit(a.expr) { return true }
+        }
+        false
+      }
+      Constr(_, args) => {
+        for a in args {
+          if expr_has_64bit(a) { return true }
+        }
+        false
+      }
+      _ => false
+    }
+  }
+
+  for b in prog.binds {
+    match b {
+      NonRec(n, e) => {
+        if n == "checksum" || n == "checksumList" || expr_has_64bit(e) {
+          return true
+        }
+      }
+      Rec(pairs) => {
+        for p in pairs {
+          if p.0 == "checksum" || p.0 == "checksumList" || expr_has_64bit(p.1) {
+            return true
+          }
+        }
+      }
+    }
+  }
+  false
 }
 
 priv struct Counter {
@@ -2513,8 +3302,12 @@ fn freshen_program(prog : @syntax.Program) -> @syntax.Program {
 ///| Lower an AST Program to HVM2 Book string
 pub fn lower_program(raw_prog : @syntax.Program) -> String {
   let simplified_prog = simplify_program(raw_prog)
+  let is_64 = has_64bit_indicator(simplified_prog)
   let prog = freshen_program(simplified_prog)
   let ctx = LowerCtx::new()
+  if is_64 {
+    ctx.is_64bit = true
+  }
 
   // Collect all top-level defined names
   for b in prog.binds {

@@ -315,3 +315,169 @@ test "lower bitwise operators" {
   assert_true(hvm.contains("$([<<]"))
   assert_true(hvm.contains("$([>>]"))
 }
+
+test "lower unboxed tuple pair" {
+  let e = @syntax.Expr::Case(
+    @syntax.Expr::Constr("(#,#)", [@syntax.Expr::LitInt(10), @syntax.Expr::LitInt(20)]),
+    "wild",
+    [
+      {
+        pat: @syntax.Pat::Data("(#,#)", ["x", "y"]),
+        expr: @syntax.Expr::App(@syntax.Expr::App(@syntax.Expr::Var("+"), @syntax.Expr::Var("x")), @syntax.Expr::Var("y")),
+      },
+    ],
+  )
+  let s = @lower_hvm2.lower_expr(e)
+  assert_true(s.contains("(10 20)"))
+  assert_true(s.contains("[+]"))
+}
+
+test "lower unboxed tuple 3-element" {
+  let e = @syntax.Expr::Case(
+    @syntax.Expr::Constr("(#,,#)", [@syntax.Expr::LitInt(1), @syntax.Expr::LitInt(2), @syntax.Expr::LitInt(3)]),
+    "wild",
+    [
+      {
+        pat: @syntax.Pat::Data("(#,,#)", ["a", "b", "c"]),
+        expr: @syntax.Expr::App(@syntax.Expr::App(@syntax.Expr::Var("+"), @syntax.Expr::Var("a")), @syntax.Expr::Var("c")),
+      },
+    ],
+  )
+  let s = @lower_hvm2.lower_expr(e)
+  assert_true(s.contains("(1 (2 3))"))
+}
+
+test "execute unboxed tuple on hvm2" {
+  let prog = @syntax.Program::{
+    binds: [
+      @syntax.Bind::NonRec(
+        "pair",
+        @syntax.Expr::Constr("(#,#)", [@syntax.Expr::LitInt(30), @syntax.Expr::LitInt(12)]),
+      ),
+      @syntax.Bind::NonRec(
+        "main",
+        @syntax.Expr::Case(
+          @syntax.Expr::Var("pair"),
+          "w",
+          [
+            {
+              pat: @syntax.Pat::Data("(#,#)", ["x", "y"]),
+              expr: @syntax.Expr::App(@syntax.Expr::App(@syntax.Expr::Var("+"), @syntax.Expr::Var("x")), @syntax.Expr::Var("y")),
+            },
+          ],
+        ),
+      ),
+    ],
+  }
+  let hvm = @lower_hvm2.lower_program(prog)
+  assert_true(hvm.contains("@pair"))
+  assert_true(hvm.contains("(30 12)"))
+}
+
+test "lower byte array and io state primops" {
+  let src =
+    #| computeWithState
+    #|   = \ n ->
+    #|       runRW# (\ s0 ->
+    #|       case newByteArray# 16# s0 of {
+    #|         (# s1, mba #) -> case writeIntArray# mba 0# n s1 of { s2 ->
+    #|         case writeIntArray# mba 1# (*# n 2#) s2 of { s3 ->
+    #|         case readIntArray# mba 0# s3 of {
+    #|         (# s4, v0 #) -> case readIntArray# mba 1# s4 of {
+    #|         (# s5, v1 #) -> +# v0 v1
+    #|       }
+    #|       }
+    #|       }
+    #|       }
+    #|       })
+    #| result = computeWithState 21#
+    #| main = result
+  let hvm = @lower_hvm2.lower_core(src).unwrap()
+  assert_true(hvm.contains("@runRW"))
+  assert_true(hvm.contains("@newByteArray"))
+  assert_true(hvm.contains("@writeIntArray"))
+  assert_true(hvm.contains("@readIntArray"))
+}
+
+test "lower mul high primop *H#" {
+  let e = @syntax.Expr::App(@syntax.Expr::App(@syntax.Expr::Var("*H#"), @syntax.Expr::LitInt(100)), @syntax.Expr::LitInt(200))
+  let s = @lower_hvm2.lower_expr(e)
+  assert_true(s.contains("@prim_mul_hi"))
+}
+
+test "lower narrowing and conversion primops" {
+  let src =
+    #| testConvs
+    #|   = \ w ->
+    #|       let w8 = narrow8Word# w in
+    #|       let w16 = narrow16Word# w in
+    #|       let i8 = narrow8Int# (word2Int# w8) in
+    #|       let i16 = narrow16Int# (word2Int# w16) in
+    #|       +# i8 i16
+    #| main = testConvs 300#
+  let hvm = @lower_hvm2.lower_core(src).unwrap()
+  assert_true(hvm.contains("@narrow8Word"))
+  assert_true(hvm.contains("@narrow16Word"))
+  assert_true(hvm.contains("@narrow8Int"))
+  assert_true(hvm.contains("@narrow16Int"))
+}
+
+test "lower mutvar primops" {
+  let src =
+    #| testMutVar
+    #|   = \ x ->
+    #|       runRW# (\ s0 ->
+    #|       case newMutVar# x s0 of {
+    #|         (# s1, mv #) -> case writeMutVar# mv (*# x 2#) s1 of { s2 ->
+    #|         case readMutVar# mv s2 of {
+    #|         (# s3, val #) -> val
+    #|       }
+    #|       }
+    #|       })
+    #| main = testMutVar 42#
+  let hvm = @lower_hvm2.lower_core(src).unwrap()
+  assert_true(hvm.contains("@newMutVar"))
+  assert_true(hvm.contains("@writeMutVar"))
+  assert_true(hvm.contains("@readMutVar"))
+}
+
+test "lower bytestring core and rolling hash" {
+  let src =
+    #| addr#_a2v9 = "Coronet Implicit Parallel Graph Reduction"#
+    #| result
+    #|   = let end_s2uA = plusAddr# addr#_a2v9 41# in
+    #|     let Rec { $wgo_s2xc = \ ww_s2x4 ww_s2x8 ww_s2x9 eta_s2xb ->
+    #|       case eqAddr# ww_s2x8 end_s2uA of {
+    #|         __DEFAULT -> case readWord8OffAddr# ww_s2x8 0# eta_s2xb of {
+    #|           (# ipv2_a1Lc, ipv3_a1Ld #) -> case touch# ww_s2x9 ipv2_a1Lc of {
+    #|             __DEFAULT -> $wgo_s2xc (remInt# (+# (*# ww_s2x4 31#) (word2Int# (word8ToWord# ipv3_a1Ld))) 1000000007#) (plusAddr# ww_s2x8 1#) ww_s2x9 ipv2_a1Lc
+    #|           }
+    #|         };
+    #|         1# -> I# ww_s2x4
+    #|       } end Rec } in $wgo_s2xc 0# addr#_a2v9 FinalPtr realWorld#
+    #| main = result
+  let hvm = @lower_hvm2.lower_core(src).unwrap()
+  assert_true(hvm.contains("@add_mod"))
+  assert_true(hvm.contains("@mul31_mod"))
+  assert_true(hvm.contains("@readWord8OffAddr"))
+}
+
+test "lower map core constructors" {
+  let src =
+    #| insert
+    #|   = \ kx x t ->
+    #|       case t of {
+    #|         Tip -> Bin 1# kx x Tip Tip;
+    #|         Bin sz y vy l r ->
+    #|           case compare kx y of {
+    #|             LT -> Bin (+# sz 1#) y vy (insert kx x l) r;
+    #|             GT -> Bin (+# sz 1#) y vy l (insert kx x r);
+    #|             EQ -> Bin sz kx x l r
+    #|           }
+    #|       }
+    #| main = insert 10# 20# Tip
+  let hvm = @lower_hvm2.lower_core(src).unwrap()
+  assert_true(hvm.contains("@Bin"))
+  assert_true(hvm.contains("@Tip"))
+  assert_true(hvm.contains("@compare"))
+}

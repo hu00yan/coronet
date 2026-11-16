@@ -155,6 +155,29 @@ pub fn link_programs(programs : Array[Program]) -> Program {
     }
   }
 
+  // Case C: GHC unique suffix match (e.g. fv is Data_ListOps_$wmySum or $wmySum,
+  // and defined symbol has a GHC unique suffix like Data_ListOps_$wmySum_sKG).
+  for fv in free_vars {
+    if !seen_names.contains(fv) {
+      let mut matched : String? = None
+      let fv_prefix = fv + "_"
+      let unqual_prefix = get_unqualified_name(fv) + "_"
+      for def_name in seen_names {
+        if def_name.has_prefix(fv_prefix) || def_name.has_prefix(unqual_prefix) {
+          matched = Some(def_name)
+          break
+        }
+      }
+      match matched {
+        Some(target) => {
+          seen_names.push(fv)
+          unified_binds.push(Bind::NonRec(fv, Expr::Var(target)))
+        }
+        None => ()
+      }
+    }
+  }
+
   // 4. Ensure entry point 'main = result' if result exists and main does not
   if !seen_names.contains("main") && seen_names.contains("result") {
     unified_binds.push(Bind::NonRec("main", Expr::Var("result")))

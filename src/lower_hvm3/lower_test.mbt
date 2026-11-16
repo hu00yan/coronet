@@ -615,3 +615,117 @@ test "lower sha256 rotate and hashstate snippet" {
   assert_true(hvm3_code.contains("(| (>> x i) (<< x j))"))
   assert_true(hvm3_code.contains("@main = ((@rotr 305419896) 4)"))
 }
+
+test "lower unboxed tuple pair" {
+  let src =
+    #|swap = \ p ->
+    #|  case p of {
+    #|    Pair x y -> Pair y x
+    #|  }
+    #|main = swap (Pair 10# 20#)
+  let prog = @syntax.parse_program(src).unwrap()
+  let hvm3_code = @lower_hvm3.lower(prog)
+
+  assert_true(hvm3_code.contains("@Pair = (λ&a0 (λ&a1 (λ&c0 ((c0 a0) a1))))"))
+  assert_true(hvm3_code.contains("(p (λ&x (λ&y ((@Pair y) x))))"))
+  assert_true(hvm3_code.contains("@main = (@swap ((@Pair 10) 20))"))
+}
+
+test "lower unboxed tuple 3-tuple" {
+  let src =
+    #|sum3 = \ t ->
+    #|  case t of {
+    #|    Tuple3 a b c -> +# (+# a b) c
+    #|  }
+    #|main = sum3 (Tuple3 1# 2# 3#)
+  let prog = @syntax.parse_program(src).unwrap()
+  let hvm3_code = @lower_hvm3.lower(prog)
+
+  assert_true(
+    hvm3_code.contains(
+      "@Tuple3 = (λ&a0 (λ&a1 (λ&a2 (λ&c0 (((c0 a0) a1) a2)))))",
+    ),
+  )
+  assert_true(hvm3_code.contains("(t (λ&a (λ&b (λ&c (+ (+ a b) c)))))"))
+  assert_true(hvm3_code.contains("@main = (@sum3 (((@Tuple3 1) 2) 3))"))
+}
+
+test "lower 01_unboxed_tuple fixture" {
+  let src =
+    #|divModPrim
+    #|  = \ a b ->
+    #|      (# quotInt# a b, remInt# a b #)
+    #|result
+    #|  = case divModPrim 123# 10# of ds {
+    #|      (# q, r #) -> I# (+# (*# q 10#) r)
+    #|    }
+    #|main = result
+  let prog = @syntax.parse_program(src).unwrap()
+  let hvm3_code = @lower_hvm3.lower(prog)
+
+  assert_true(hvm3_code.contains("@divModPrim = (λ&a (λ&b ((@Pair ((@sdiv a) b)) ((@srem a) b))))"))
+  assert_true(hvm3_code.contains("@main = @result"))
+}
+
+test "lower 02_io_state byte array primops fixture" {
+  let src =
+    #|result
+    #|  = runRW# (\ s0_aDl ->
+    #|      case newByteArray# 16# s0_aDl of ds_dZy {
+    #|        (# ipv_sZV, ipv_sZW #) -> case writeIntArray# ipv_sZW 0# 21# ipv_sZV of s2_aDo {
+    #|        __DEFAULT -> case writeIntArray# ipv_sZW 1# 42# s2_aDo of s3_aDp {
+    #|        __DEFAULT -> case readIntArray# ipv_sZW 0# s3_aDp of ds_dZD {
+    #|        (# ipv_sZY, ipv_sZZ #) -> case readIntArray# ipv_sZW 1# ipv_sZY of ds_dZF {
+    #|        (# ipv_s101, ipv_s102 #) -> I# (+# ipv_sZZ ipv_s102)
+    #|      }
+    #|      }
+    #|      }
+    #|      }
+    #|      })
+    #|main = result
+  let prog = @syntax.parse_program(src).unwrap()
+  let hvm3_code = @lower_hvm3.lower(prog)
+
+  assert_true(hvm3_code.contains("@runRW_ = (λ&f (f (λ&i 0)))"))
+  assert_true(hvm3_code.contains("@newByteArray_ = (λ&size (λ&s ((@Pair (λ&i 0)) 0)))"))
+  assert_true(hvm3_code.contains("@writeIntArray_ = (λ&arr (λ&idx (λ&val (λ&s (λ&i (~ (== i idx) { 0: (s i) 1+_: val }))))))"))
+  assert_true(hvm3_code.contains("@readIntArray_ = (λ&arr (λ&idx (λ&s ((@Pair s) (s idx)))))"))
+  assert_true(hvm3_code.contains("@main = @result"))
+}
+
+test "lower Addr# string literals and CString unpack" {
+  let src =
+    #|str = "Hello World!"#
+    #|result
+    #|  = case unpackCString# str of {
+    #|      Nil -> 0#;
+    #|      Cons c cs -> case c of { C# ch -> ord# ch }
+    #|    }
+    #|main = result
+  let prog = @syntax.parse_program(src).unwrap()
+  let hvm3_code = @lower_hvm3.lower(prog)
+
+  assert_true(hvm3_code.contains("@unpackCString_ = (λ&addr (addr (λ&str_fn (λ&list (λ&curr_off list)))))"))
+  assert_true(hvm3_code.contains("@str = (((@Tuple3 (λ&i (~ i { 0: 72 1: 101"))
+  assert_true(hvm3_code.contains("@main = @result"))
+}
+
+test "lower compare and Ordering constructors" {
+  let src =
+    #|result
+    #|  = case compare () 10# 20# of {
+    #|      LT -> 1#;
+    #|      EQ -> 2#;
+    #|      GT -> 3#
+    #|    }
+    #|main = result
+  let prog = @syntax.parse_program(src).unwrap()
+  let hvm3_code = @lower_hvm3.lower(prog)
+
+  assert_true(hvm3_code.contains("@compare = (λ&dict (λ&a (λ&b (~ ((@slt a) b) { 0: (~ (== a b) { 0: @GT 1+p: @EQ }) 1+p: @LT }))))"))
+  assert_true(hvm3_code.contains("@LT = (λ&c0 (λ&c1 (λ&c2 c0)))"))
+  assert_true(hvm3_code.contains("@EQ = (λ&c0 (λ&c1 (λ&c2 c1)))"))
+  assert_true(hvm3_code.contains("@GT = (λ&c0 (λ&c1 (λ&c2 c2)))"))
+  assert_true(hvm3_code.contains("@main = @result"))
+}
+

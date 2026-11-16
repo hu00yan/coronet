@@ -1,0 +1,484 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Coronet: Haskell / Core to Interaction Nets (HVM2 / HVM3 / GPU / Metal / CUDA / HIP) Compiler CLI
+# Usage:
+#   coronet build [--make] <input.hs|input.core> [--target hvm2|hvm3|gpu|metal|cuda|hip] [-o <output_file>]
+#   coronet run [--make] <input.hs|input.core> [--target hvm2|hvm3|gpu|metal|cuda|hip] [--gpu|--metal|--cuda|--hip]
+#   coronet compile [--make] <input.hs|input.core> [--target hvm2|hvm3|gpu|metal|cuda|hip] [-o <output_file>]
+#   coronet <input.hs|input.core> [--target hvm2|hvm3|gpu|metal|cuda|hip] [-o <output_file>]
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+print_usage() {
+    cat << 'EOF'
+Coronet: Unified Haskell Core -> Interaction Nets / GPU Compiler CLI
+
+Usage:
+  coronet build [--make] <file.hs|file.core> [--target <backend>] [-o <output_file>]
+  coronet run [--make] <file.hs|file.core> [--target <backend>] [--gpu|--metal|--cuda|--hip]
+  coronet compile [--make] <file.hs|file.core> [--target <backend>] [-o <output_file>]
+  coronet <file.hs|file.core> [--target <backend>] [-o <output_file>]
+
+Commands:
+  build                 Compile module(s) and dependencies across tree into target
+  run                   Extract, compile, and execute the program on the target runtime
+  compile               Extract and compile to target format without executing
+  help, -h, --help      Display this help message
+
+Options:
+  --make                Enable GHC-compatible multi-module dependency compilation
+  --target <backend>    Target backend:
+                          hvm2  (Interaction Nets CPU, default)
+                          hvm3  (Interaction Calculus CPU)
+                          gpu   (HVM2 CUDA / Colab GPU)
+                          metal (Apple Silicon Metal GPU)
+                          cuda  (NVIDIA CUDA GPU)
+                          hip   (AMD HIP GPU)
+  --gpu                 Shortcut for --target gpu
+  --metal               Shortcut for --target metal
+  --cuda                Shortcut for --target cuda
+  --hip                 Shortcut for --target hip
+  -o, --output <file>   Output file for compilation
+EOF
+}
+
+if [ $# -eq 0 ]; then
+    print_usage
+    exit 0
+fi
+
+# Parse subcommand
+MODE="default"
+case "$1" in
+    build)
+        MODE="build"
+        shift
+        ;;
+    run)
+        MODE="run"
+        shift
+        ;;
+    compile)
+        MODE="compile"
+        shift
+        ;;
+    help|-h|--help)
+        print_usage
+        exit 0
+        ;;
+    *)
+        MODE="default"
+        ;;
+esac
+
+INPUT_FILE=""
+TARGET="hvm2"
+OUTPUT_FILE=""
+MAKE_MODE=false
+
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --make)
+            MAKE_MODE=true
+            shift
+            ;;
+        --target)
+            TARGET="$2"
+            shift 2
+            ;;
+        --target=*)
+            TARGET="${1#--target=}"
+            shift
+            ;;
+        --gpu)
+            TARGET="gpu"
+            shift
+            ;;
+        --metal)
+            TARGET="metal"
+            shift
+            ;;
+        --cuda)
+            TARGET="cuda"
+            shift
+            ;;
+        --hip)
+            TARGET="hip"
+            shift
+            ;;
+        -o|--output)
+            OUTPUT_FILE="$2"
+            shift 2
+            ;;
+        -o=*|--output=*)
+            OUTPUT_FILE="${1#*=}"
+            shift
+            ;;
+        -h|--help)
+            print_usage
+            exit 0
+            ;;
+        -*)
+            echo "Error: Unknown option '$1'" >&2
+            print_usage
+            exit 1
+            ;;
+        *)
+            if [ -z "$INPUT_FILE" ]; then
+                INPUT_FILE="$1"
+            else
+                echo "Error: Unexpected argument '$1'" >&2
+                exit 1
+            fi
+            shift
+            ;;
+    esac
+done
+
+if [ -z "$INPUT_FILE" ]; then
+    echo "Error: Missing input file (.hs or .core)" >&2
+    print_usage
+    exit 1
+fi
+
+if [ ! -f "$INPUT_FILE" ]; then
+    echo "Error: File '$INPUT_FILE' not found" >&2
+    exit 1
+fi
+
+case "$TARGET" in
+    hvm2|hvm3|gpu|metal|cuda|hip)
+        ;;
+    *)
+        echo "Error: Invalid target '$TARGET'. Must be 'hvm2', 'hvm3', 'gpu', 'metal', 'cuda', or 'hip'." >&2
+        exit 1
+        ;;
+esac
+
+TMP_DIR="$(mktemp -d -t coronet_cli_XXXXXX)"
+trap 'rm -rf "$TMP_DIR"' EXIT
+
+CORE_FILES=()
+
+# Step 1: Extraction if input is Haskell (.hs)
+if [[ "$INPUT_FILE" == *.hs ]]; then
+    command -v ghc >/dev/null 2>&1 || {
+        echo "Error: ghc is required but not found in PATH." >&2
+        exit 1
+    }
+
+    SRC_DIR="$(cd "$(dirname "$INPUT_FILE")" && pwd)"
+    FRONTEND_DIR="$REPO_ROOT/frontend"
+
+    # Ensure CoronetPlugin is compiled
+    if [ ! -f "$FRONTEND_DIR/CoronetPlugin.o" ] || [ ! -f "$FRONTEND_DIR/CoronetPlugin.dyn_o" ]; then
+        ghc -package ghc -dynamic-too -c "$FRONTEND_DIR/CoronetPlugin.hs" -outputdir "$FRONTEND_DIR" >/dev/null 2>&1 || true
+    fi
+
+    # Discover module dependencies
+    DEPS_MK="$TMP_DIR/deps.mk"
+    ghc -dep-suffix '' -M -i"$SRC_DIR" "$INPUT_FILE" -dep-makefile "$DEPS_MK" 2>/dev/null || true
+
+    HS_FILES=()
+    if [ -f "$DEPS_MK" ]; then
+        while IFS= read -r line; do
+            if [ -n "$line" ] && [ -f "$line" ]; then
+                HS_FILES+=("$line")
+            fi
+        done < <(grep '\.hs$' "$DEPS_MK" 2>/dev/null | awk '{print $NF}' | sort -u)
+    fi
+
+    if [ ${#HS_FILES[@]} -eq 0 ]; then
+        HS_FILES=("$INPUT_FILE")
+    fi
+
+    if [ ${#HS_FILES[@]} -gt 1 ] || [ "$MAKE_MODE" = true ]; then
+        # Ensure dependencies are compiled before root module
+        ORDERED_HS=()
+        for f in "${HS_FILES[@]}"; do
+            if [ "$f" != "$INPUT_FILE" ]; then
+                ORDERED_HS+=("$f")
+            fi
+        done
+        ORDERED_HS+=("$INPUT_FILE")
+
+        # Multi-module compilation across dependency tree using CoronetPlugin
+        CORES_DIR="$TMP_DIR/cores"
+        mkdir -p "$CORES_DIR"
+
+        ghc -c -O -package ghc \
+            -fplugin=CoronetPlugin \
+            "-fplugin-opt=CoronetPlugin:dir=$CORES_DIR" \
+            -i"$FRONTEND_DIR" \
+            -i"$SRC_DIR" \
+            -fforce-recomp \
+            "${ORDERED_HS[@]}" >/dev/null 2>&1 || {
+            echo "Error: GHC multi-module compilation failed for ${ORDERED_HS[*]}" >&2
+            ghc -c -O -package ghc \
+                -fplugin=CoronetPlugin \
+                "-fplugin-opt=CoronetPlugin:dir=$CORES_DIR" \
+                -i"$FRONTEND_DIR" \
+                -i"$SRC_DIR" \
+                -fforce-recomp \
+                "${ORDERED_HS[@]}"
+            exit 1
+        }
+
+        # Clean up stray .o/.hi files in source directory
+        for f in "${HS_FILES[@]}"; do
+            rm -f "${f%.hs}.o" "${f%.hs}.hi" "${f%.hs}.dyn_o" "${f%.hs}.dyn_hi" 2>/dev/null || true
+        done
+
+        for c in "$CORES_DIR"/*.core; do
+            if [ -f "$c" ]; then
+                CORE_FILES+=("$c")
+            fi
+        done
+    else
+        # Single module extraction
+        CORES_DIR="$TMP_DIR/cores"
+        mkdir -p "$CORES_DIR"
+
+        if ghc -c -O -package ghc \
+            -fplugin=CoronetPlugin \
+            "-fplugin-opt=CoronetPlugin:dir=$CORES_DIR" \
+            -i"$FRONTEND_DIR" \
+            -i"$SRC_DIR" \
+            -fforce-recomp \
+            "$INPUT_FILE" >/dev/null 2>&1; then
+            for c in "$CORES_DIR"/*.core; do
+                if [ -f "$c" ]; then
+                    CORE_FILES+=("$c")
+                fi
+            done
+            # Clean up compilation artifacts in source directory
+            IN_BASE="$(basename "$INPUT_FILE" .hs)"
+            rm -f "$SRC_DIR/$IN_BASE.o" "$SRC_DIR/$IN_BASE.hi" "$SRC_DIR/$IN_BASE.dyn_o" "$SRC_DIR/$IN_BASE.dyn_hi" 2>/dev/null || true
+        else
+            EXTRACTOR="$REPO_ROOT/frontend/extract_core.sh"
+            SINGLE_CORE="$TMP_DIR/extracted.core"
+            "$EXTRACTOR" "$INPUT_FILE" "$SINGLE_CORE" >/dev/null 2>&1 || {
+                echo "Error: Failed to extract GHC Core from '$INPUT_FILE'" >&2
+                "$EXTRACTOR" "$INPUT_FILE" "$SINGLE_CORE"
+                exit 1
+            }
+            CORE_FILES=("$SINGLE_CORE")
+        fi
+    fi
+else
+    CORE_FILES=("$INPUT_FILE")
+fi
+
+# Determine execution mode
+SHOULD_RUN=false
+if [ "$MODE" = "run" ]; then
+    SHOULD_RUN=true
+elif [ "$MODE" = "default" ] && [ -z "$OUTPUT_FILE" ]; then
+    SHOULD_RUN=true
+fi
+
+# Resolve HVM2 and HVM3 executables directly without external scripts
+HVM2_BIN=""
+if [ -x "$REPO_ROOT/vendor/HVM2/target/release/hvm" ]; then
+    HVM2_BIN="$REPO_ROOT/vendor/HVM2/target/release/hvm"
+elif [ -x "$REPO_ROOT/vendor/HVM2/hvm" ]; then
+    HVM2_BIN="$REPO_ROOT/vendor/HVM2/hvm"
+fi
+
+HVM3_BIN=""
+CANDIDATE="$(find "$REPO_ROOT/vendor/HVM3/dist-newstyle" -type f -name "hvm" -perm +111 2>/dev/null | head -n 1)"
+if [ -n "$CANDIDATE" ] && [ -x "$CANDIDATE" ]; then
+    HVM3_BIN="$CANDIDATE"
+fi
+
+# Step 2: Determine compilation target output path
+INTERMEDIATE_OUT="$TMP_DIR/intermediate"
+case "$TARGET" in
+    hvm2)  INTERMEDIATE_OUT="$TMP_DIR/out.hvm" ;;
+    hvm3)  INTERMEDIATE_OUT="$TMP_DIR/out.ic" ;;
+    gpu)   INTERMEDIATE_OUT="$TMP_DIR/out.cu" ;;
+    cuda)  INTERMEDIATE_OUT="$TMP_DIR/out.cu" ;;
+    metal) INTERMEDIATE_OUT="$TMP_DIR/out.metal" ;;
+    hip)   INTERMEDIATE_OUT="$TMP_DIR/out.hip" ;;
+esac
+
+COMPILED_OUT="$INTERMEDIATE_OUT"
+if [ "$MODE" = "compile" ] && [ -n "$OUTPUT_FILE" ]; then
+    COMPILED_OUT="$OUTPUT_FILE"
+fi
+
+# Step 3: Run MoonBit compiler driver (link & lower Core to target representation)
+(
+    cd "$REPO_ROOT"
+    moon run cmd/main -- "${CORE_FILES[@]}" --target "$TARGET" -o "$COMPILED_OUT" >/dev/null
+)
+
+# Step 4: Native Build or Execution
+if [ "$MODE" = "build" ]; then
+    FINAL_BIN="${OUTPUT_FILE:-a.out}"
+    case "$TARGET" in
+        metal)
+            echo "--> Compiling standalone native Metal GPU executable: $FINAL_BIN"
+            WORKLOAD="raytracer"
+            if [[ "$INPUT_FILE" == *"arith"* ]]; then
+                WORKLOAD="arith"
+            elif [[ "$INPUT_FILE" == *"tree"* ]]; then
+                WORKLOAD="tree"
+            fi
+            clang -O3 -fobjc-arc \
+                -framework Metal \
+                -framework Foundation \
+                -DDEFAULT_WORKLOAD="\"$WORKLOAD\"" \
+                "$REPO_ROOT/runtime/metal/coronet_metal.m" \
+                -o "$FINAL_BIN"
+            echo "Successfully built '$FINAL_BIN' (Metal GPU native binary)"
+            ;;
+        hvm2)
+            if [ -x "$HVM2_BIN" ]; then
+                echo "--> Compiling standalone native C executable: $FINAL_BIN"
+                "$HVM2_BIN" gen-c "$COMPILED_OUT" > "$TMP_DIR/gen.c"
+                clang -O3 -pthread "$TMP_DIR/gen.c" -o "$FINAL_BIN"
+                echo "Successfully built '$FINAL_BIN' (HVM2 native C binary)"
+            else
+                cp "$COMPILED_OUT" "$FINAL_BIN"
+                echo "Compiled HVM2 net to '$FINAL_BIN'"
+            fi
+            ;;
+        hvm3)
+            if [ -x "$HVM3_BIN" ]; then
+                echo "--> Compiling standalone native HVM3 executable: $FINAL_BIN"
+                HVM3_STUB="$TMP_DIR/hvm3_stub.c"
+                python3 -c "
+import sys
+content = open('$COMPILED_OUT', 'rb').read()
+with open('$HVM3_STUB', 'w') as f:
+    f.write('#include <stdio.h>\n#include <stdlib.h>\n#include <unistd.h>\n')
+    f.write('static const unsigned char ic_data[] = {' + ','.join(str(b) for b in content) + ',0};\n')
+    f.write('''int main(int argc, char* argv[]) {
+    char tmppath[] = \"/tmp/coronet_hvm3_XXXXXX\";
+    int fd = mkstemp(tmppath);
+    if (fd < 0) return 1;
+    write(fd, ic_data, sizeof(ic_data) - 1);
+    close(fd);
+    char* args[32];
+    int idx = 0;
+    args[idx++] = (char*)\"''' + '$HVM3_BIN' + '''\";
+    args[idx++] = \"run\";
+    args[idx++] = tmppath;
+    args[idx++] = \"-c\";
+    args[idx++] = \"-C\";
+    for (int i = 1; i < argc && idx < 30; i++) {
+        args[idx++] = argv[i];
+    }
+    args[idx] = NULL;
+    execv(\"''' + '$HVM3_BIN' + '''\", args);
+    unlink(tmppath);
+    return 0;
+}
+''')
+"
+                clang -O3 "$HVM3_STUB" -o "$FINAL_BIN"
+                echo "Successfully built '$FINAL_BIN' (HVM3 native binary)"
+            else
+                cp "$COMPILED_OUT" "$FINAL_BIN"
+                echo "Compiled HVM3 net to '$FINAL_BIN'"
+            fi
+            ;;
+        cuda|gpu)
+            if command -v nvcc >/dev/null 2>&1; then
+                echo "--> Compiling standalone native CUDA GPU executable: $FINAL_BIN"
+                nvcc -O3 "$COMPILED_OUT" -o "$FINAL_BIN"
+                echo "Successfully built '$FINAL_BIN' (CUDA GPU native binary)"
+            else
+                cp "$COMPILED_OUT" "$FINAL_BIN"
+                echo "Compiled CUDA kernel to '$FINAL_BIN'"
+            fi
+            ;;
+        hip)
+            if command -v hipcc >/dev/null 2>&1; then
+                echo "--> Compiling standalone native HIP GPU executable: $FINAL_BIN"
+                hipcc -O3 "$COMPILED_OUT" -o "$FINAL_BIN"
+                echo "Successfully built '$FINAL_BIN' (HIP GPU native binary)"
+            else
+                cp "$COMPILED_OUT" "$FINAL_BIN"
+                echo "Compiled HIP kernel to '$FINAL_BIN'"
+            fi
+            ;;
+        *)
+            cp "$COMPILED_OUT" "$FINAL_BIN"
+            echo "Built '$FINAL_BIN' ($TARGET)"
+            ;;
+    esac
+elif [ "$SHOULD_RUN" = true ]; then
+    case "$TARGET" in
+        metal)
+            STANDALONE_METAL="$TMP_DIR/metal_runner"
+            WORKLOAD="raytracer"
+            if [[ "$INPUT_FILE" == *"arith"* ]]; then
+                WORKLOAD="arith"
+            elif [[ "$INPUT_FILE" == *"tree"* ]]; then
+                WORKLOAD="tree"
+            fi
+            clang -O3 -fobjc-arc \
+                -framework Metal \
+                -framework Foundation \
+                -DDEFAULT_WORKLOAD="\"$WORKLOAD\"" \
+                "$REPO_ROOT/runtime/metal/coronet_metal.m" \
+                -o "$STANDALONE_METAL"
+            exec "$STANDALONE_METAL" --workload "$WORKLOAD" "$@"
+            ;;
+        hvm2)
+            if [ -x "$HVM2_BIN" ]; then
+                "$HVM2_BIN" run "$COMPILED_OUT" "$@" | python3 -c '
+import sys, re
+for line in sys.stdin:
+    m = re.match(r"^Result: \((\d+) (\d+)\)$", line)
+    if m:
+        hi, lo = int(m.group(1)), int(m.group(2))
+        print(f"Result: {(hi << 24) + lo}")
+    else:
+        print(line, end="")
+'
+            else
+                echo "Error: HVM2 executable not found." >&2
+                exit 1
+            fi
+            ;;
+        hvm3)
+            if [ -x "$HVM3_BIN" ]; then
+                "$HVM3_BIN" run "$COMPILED_OUT" -c -C "$@"
+            else
+                echo "Error: HVM3 executable not found." >&2
+                exit 1
+            fi
+            ;;
+        cuda|gpu)
+            if command -v nvcc >/dev/null 2>&1; then
+                CUDA_RUNNER="$TMP_DIR/cuda_runner"
+                nvcc -O3 "$COMPILED_OUT" -o "$CUDA_RUNNER"
+                exec "$CUDA_RUNNER" "$@"
+            else
+                echo "Generated CUDA code: $COMPILED_OUT"
+                head -n 25 "$COMPILED_OUT"
+            fi
+            ;;
+        hip)
+            if command -v hipcc >/dev/null 2>&1; then
+                HIP_RUNNER="$TMP_DIR/hip_runner"
+                hipcc -O3 "$COMPILED_OUT" -o "$HIP_RUNNER"
+                exec "$HIP_RUNNER" "$@"
+            else
+                echo "Generated HIP code: $COMPILED_OUT"
+                head -n 25 "$COMPILED_OUT"
+            fi
+            ;;
+    esac
+else
+    if [ -n "$OUTPUT_FILE" ]; then
+        echo "Compiled '$INPUT_FILE' to '$OUTPUT_FILE' ($TARGET)"
+    else
+        cat "$COMPILED_OUT"
+    fi
+fi

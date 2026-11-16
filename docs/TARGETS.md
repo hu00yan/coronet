@@ -295,3 +295,30 @@ The sample programs in `tests/samples/` verify all core semantics across both en
 | `04_higher_order` | Lambdas, closures, higher-order map | `tests/samples/hvm2/04_higher_order.hvm` | `tests/samples/hvm3/04_higher_order.hvm` | `42` / `12` |
 
 Both runners are executable and ready for integration into the Coronet compiler driver and end-to-end test runner (`tests/e2e/run_all.sh`).
+
+---
+
+## 6. Native GPU Targets: Metal, CUDA & HIP
+
+Coronet provides native GPU execution engines supporting zero-copy execution and massively parallel graph rewriting:
+
+### 6.1 Apple Silicon Metal (`--target metal`)
+- **Location**: `runtime/metal/coronet_metal.metal` (MSL Compute Shader) and `runtime/metal/coronet_metal.m` (Objective-C Host Harness)
+- **Runner**: `./scripts/run_metal.sh`
+- **Features**:
+  * Zero-Copy Unified Memory (`MTLResourceStorageModeShared`) bypassing PCIe copy bottlenecks.
+  * Native 32-bit atomic primitives (`atomic_uint`) for lock-free variable substitution.
+  * Supports scalable parallel workloads:
+    - Arithmetic reduction: `./scripts/run_metal.sh --workload arith`
+    - Parallel tree reduction: `./scripts/run_metal.sh --workload tree`
+    - Scalable Raytracer: `./scripts/run_metal.sh --workload raytracer -r 32` (or `-r 64`)
+  * Machine-readable output: `./scripts/run_metal.sh --json`
+
+### 6.2 NVIDIA CUDA (`--target cuda`)
+- **Location**: `runtime/cuda/coronet_cuda.cu`
+- **Features**: Hierarchical Redex Bag, warp ballot intrinsics, lock-free 64-bit atomic CAS substitutions, dynamic shared memory tuning.
+
+### 6.3 AMD ROCm HIP (`--target hip`)
+- **Location**: `runtime/hip/coronet_hip.cpp`
+- **Features**: AMD Instinct and Radeon support via `hipLaunchKernelGGL`, wavefront-64 alignment, and lock-free interaction net reduction.
+

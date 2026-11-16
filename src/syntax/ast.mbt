@@ -191,6 +191,42 @@ pub fn Alt::data(name : String, binders : Array[String], expr : Expr) -> Alt {
 }
 
 ///|
+pub fn Alt::unboxed_tuple(vars : Array[String], expr : Expr) -> Alt {
+  let cname = if vars.length() == 0 {
+    "(##)"
+  } else if vars.length() == 1 {
+    "(# #)"
+  } else {
+    let buf = StringBuilder()
+    buf.write_string("(#")
+    for _ in 1..<vars.length() {
+      buf.write_string(",")
+    }
+    buf.write_string("#)")
+    buf.to_string()
+  }
+  { pat: Data(cname, vars), expr }
+}
+
+///|
+pub fn Pat::unboxed_tuple(vars : Array[String]) -> Pat {
+  let cname = if vars.length() == 0 {
+    "(##)"
+  } else if vars.length() == 1 {
+    "(# #)"
+  } else {
+    let buf = StringBuilder()
+    buf.write_string("(#")
+    for _ in 1..<vars.length() {
+      buf.write_string(",")
+    }
+    buf.write_string("#)")
+    buf.to_string()
+  }
+  Data(cname, vars)
+}
+
+///|
 pub fn Bind::non_rec(name : String, expr : Expr) -> Bind {
   NonRec(name, expr)
 }
@@ -261,6 +297,40 @@ pub fn Expr::case_(scrutinee : Expr, binder : String, alts : Array[Alt]) -> Expr
 ///|
 pub fn Expr::constr(name : String, args : Array[Expr]) -> Expr {
   Constr(name, args)
+}
+
+///| Construct an unboxed tuple expression: (# a, b #)
+pub fn Expr::unboxed_tuple(elements : Array[Expr]) -> Expr {
+  let cname = if elements.length() == 0 {
+    "(##)"
+  } else if elements.length() == 1 {
+    "(# #)"
+  } else {
+    let buf = StringBuilder()
+    buf.write_string("(#")
+    for _ in 1..<elements.length() {
+      buf.write_string(",")
+    }
+    buf.write_string("#)")
+    buf.to_string()
+  }
+  Constr(cname, elements)
+}
+
+///| Construct a boxed tuple expression: (a, b)
+pub fn Expr::tuple(elements : Array[Expr]) -> Expr {
+  let cname = if elements.length() == 0 {
+    "()"
+  } else {
+    let buf = StringBuilder()
+    buf.write_string("(")
+    for _ in 1..<elements.length() {
+      buf.write_string(",")
+    }
+    buf.write_string(")")
+    buf.to_string()
+  }
+  Constr(cname, elements)
 }
 
 ///| Unwind nested App(App(f, a), b) into (f, [a, b])

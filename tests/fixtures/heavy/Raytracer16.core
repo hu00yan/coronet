@@ -1,0 +1,494 @@
+Rec {
+appendL
+  = \ xs_aYF ys_aYG ->
+      case xs_aYF of wild_X1E {
+        Nil -> ys_aYG;
+        Cons z_aYH zs_aYI -> Cons z_aYH (appendL zs_aYI ys_aYG)
+      };
+end Rec }
+
+sceneLight_s1M4
+  = I# 500#
+
+sceneLight_s1M5
+  = I# 1000#
+
+sceneLight_s1M7
+  = Vec3 sceneLight_s1M4 sceneLight_s1M5 sceneLight_s1M4
+
+sceneLight_s1M8
+  = I# 800#
+
+sceneLight
+  = Light sceneLight_s1M7 sceneLight_s1M8
+
+Rec {
+isqrtStep
+  = \ n_aXF x_aXG ->
+      case x_aXG of wild_a1MS {
+        I# x_a1MT -> case x_a1MT of wild_X1E {
+        __DEFAULT -> case n_aXF of wild_a1N0 {
+        I# x_a1N1 -> let yn#_a2LS = <# wild_X1E 0# in let c0#_a2LT = andI# (<# x_a1N1 0#) (notI# yn#_a2LS) in let c1#_a2LU = andI# (># x_a1N1 0#) yn#_a2LS in case -# (quotInt# (+# x_a1N1 (-# c0#_a2LT c1#_a2LU)) wild_X1E) (orI# c0#_a2LT c1#_a2LU) of ds2_a1N6 {
+        __DEFAULT -> let x_a2KG = uncheckedIShiftRA# (+# wild_X1E ds2_a1N6) 1# in case >=# x_a2KG wild_X1E of lwild_s2KL {
+        __DEFAULT -> isqrtStep wild_a1N0 (I# x_a2KG);
+        1# -> wild_a1MS
+      }
+      }
+      };
+        -1# -> case n_aXF of wild_a2Ku {
+        I# x_a2Kv -> case x_a2Kv of wild_X1G {
+        __DEFAULT -> let c0#_a2LT = andI# (<# wild_X1G 0#) -2# in let c1#_a2LU = andI# (># wild_X1G 0#) 1# in let x_a2KG = uncheckedIShiftRA# (+# -1# (-# (quotInt# (+# wild_X1G (-# c0#_a2LT c1#_a2LU)) -1#) (orI# c0#_a2LT c1#_a2LU))) 1# in case >=# x_a2KG -1# of lwild_s2KL {
+        __DEFAULT -> isqrtStep wild_a2Ku (I# x_a2KG);
+        1# -> wild_a1MS
+      };
+        -9223372036854775808# -> case overflowError of wild_48_0 {
+
+      }
+      }
+      };
+        0# -> case divZeroError of wild_48_0 {
+
+      }
+      }
+      };
+end Rec }
+
+sceneSpheres_s1Ne
+  = I# 0#
+
+sceneSpheres_s1Ng
+  = I# -1000#
+
+sceneSpheres_s1Nh
+  = Vec3 sceneSpheres_s1Ne sceneSpheres_s1Ne sceneSpheres_s1Ng
+
+sceneSpheres_s1Ni
+  = I# 400#
+
+sceneSpheres_s1Nj
+  = I# 1#
+
+sceneSpheres_s1Nk
+  = Sphere sceneSpheres_s1Nh sceneSpheres_s1Ni sceneSpheres_s1Nj
+
+sceneSpheres_s1Nl
+  = I# -400#
+
+sceneSpheres_s1Nm
+  = I# 200#
+
+sceneSpheres_s1Nn
+  = I# -1200#
+
+sceneSpheres_s1No
+  = Vec3 sceneSpheres_s1Nl sceneSpheres_s1Nm sceneSpheres_s1Nn
+
+sceneSpheres_s1Np
+  = I# 300#
+
+sceneSpheres_s1Nq
+  = I# 2#
+
+sceneSpheres_s1Nr
+  = Sphere sceneSpheres_s1No sceneSpheres_s1Np sceneSpheres_s1Nq
+
+sceneSpheres_s1Nt
+  = I# -200#
+
+sceneSpheres_s1Nu
+  = I# -800#
+
+sceneSpheres_s1Nv
+  = Vec3 sceneSpheres_s1Ni sceneSpheres_s1Nt sceneSpheres_s1Nu
+
+sceneSpheres_s1Nw
+  = I# 250#
+
+sceneSpheres_s1Nx
+  = I# 3#
+
+sceneSpheres_s1Ny
+  = Sphere sceneSpheres_s1Nv sceneSpheres_s1Nw sceneSpheres_s1Nx
+
+sceneSpheres_s1Nz
+  = Cons sceneSpheres_s1Ny Nil
+
+sceneSpheres_s1NA
+  = Cons sceneSpheres_s1Nr sceneSpheres_s1Nz
+
+sceneSpheres
+  = Cons sceneSpheres_s1Nk sceneSpheres_s1NA
+
+Rec {
+checksumList
+  = \ xs_aYJ ->
+      case xs_aYJ of wild_X1E {
+        Nil -> sceneSpheres_s1Ne;
+        Cons p_aYK ps_aYL -> case p_aYK of wild_a1MS {
+        I# x_a1MT -> case checksumList ps_aYL of wild1_a1NV {
+        I# y_a1NW -> let x#_a2LV = +# x_a1MT (*# 31# y_a1NW) in case remInt# x#_a2LV 1000000007# of r#_a2LY {
+        __DEFAULT -> I# (+# r#_a2LY (andI# (-# 0# (andI# (<# x#_a2LV 0#) 1#)) 1000000007#));
+        0# -> sceneSpheres_s1Ne
+      }
+      }
+      }
+      };
+end Rec }
+
+isqrt
+  = \ n_aL4 ->
+      case n_aL4 of wild_a2KO {
+        I# x_a2KP -> case <=# x_a2KP 0# of lwild_s2KU {
+        __DEFAULT -> isqrtStep wild_a2KO (I# (+# (uncheckedIShiftRA# x_a2KP 1#) 1#));
+        1# -> sceneSpheres_s1Ne
+      }
+      }
+
+vscale
+  = \ ds_d1KO s_aL3 ->
+      case ds_d1KO of wild_X1E {
+        Vec3 x_aL0 y_aL1 z_aL2 -> Vec3 (case x_aL0 of wild_a1NS {
+        I# x_a1NT -> case s_aL3 of wild1_a1NV {
+        I# y_a1NW -> I# (let x#_a2LQ = *# x_a1NT y_a1NW in let c0#_a2LT = <# x#_a2LQ 0# in -# (quotInt# (+# x#_a2LQ c0#_a2LT) 1000#) c0#_a2LT)
+      }
+      }) (case y_aL1 of wild_a1NS {
+        I# x_a1NT -> case s_aL3 of wild1_a1NV {
+        I# y_a1NW -> I# (let x#_a2LQ = *# x_a1NT y_a1NW in let c0#_a2LT = <# x#_a2LQ 0# in -# (quotInt# (+# x#_a2LQ c0#_a2LT) 1000#) c0#_a2LT)
+      }
+      }) (case z_aL2 of wild_a1NS {
+        I# x_a1NT -> case s_aL3 of wild1_a1NV {
+        I# y_a1NW -> I# (let x#_a2LQ = *# x_a1NT y_a1NW in let c0#_a2LT = <# x#_a2LQ 0# in -# (quotInt# (+# x#_a2LQ c0#_a2LT) 1000#) c0#_a2LT)
+      }
+      })
+      }
+
+vdot
+  = \ ds_d1KS ds_d1KT ->
+      case ds_d1KS of wild_X1E {
+        Vec3 x1_aFD y1_aFE z1_aFF -> case ds_d1KT of wild_X1 {
+        Vec3 x2_aFG y2_aFH z2_aFI -> case x1_aFD of wild_a1NS {
+        I# x_a1NT -> case x2_aFG of wild1_a1NV {
+        I# y_a1NW -> case y1_aFE of wild_X1F {
+        I# x_X1G -> case y2_aFH of wild1_X1H {
+        I# y_X1I -> case z1_aFF of wild_X1J {
+        I# x_X1K -> case z2_aFI of wild1_X1L {
+        I# y_X1M -> I# (let x#_a2LQ = +# (+# (*# x_a1NT y_a1NW) (*# x_X1G y_X1I)) (*# x_X1K y_X1M) in let c0#_a2LT = <# x#_a2LQ 0# in -# (quotInt# (+# x#_a2LQ c0#_a2LT) 1000#) c0#_a2LT)
+      }
+      }
+      }
+      }
+      }
+      }
+      }
+      }
+
+lvl_s2Jj
+  = Vec3 sceneSpheres_s1Ne sceneSpheres_s1Ne sceneLight_s1M5
+
+vnorm
+  = \ v_aXI ->
+      case v_aXI of wild_X1E {
+        Vec3 x_aXJ y_aXK z_aXL -> case x_aXJ of wild_a1NS {
+        I# x_a1NT -> case y_aXK of wild_X1F {
+        I# x_X1G -> case z_aXL of wild_X1J {
+        I# x_X1K -> let x#_a2LQ = +# (+# (*# x_a1NT x_a1NT) (*# x_X1G x_X1G)) (*# x_X1K x_X1K) in let c0#_a2LT = <# x#_a2LQ 0# in let x_a2KP = *# (-# (quotInt# (+# x#_a2LQ c0#_a2LT) 1000#) c0#_a2LT) 1000# in let $j_s2LH = \ x_X1L ->
+      case <=# x_X1L 0# of lwild_s2L4 {
+        __DEFAULT -> Vec3 (case x_X1L of wild_X1M {
+        __DEFAULT -> let x#_X1N = *# x_a1NT 1000# in let yn#_X1O = <# wild_X1M 0# in let c0#_X1P = andI# (<# x#_X1N 0#) (notI# yn#_X1O) in let c1#_X1Q = andI# (># x#_X1N 0#) yn#_X1O in case -# (quotInt# (+# x#_X1N (-# c0#_X1P c1#_X1Q)) wild_X1M) (orI# c0#_X1P c1#_X1Q) of ds2_X1R {
+        __DEFAULT -> I# ds2_X1R
+      };
+        -1# -> case *# x_a1NT 1000# of wild_X1O {
+        __DEFAULT -> I# (let c0#_X1Q = andI# (<# wild_X1O 0#) -2# in let c1#_X1R = andI# (># wild_X1O 0#) 1# in -# (quotInt# (+# wild_X1O (-# c0#_X1Q c1#_X1R)) -1#) (orI# c0#_X1Q c1#_X1R));
+        -9223372036854775808# -> overflowError
+      };
+        0# -> divZeroError
+      }) (case x_X1L of wild_X1M {
+        __DEFAULT -> let x#_X1N = *# x_X1G 1000# in let yn#_X1O = <# wild_X1M 0# in let c0#_X1P = andI# (<# x#_X1N 0#) (notI# yn#_X1O) in let c1#_X1Q = andI# (># x#_X1N 0#) yn#_X1O in case -# (quotInt# (+# x#_X1N (-# c0#_X1P c1#_X1Q)) wild_X1M) (orI# c0#_X1P c1#_X1Q) of ds2_X1R {
+        __DEFAULT -> I# ds2_X1R
+      };
+        -1# -> case *# x_X1G 1000# of wild_X1O {
+        __DEFAULT -> I# (let c0#_X1Q = andI# (<# wild_X1O 0#) -2# in let c1#_X1R = andI# (># wild_X1O 0#) 1# in -# (quotInt# (+# wild_X1O (-# c0#_X1Q c1#_X1R)) -1#) (orI# c0#_X1Q c1#_X1R));
+        -9223372036854775808# -> overflowError
+      };
+        0# -> divZeroError
+      }) (case x_X1L of wild_X1M {
+        __DEFAULT -> let x#_X1N = *# x_X1K 1000# in let yn#_X1O = <# wild_X1M 0# in let c0#_X1P = andI# (<# x#_X1N 0#) (notI# yn#_X1O) in let c1#_X1Q = andI# (># x#_X1N 0#) yn#_X1O in case -# (quotInt# (+# x#_X1N (-# c0#_X1P c1#_X1Q)) wild_X1M) (orI# c0#_X1P c1#_X1Q) of ds2_X1R {
+        __DEFAULT -> I# ds2_X1R
+      };
+        -1# -> case *# x_X1K 1000# of wild_X1O {
+        __DEFAULT -> I# (let c0#_X1Q = andI# (<# wild_X1O 0#) -2# in let c1#_X1R = andI# (># wild_X1O 0#) 1# in -# (quotInt# (+# wild_X1O (-# c0#_X1Q c1#_X1R)) -1#) (orI# c0#_X1Q c1#_X1R));
+        -9223372036854775808# -> overflowError
+      };
+        0# -> divZeroError
+      });
+        1# -> lvl_s2Jj
+      } in case <=# x_a2KP 0# of lwild_s2KU {
+        __DEFAULT -> case isqrtStep (I# x_a2KP) (I# (+# (uncheckedIShiftRA# x_a2KP 1#) 1#)) of wild_a2KO {
+        I# x_X1L -> $j_s2LH x_X1L
+      };
+        1# -> $j_s2LH 0#
+      }
+      }
+      }
+      }
+      }
+
+vsub
+  = \ ds_d1L2 ds_d1L3 ->
+      case ds_d1L2 of wild_X1E {
+        Vec3 x1_aFx y1_aFy z1_aFz -> case ds_d1L3 of wild_X1 {
+        Vec3 x2_aFA y2_aFB z2_aFC -> Vec3 (- x1_aFx x2_aFA) (- y1_aFy y2_aFB) (- z1_aFz z2_aFC)
+      }
+      }
+
+lvl_s2Ju
+  = I# -1#
+
+intersectSphere
+  = \ ds_d1L7 ds_d1L8 ->
+      case ds_d1L7 of wild_X1E {
+        Ray orig_aXO dir_aXP -> case ds_d1L8 of wild_X1 {
+        Sphere center_aXQ radius_aXR ds_d1Le -> case orig_aXO of wild_X1F {
+        Vec3 x1_aFx y1_aFy z1_aFz -> case center_aXQ of wild_X1G {
+        Vec3 x2_aFA y2_aFB z2_aFC -> case dir_aXP of wild_X1H {
+        Vec3 x2_aFG y2_aFH z2_aFI -> case x1_aFx of wild_a1O0 {
+        I# x_a1O1 -> case x2_aFA of wild1_a1O3 {
+        I# y_a1O4 -> case x2_aFG of wild1_a1NV {
+        I# y_a1NW -> case y1_aFy of wild_X1I {
+        I# x_X1J -> case y2_aFB of wild1_X1K {
+        I# y_X1L -> case y2_aFH of wild1_X1N {
+        I# y_X1O -> case z1_aFz of wild_X1P {
+        I# x_X1Q -> case z2_aFC of wild1_X1R {
+        I# y_X1S -> case z2_aFI of wild1_X1U {
+        I# y_X1V -> case radius_aXR of wild_X27 {
+        I# x_X28 -> let x_a1NT = -# x_a1O1 y_a1O4 in let x_X1M = -# x_X1J y_X1L in let x_X1T = -# x_X1Q y_X1S in let x#_a2LQ = +# (+# (*# x_a1NT y_a1NW) (*# x_X1M y_X1O)) (*# x_X1T y_X1V) in let c0#_a2LT = <# x#_a2LQ 0# in let x_X1W = *# 2# (-# (quotInt# (+# x#_a2LQ c0#_a2LT) 1000#) c0#_a2LT) in let x#_X1X = +# (+# (*# y_a1NW y_a1NW) (*# y_X1O y_X1O)) (*# y_X1V y_X1V) in let c0#_X1Y = <# x#_X1X 0# in let y_X1Z = -# (quotInt# (+# x#_X1X c0#_X1Y) 1000#) c0#_X1Y in let x#_X25 = +# (+# (*# x_a1NT x_a1NT) (*# x_X1M x_X1M)) (*# x_X1T x_X1T) in let c0#_X26 = <# x#_X25 0# in let x#_X29 = *# x_X28 x_X28 in let c0#_X2a = <# x#_X29 0# in let x_a2L8 = -# (*# x_X1W x_X1W) (*# (*# 4# y_X1Z) (-# (-# (quotInt# (+# x#_X25 c0#_X26) 1000#) c0#_X26) (-# (quotInt# (+# x#_X29 c0#_X2a) 1000#) c0#_X2a))) in case <# x_a2L8 0# of lwild_s2Lq {
+        __DEFAULT -> let x_a2KP = *# x_a2L8 1000# in let $j_s2Ld = \ y_X2b ->
+      case *# 2# y_X1Z of wild_X2c {
+        __DEFAULT -> let yn#_X2d = <# wild_X2c 0# in let a_s2M4 = -# (negateInt# (*# x_X1W 1000#)) y_X2b in let c0#_X2f = andI# (<# a_s2M4 0#) (notI# yn#_X2d) in let c1#_X2e = andI# (># a_s2M4 0#) yn#_X2d in case -# (quotInt# (+# a_s2M4 (-# c0#_X2f c1#_X2e)) wild_X2c) (orI# c0#_X2f c1#_X2e) of ds2_X2g {
+        __DEFAULT -> case ># ds2_X2g 10# of lwild_s2Lp {
+        __DEFAULT -> lvl_s2Ju;
+        1# -> I# ds2_X2g
+      }
+      };
+        -1# -> case -# (negateInt# (*# x_X1W 1000#)) y_X2b of wild_X2e {
+        __DEFAULT -> let c0#_X2g = andI# (<# wild_X2e 0#) -2# in let c1#_X2h = andI# (># wild_X2e 0#) 1# in let ds2_X2i = -# (quotInt# (+# wild_X2e (-# c0#_X2g c1#_X2h)) -1#) (orI# c0#_X2g c1#_X2h) in case ># ds2_X2i 10# of lwild_s2Lp {
+        __DEFAULT -> lvl_s2Ju;
+        1# -> I# ds2_X2i
+      };
+        -9223372036854775808# -> case overflowError of wild_48_0 {
+
+      }
+      };
+        0# -> case divZeroError of wild_48_0 {
+
+      }
+      } in case <=# x_a2KP 0# of lwild_s2KU {
+        __DEFAULT -> case isqrtStep (I# x_a2KP) (I# (+# (uncheckedIShiftRA# x_a2KP 1#) 1#)) of wild1_X2b {
+        I# y_X2c -> $j_s2Ld y_X2c
+      };
+        1# -> $j_s2Ld 0#
+      };
+        1# -> lvl_s2Ju
+      }
+      }
+      }
+      }
+      }
+      }
+      }
+      }
+      }
+      }
+      }
+      }
+      }
+      }
+      }
+      }
+
+vadd
+  = \ ds_d1Lf ds_d1Lg ->
+      case ds_d1Lf of wild_X1E {
+        Vec3 x1_aCM y1_aCN z1_aCO -> case ds_d1Lg of wild_X1 {
+        Vec3 x2_aCP y2_aCQ z2_aCR -> Vec3 (+ x1_aCM x2_aCP) (+ y1_aCN y2_aCQ) (+ z1_aCO z2_aCR)
+      }
+      }
+
+shadeRay
+  = \ ds_d1Lk idx_aYe t_aYf ds_d1Ll ->
+      case ds_d1Lk of wild_X1E {
+        Ray orig_aYc dir_aYd -> case ds_d1Ll of wild_X1 {
+        Light lpos_aYg intensity_aYh -> case idx_aYe of wild_X2 {
+        I# ds_d1LE -> let $j_s2Kn = \ x_a1MT ->
+      case orig_aYc of wild_X1F {
+        Vec3 x1_aCM y1_aCN z1_aCO -> case dir_aYd of wild_X1G {
+        Vec3 x_aL0 y_aL1 z_aL2 -> let hit_s2M3 = case z1_aCO of wild_a1MS {
+        I# x_X1H -> case z_aL2 of wild_a1NS {
+        I# x_a1NT -> case t_aYf of wild1_a1NV {
+        I# y_a1NW -> I# (let x#_a2LQ = *# x_a1NT y_a1NW in let c0#_a2LT = <# x#_a2LQ 0# in +# x_X1H (-# (quotInt# (+# x#_a2LQ c0#_a2LT) 1000#) c0#_a2LT))
+      }
+      }
+      } in let hit_s2M2 = case y1_aCN of wild_a1MS {
+        I# x_X1H -> case y_aL1 of wild_a1NS {
+        I# x_a1NT -> case t_aYf of wild1_a1NV {
+        I# y_a1NW -> I# (let x#_a2LQ = *# x_a1NT y_a1NW in let c0#_a2LT = <# x#_a2LQ 0# in +# x_X1H (-# (quotInt# (+# x#_a2LQ c0#_a2LT) 1000#) c0#_a2LT))
+      }
+      }
+      } in let hit_s2M1 = case x1_aCM of wild_a1MS {
+        I# x_X1H -> case x_aL0 of wild_a1NS {
+        I# x_a1NT -> case t_aYf of wild1_a1NV {
+        I# y_a1NW -> I# (let x#_a2LQ = *# x_a1NT y_a1NW in let c0#_a2LT = <# x#_a2LQ 0# in +# x_X1H (-# (quotInt# (+# x#_a2LQ c0#_a2LT) 1000#) c0#_a2LT))
+      }
+      }
+      } in let $j_s2LK = \ x1_aFD y1_aFE z1_aFF ->
+      case lpos_aYg of wild_X1H {
+        Vec3 x1_aFx y1_aFy z1_aFz -> case vnorm (Vec3 (- x1_aFx hit_s2M1) (- y1_aFy hit_s2M2) (- z1_aFz hit_s2M3)) of wild_X1I {
+        Vec3 x2_aFG y2_aFH z2_aFI -> case x1_aFD of wild_a1NS {
+        I# x_a1NT -> case x2_aFG of wild1_a1NV {
+        I# y_a1NW -> case y1_aFE of wild_X1J {
+        I# x_X1K -> case y2_aFH of wild1_X1L {
+        I# y_X1M -> case z1_aFF of wild_X1N {
+        I# x_X1O -> case z2_aFI of wild1_X1P {
+        I# y_X1Q -> let x#_a2LQ = +# (+# (*# x_a1NT y_a1NW) (*# x_X1K y_X1M)) (*# x_X1O y_X1Q) in let c0#_a2LT = <# x#_a2LQ 0# in let ds2_a1N6 = -# (quotInt# (+# x#_a2LQ c0#_a2LT) 1000#) c0#_a2LT in let $j_s2Kl = \ x_X1R ->
+      case intensity_aYh of wild1_X1S {
+        I# y_X1T -> I# (let x#_X1U = *# x_X1R y_X1T in let c0#_X1V = <# x#_X1U 0# in +# x_a1MT (-# (quotInt# (+# x#_X1U c0#_X1V) 1000#) c0#_X1V))
+      } in case <# ds2_a1N6 0# of lwild_s2Lr {
+        __DEFAULT -> $j_s2Kl ds2_a1N6;
+        1# -> $j_s2Kl 0#
+      }
+      }
+      }
+      }
+      }
+      }
+      }
+      }
+      } in case ds_d1LE of ds_X3 {
+        __DEFAULT -> case vnorm (Vec3 (case hit_s2M1 of wild_a1O0 {
+        I# x_a1O1 -> I# (-# x_a1O1 400#)
+      }) (case hit_s2M2 of wild_a1O0 {
+        I# x_a1O1 -> I# (-# x_a1O1 -200#)
+      }) (case hit_s2M3 of wild_a1O0 {
+        I# x_a1O1 -> I# (-# x_a1O1 -800#)
+      })) of wild_X1H {
+        Vec3 x1_aFD y1_aFE z1_aFF -> $j_s2LK x1_aFD y1_aFE z1_aFF
+      };
+        0# -> case vnorm (Vec3 hit_s2M1 hit_s2M2 (case hit_s2M3 of wild_a1O0 {
+        I# x_a1O1 -> I# (-# x_a1O1 -1000#)
+      })) of wild_X1H {
+        Vec3 x1_aFD y1_aFE z1_aFF -> $j_s2LK x1_aFD y1_aFE z1_aFF
+      };
+        1# -> case vnorm (Vec3 (case hit_s2M1 of wild_a1O0 {
+        I# x_a1O1 -> I# (-# x_a1O1 -400#)
+      }) (case hit_s2M2 of wild_a1O0 {
+        I# x_a1O1 -> I# (-# x_a1O1 200#)
+      }) (case hit_s2M3 of wild_a1O0 {
+        I# x_a1O1 -> I# (-# x_a1O1 -1200#)
+      })) of wild_X1H {
+        Vec3 x1_aFD y1_aFE z1_aFF -> $j_s2LK x1_aFD y1_aFE z1_aFF
+      }
+      }
+      }
+      } in case ds_d1LE of ds_X3 {
+        __DEFAULT -> $j_s2Kn 300#;
+        0# -> $j_s2Kn 100#;
+        1# -> $j_s2Kn 200#
+      }
+      }
+      }
+      }
+
+lvl_s2JI
+  = I# 20#
+
+Rec {
+findClosest
+  = \ ray_aY2 spheres_aY3 bestIdx_aY4 bestT_aY5 curIdx_aY6 light_aY7 ->
+      case spheres_aY3 of wild_X1E {
+        Nil -> case bestIdx_aY4 of wild_a2L7 {
+        I# x_a2L8 -> case <# x_a2L8 0# of lwild_s2Ls {
+        __DEFAULT -> shadeRay ray_aY2 wild_a2L7 bestT_aY5 light_aY7;
+        1# -> lvl_s2JI
+      }
+      };
+        Cons s_aY8 rest_aY9 -> case intersectSphere ray_aY2 s_aY8 of wild_a2Lj {
+        I# x_a2Lk -> let idx_s2I6 = case curIdx_aY6 of wild_a1MS {
+        I# x_a1MT -> I# (+# x_a1MT 1#)
+      } in case ># x_a2Lk 0# of lwild_s2Lu {
+        __DEFAULT -> findClosest ray_aY2 rest_aY9 bestIdx_aY4 bestT_aY5 idx_s2I6 light_aY7;
+        1# -> case bestT_aY5 of wild1_a2La {
+        I# y_a2Lb -> case <# x_a2Lk y_a2Lb of lwild_s2Lt {
+        __DEFAULT -> findClosest ray_aY2 rest_aY9 bestIdx_aY4 wild1_a2La idx_s2I6 light_aY7;
+        1# -> findClosest ray_aY2 rest_aY9 idx_s2I6 wild_a2Lj idx_s2I6 light_aY7
+      }
+      }
+      }
+      }
+      };
+end Rec }
+
+lvl_s2JL
+  = I# 999999#
+
+traceRay
+  = \ ray_aXZ spheres_aY0 light_aY1 ->
+      findClosest ray_aXZ spheres_aY0 lvl_s2Ju lvl_s2JL lvl_s2Ju light_aY1
+
+Rec {
+renderRow
+  = \ y_aYo x_aYp width_aYq spheres_aYr light_aYs ->
+      case x_aYp of wild_a2KF {
+        I# x_a2KG -> case width_aYq of wild1_a2KI {
+        I# y_a2KJ -> case >=# x_a2KG y_a2KJ of lwild_s2LB {
+        __DEFAULT -> Cons (findClosest (Ray lvl_s2Jj (vnorm (Vec3 (case y_a2KJ of wild_X1F {
+        __DEFAULT -> let x#_a2LQ = *# (-# x_a2KG (uncheckedIShiftRA# wild_X1F 1#)) 800# in let yn#_a2LS = <# wild_X1F 0# in let c0#_a2LT = andI# (<# x#_a2LQ 0#) (notI# yn#_a2LS) in let c1#_a2LU = andI# (># x#_a2LQ 0#) yn#_a2LS in case -# (quotInt# (+# x#_a2LQ (-# c0#_a2LT c1#_a2LU)) wild_X1F) (orI# c0#_a2LT c1#_a2LU) of ds2_a1N6 {
+        __DEFAULT -> I# ds2_a1N6
+      };
+        -1# -> case *# 800# x_a2KG of lwild_s2LP {
+        __DEFAULT -> I# (let x#_a2LQ = -# lwild_s2LP -800# in let c0#_a2LT = andI# (<# x#_a2LQ 0#) -2# in let c1#_a2LU = andI# (># x#_a2LQ 0#) 1# in -# (quotInt# (+# x#_a2LQ (-# c0#_a2LT c1#_a2LU)) -1#) (orI# c0#_a2LT c1#_a2LU));
+        9223372036854775008# -> overflowError
+      };
+        0# -> divZeroError
+      }) (case y_a2KJ of wild_X1F {
+        __DEFAULT -> case y_aYo of wild_a1O0 {
+        I# x_a1O1 -> let x#_a2LQ = *# (-# x_a1O1 (uncheckedIShiftRA# wild_X1F 1#)) 800# in let yn#_a2LS = <# wild_X1F 0# in let c0#_a2LT = andI# (<# x#_a2LQ 0#) (notI# yn#_a2LS) in let c1#_a2LU = andI# (># x#_a2LQ 0#) yn#_a2LS in case -# (quotInt# (+# x#_a2LQ (-# c0#_a2LT c1#_a2LU)) wild_X1F) (orI# c0#_a2LT c1#_a2LU) of ds2_a1N6 {
+        __DEFAULT -> I# ds2_a1N6
+      }
+      };
+        -1# -> case y_aYo of wild_a1O0 {
+        I# x_a1O1 -> case *# 800# x_a1O1 of lwild_s2LO {
+        __DEFAULT -> I# (let x#_a2LQ = -# lwild_s2LO -800# in let c0#_a2LT = andI# (<# x#_a2LQ 0#) -2# in let c1#_a2LU = andI# (># x#_a2LQ 0#) 1# in -# (quotInt# (+# x#_a2LQ (-# c0#_a2LT c1#_a2LU)) -1#) (orI# c0#_a2LT c1#_a2LU));
+        9223372036854775008# -> overflowError
+      }
+      };
+        0# -> divZeroError
+      }) sceneSpheres_s1Ng))) spheres_aYr lvl_s2Ju lvl_s2JL lvl_s2Ju light_aYs) (renderRow y_aYo (I# (+# x_a2KG 1#)) wild1_a2KI spheres_aYr light_aYs);
+        1# -> Nil
+      }
+      }
+      };
+end Rec }
+
+Rec {
+renderGrid
+  = \ y_aYy height_aYz width_aYA spheres_aYB light_aYC ->
+      case y_aYy of wild_a2KF {
+        I# x_a2KG -> case height_aYz of wild1_a2KI {
+        I# y_a2KJ -> case >=# x_a2KG y_a2KJ of lwild_s2LC {
+        __DEFAULT -> appendL (renderRow wild_a2KF sceneSpheres_s1Ne width_aYA spheres_aYB light_aYC) (renderGrid (I# (+# x_a2KG 1#)) wild1_a2KI width_aYA spheres_aYB light_aYC);
+        1# -> Nil
+      }
+      }
+      };
+end Rec }
+
+lvl_s2M7
+  = I# 16#
+
+lvl_s2M9
+  = renderGrid sceneSpheres_s1Ne lvl_s2M7 lvl_s2M7 sceneSpheres sceneLight
+
+result
+  = checksumList lvl_s2M9
+
+main = result
