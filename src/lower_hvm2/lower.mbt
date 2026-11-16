@@ -198,6 +198,9 @@ pub fn sanitize_name(name : String) -> String {
     "tag_Value" => "tag_Value"
     "patError" | "patError#" => "patError"
     "eqString" => "eqString"
+    "&&" | "and" => "logical_and"
+    "||" | "or" => "logical_or"
+    "isTrue#" | "isTrue" => "isTrue"
     "++" | "_plus__plus_" | "append" => "append"
     "realWorld#" | "void#" => "realWorld"
     "overflowError" => "overflowError"
@@ -223,6 +226,16 @@ pub fn sanitize_name(name : String) -> String {
       }
       buf.to_string()
     }
+  }
+}
+
+///| Primitives whose application is the crash value and whose arguments are
+///| therefore never evaluated.
+pub fn is_crash_prim(name : String) -> Bool {
+  match name {
+    "error" | "errorWithoutStackTrace" | "undefined" | "patError" | "patError#" |
+    "absentError" | "raise#" | "raiseIO#" => true
+    _ => false
   }
 }
 
@@ -295,6 +308,10 @@ pub fn is_builtin_prim(name : String) -> Bool {
     "Eq" | "C:Eq" | "Show" | "C:Show" | "C" | "C_Eq" => true
     "tag_Literal" | "tag_Bool" | "tag_AltCon" | "tag_CoreBind" | "tag_CoreExpr" | "tag_Value" => true
     "tagToEnum#" | "dataToTagSmall#" | "patError" | "patError#" | "eqString" | "_plus__plus_" | "append" => true
+    "reallyUnsafePtrEquality#" | "reallyUnsafePtrEquality" => true
+    "lazy" => true
+    "error" | "errorWithoutStackTrace" | "undefined" => true
+    "&&" | "||" | "isTrue#" | "isTrue" => true
     "map" | "filter" | "elem" | "notElem" | "concatMap" | "fst" | "snd" => true
     "$fEqList_$s$c_ne_1" | "_fEqList__s_c_ne_1" | "$fEqList_$c_eq_" | "_fEqList__c_eq_" => true
     "$fEqTuple2" | "_fEqTuple2" | "$fEqList_$s$fEqList1" | "_fEqList__s_fEqList1" => true
@@ -1116,6 +1133,15 @@ fn LowerCtx::add_builtin_prims(self : LowerCtx) -> Unit {
     redexes: [{ fst: Num(0), snd: Var("ret") }],
   })
 
+  // reallyUnsafePtrEquality# a b = 0#. Pointer identity is not observable in a
+  // pure net, and GHC only promises that True implies equality, so False is
+  // always sound. Programs keep working; some identity fast paths just stop
+  // short-circuiting.
+  self.add_def("reallyUnsafePtrEquality_hash", Net::{
+    root: Con(Era, Con(Era, Var("ret"))),
+    redexes: [{ fst: Num(0), snd: Var("ret") }],
+  })
+
   self.add_def("check_gt59", Net::{
     root: Con(Var("hi"), Con(Var("lo"), Var("ret"))),
     redexes: [
@@ -1335,6 +1361,28 @@ fn LowerCtx::add_builtin_prims(self : LowerCtx) -> Unit {
     root: Con(Var("a"), Con(Var("s"), Var("ret"))),
     redexes: [{ fst: Var("ret"), snd: Con(Var("s"), Var("a")) }],
   })
+  // error msg = a value. There is no exception channel; see docs/real_world_gaps.md.
+  self.add_def("error", Net::{
+    root: Con(Era, Var("ret")),
+    redexes: [{ fst: Num(0), snd: Var("ret") }],
+  })
+  // isTrue# x = (x /= 0#): GHC's tag-to-Bool test.
+  self.add_def("isTrue", Net::{
+    root: Con(Var("x"), Var("ret")),
+    redexes: [{ fst: Var("x"), snd: Opr(OpSym("[!]"), Opr(Num(0), Var("ret"))) }],
+  })
+  // (&&) a b = a b False, (||) a b = a True b, with the Scott Bool encoding.
+  self.add_def("logical_and", Net::{
+    root: Con(Var("a"), Con(Var("b"), Var("ret"))),
+    redexes: [{ fst: Var("a"), snd: Con(Var("b"), Con(Ref("False"), Var("ret"))) }],
+  })
+  self.add_def("logical_or", Net::{
+    root: Con(Var("a"), Con(Var("b"), Var("ret"))),
+    redexes: [{ fst: Var("a"), snd: Con(Ref("True"), Con(Var("b"), Var("ret"))) }],
+  })
+  // lazy x = x. GHC uses it to hide a value from strictness analysis; the net
+  // encoding has no forcing to suppress, so it is the identity wire.
+  self.add_def("lazy", Net::{ root: Con(Var("x"), Var("x")), redexes: [] })
   self.add_def("seq", Net::{
     root: Con(Era, Con(Var("b"), Con(Var("s"), Var("ret")))),
     redexes: [{ fst: Var("ret"), snd: Con(Var("s"), Var("b")) }],
@@ -4008,10 +4056,16 @@ fn simplify_program(prog : @syntax.Program) -> @syntax.Program {
   @syntax.Program::new(new_binds)
 }
 
+///| Does this program need the hi/lo 64-bit encoding for its result?
+///|
+///| A wide literal used to be enough to answer yes. Real projects carry 2^63
+///| bounds, hash multipliers and `maxBound` constants in modules that have
+///| nothing to do with the computed result, and switching the whole book to the
+///| hi/lo `main` shape silently turns a correct answer into a pair of limbs.
+///| Only the presence of the routines that actually do wide arithmetic counts.
 fn has_64bit_indicator(prog : @syntax.Program) -> Bool {
   fn expr_has_64bit(e : @syntax.Expr) -> Bool {
     match e {
-      LitInt(i) => i > 16777215 && i != 1000000007
       Var("checksum" | "checksumList" | "add_mod" | "mul31_mod") => true
       App(f, a) => expr_has_64bit(f) || expr_has_64bit(a)
       Lam(_, b) => expr_has_64bit(b)
