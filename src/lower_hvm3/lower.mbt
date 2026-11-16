@@ -603,6 +603,26 @@ fn lower_expr_ctx(expr : @syntax.Expr, ctx : LowerContext) -> String {
       if name == "realWorld#" || name == "void#" {
         return "0"
       }
+      // Pointer identity has no meaning in the interaction calculus; GHC only
+      // promises that True implies equality, so a constant False is sound.
+      if name == "reallyUnsafePtrEquality#" || name == "reallyUnsafePtrEquality" {
+        return "(λ&_a (λ&_b 0))"
+      }
+      if name == "lazy" {
+        return "(λ&x x)"
+      }
+      if name == "&&" || name == "and" {
+        return "(λ&a (λ&b (a b @False)))"
+      }
+      if name == "||" || name == "or" {
+        return "(λ&a (λ&b (a @True b)))"
+      }
+      if name == "isTrue#" || name == "isTrue" {
+        return "(λ&x (!= x 0))"
+      }
+      if name == "error" || name == "errorWithoutStackTrace" || name == "undefined" {
+        return "(λ&m 0)"
+      }
       if name == "*H#" || name == "*H" {
         return "@mulH_"
       }
@@ -816,6 +836,14 @@ fn lower_expr_ctx(expr : @syntax.Expr, ctx : LowerContext) -> String {
       let (head, args) = expr.unwind_app()
       match head {
         Var(op_name) => {
+          // `error msg` is the crash value; its message is never needed and may
+          // reference string constants from modules the project did not compile.
+          if (op_name == "error" || op_name == "errorWithoutStackTrace" ||
+            op_name == "undefined" || op_name == "patError" ||
+            op_name == "patError#" || op_name == "absentError" ||
+            op_name == "raise#" || op_name == "raiseIO#") && args.length() > 0 {
+            return "*"
+          }
           if (op_name == "C" || op_name == "C_hash" || op_name == "C#") && args.length() >= 2 {
             let second = match args[0] {
               Constr(s, _) | Var(s) => s
@@ -1935,6 +1963,10 @@ fn is_known_builtin(name : String) -> Bool {
     "add_mod" | "mul31_mod" | "_fNumWord32__c" | "divModPrim" => true
     "LT" | "EQ" | "GT" => true
     "dataToTagSmall#" | "dataToTagSmall" | "tagToEnum#" | "tagToEnum" => true
+    "reallyUnsafePtrEquality#" | "reallyUnsafePtrEquality" => true
+    "lazy" => true
+    "error" | "errorWithoutStackTrace" | "undefined" => true
+    "&&" | "||" | "isTrue#" | "isTrue" => true
     "eqString" | "map" | "filter" | "_plus__plus_" | "concatMap" | "elem" | "notElem" | "fst" | "snd" => true
     "$fEqList_$c_eq_" | "$fEqTuple2" | "$fEqList_$s$c_ne_1" | "$fEqList_$s$fEqList1" => true
     "C:Eq" | "C:Show" | "C:Num" | "C:Ord" | "Eq" | "C_Eq" => true
