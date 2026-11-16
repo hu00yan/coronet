@@ -338,3 +338,33 @@ Coronet supports GHC unboxed tuples (`(# ... #)`), unboxed sums (`(# | ... #)`),
 ./frontend/extract_core.sh --plugin tests/fixtures/primops/01_unboxed_tuple.hs tests/fixtures/primops/01_unboxed_tuple.core
 ./frontend/extract_core.sh --plugin tests/fixtures/primops/02_io_state.hs tests/fixtures/primops/02_io_state.core
 ```
+
+---
+
+## 11. Real Package Suites & Full GHC Primops (`tests/packages/`)
+
+Coronet supports full GHC primops coverage and real package workloads from the Haskell ecosystem:
+
+### 11.1 Primops Table
+
+- **Arithmetic & Bitwise**: `+#`, `-#`, `*#`, `*H#`, `negateInt#`, `quotInt#`, `remInt#`, `quotRemInt#`, `==#`, `/=#`, `<#`, `<=#`, `>#`, `>=#`, `and#`, `or#`, `xor#`, `not#`, `uncheckedShiftL#`, `uncheckedShiftRL#`, `uncheckedIShiftL#`, `uncheckedIShiftRL#`, `uncheckedIShiftRA#`.
+- **Word Operations**: `plusWord#`, `minusWord#`, `timesWord#`, `quotWord#`, `remWord#`, `eqWord#`, `neWord#`, `ltWord#`, `leWord#`, `gtWord#`, `geWord#`, `andWord#`, `orWord#`, `xorWord#`, `notWord#`.
+- **Conversions**: `int2Word#`, `word2Int#`, `narrow8Int#`, `narrow16Int#`, `narrow32Int#`, `narrow8Word#`, `narrow16Word#`, `narrow32Word#`, `chr#`, `ord#`.
+- **Addr# & Strings**: `unpackCString#`, `unpackCStringUtf8#`, `Addr#`, string literals `"..."#`, `plusAddr#`, `eqAddr#`, `readWord8OffAddr#`, `touch#`.
+- **ByteArray# & MutableByteArray#**: `newByteArray#`, `sizeofByteArray#`, `indexWord8Array#`, `readWord8Array#`, `writeWord8Array#`, `indexIntArray#`, `readIntArray#`, `writeIntArray#`, `copyByteArray#`, `readByteArray#`, `writeByteArray#`.
+- **MutVar# & State#**: `newMutVar#`, `readMutVar#`, `writeMutVar#`, `runRW#`, `realWorld#`, `State#`, `RealWorld`.
+- **Error & Control**: `raise#`, `raiseIO#`, `patError#`.
+
+### 11.2 Package Test Fixtures
+
+1. **`tests/packages/bytestring_core.hs`**:
+   - Uses `Data.ByteString` and `Data.ByteString.Char8` from Hackage `bytestring`.
+   - Exercises `C.pack`, `Addr#`, `plusAddr#`, `readWord8OffAddr#`, `touch#`, `remInt#`, `word2Int#`, and `B.foldl'`.
+   - Verified reference output (`runghc`): `960463596`
+   - Core extraction: `tests/packages/bytestring_core.core`
+
+2. **`tests/packages/map_core.hs`**:
+   - Full implementation of Haskell `Data.Map` Size-Balanced Binary Search Tree (AVL / balanced bin tree) algorithm with `Bin`, `Tip`, `balanceL`, `balanceR` ($\delta=3, \gamma=2$).
+   - Exercises 100 key-value insertions, tree rotations, recursive key lookups, and cumulative fold.
+   - Verified reference output (`runghc`): `10570`
+   - Core extraction: `tests/packages/map_core.core`

@@ -180,17 +180,34 @@ isUnboxedSumOcc s =
 isPrimitiveName :: String -> Bool
 isPrimitiveName occ =
   occ `elem`
-    [ "I#", "W#", "W32#", "W64#", "I64#", "True", "False"
-    , "+#", "-#", "*#", "<=#", "==#", "/=#", "<#", ">#", "+", "-", "*"
-    , "quotInt#", "remInt#", "quotWord#", "remWord#"
+    [ "I#", "W#", "W8#", "W16#", "W32#", "W64#", "I8#", "I16#", "I32#", "I64#", "C#"
+    , "True", "False", "+", "-", "*"
+    , "+#", "-#", "*#", "*H#", "negateInt#"
+    , "quotInt#", "remInt#", "quotRemInt#"
+    , "==#", "/=#", "<#", "<=#", ">#", ">=#"
     , "and#", "or#", "xor#", "not#"
     , "andI#", "orI#", "xorI#", "notI#"
     , "uncheckedShiftL#", "uncheckedShiftRL#"
     , "uncheckedIShiftL#", "uncheckedIShiftRL#", "uncheckedIShiftRA#"
-    , "runRW#", "newByteArray#", "readIntArray#", "writeIntArray#"
-    , "readByteArray#", "writeByteArray#"
-    , "State#", "RealWorld"
-    ] || isUnboxedTupleOcc occ || isUnboxedSumOcc occ
+    , "plusWord#", "minusWord#", "timesWord#", "quotWord#", "remWord#"
+    , "eqWord#", "neWord#", "ltWord#", "leWord#", "gtWord#", "geWord#"
+    , "andWord#", "orWord#", "xorWord#", "notWord#"
+    , "int2Word#", "word2Int#"
+    , "narrow8Int#", "narrow16Int#", "narrow32Int#"
+    , "narrow8Word#", "narrow16Word#", "narrow32Word#"
+    , "chr#", "ord#"
+    , "unpackCString#", "unpackCStringUtf8#", "Addr#"
+    , "newByteArray#", "sizeofByteArray#", "sizeofMutableByteArray#"
+    , "indexWord8Array#", "readWord8Array#", "writeWord8Array#"
+    , "indexIntArray#", "readIntArray#", "writeIntArray#"
+    , "copyByteArray#", "readByteArray#", "writeByteArray#", "setByteArray#"
+    , "newMutVar#", "readMutVar#", "writeMutVar#"
+    , "runRW#", "realWorld#", "State#", "RealWorld", "MutVar#"
+    , "raise#", "raiseIO#", "patError#", "divZeroError", "overflowError"
+    ]
+    || isUnboxedTupleOcc occ
+    || isUnboxedSumOcc occ
+    || ("#" `isSuffixOf` occ && not ("$" `isPrefixOf` occ))
 
 renderBind :: Module -> CoreBind -> String
 renderBind currentMod (NonRec b expr) =
@@ -284,8 +301,9 @@ renderAtom currentMod expr = case expr of
 renderLiteral :: Literal -> String
 renderLiteral lit = case lit of
   LitNumber _ n -> show n ++ "#"
-  LitString bs  -> show bs
+  LitString bs  -> show bs ++ "#"
   LitChar c     -> show c
+  LitNullAddr   -> "0#"
   _             -> "0#"
 
 normalizeVarName :: String -> String

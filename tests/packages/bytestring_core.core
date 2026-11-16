@@ -1,0 +1,35 @@
+addr#_a2v9
+  = "Coronet Implicit Parallel Graph Reduction"#
+
+testBS
+  = BS addr#_a2v9 FinalPtr 41#
+
+lvl_s2uP
+  = I# 0#
+
+calcChecksum
+  = \ bs_aQ2 ->
+      case bs_aQ2 of wild_a1Iv {
+        BS bx_a1KX bx1_a1KY bx2_a1KZ -> let end_s2uA = plusAddr# bx_a1KX bx2_a1KZ in let Rec { $wgo_s2wQ = \ ww_s2wI ww_s2wM ww_s2wN eta_s2wP ->
+      case eqAddr# ww_s2wM end_s2uA of lwild_a1L9 {
+        __DEFAULT -> case readWord8OffAddr# ww_s2wM 0# eta_s2wP of ds2_a1Lb {
+        (# ipv2_a1Lc, ipv3_a1Ld #) -> case touch# ww_s2wN ipv2_a1Lc of s'_a1Lf {
+        __DEFAULT -> $wgo_s2wQ (remInt# (+# (*# ww_s2wI 31#) (word2Int# (word8ToWord# ipv3_a1Ld))) 1000000007#) (plusAddr# ww_s2wM 1#) ww_s2wN s'_a1Lf
+      }
+      };
+        1# -> I# ww_s2wI
+      } end Rec } in $wgo_s2wQ 0# bx_a1KX bx1_a1KY realWorld#
+      }
+
+result
+  = let end_s2uA = plusAddr# addr#_a2v9 41# in let Rec { $wgo_s2xc = \ ww_s2x4 ww_s2x8 ww_s2x9 eta_s2xb ->
+      case eqAddr# ww_s2x8 end_s2uA of lwild_a1L9 {
+        __DEFAULT -> case readWord8OffAddr# ww_s2x8 0# eta_s2xb of ds2_a1Lb {
+        (# ipv2_a1Lc, ipv3_a1Ld #) -> case touch# ww_s2x9 ipv2_a1Lc of s'_a1Lf {
+        __DEFAULT -> $wgo_s2xc (remInt# (+# (*# ww_s2x4 31#) (word2Int# (word8ToWord# ipv3_a1Ld))) 1000000007#) (plusAddr# ww_s2x8 1#) ww_s2x9 s'_a1Lf
+      }
+      };
+        1# -> I# ww_s2x4
+      } end Rec } in $wgo_s2xc 0# addr#_a2v9 FinalPtr realWorld#
+
+main = result
