@@ -1,0 +1,61 @@
+// This shows how to use a 'pseudo-metavar' to invert the binary add function,
+// and solve the equation: 'X * 20 = 5000'. Run it with collapse mode:
+// $ hvml run pseudo_metavar_nat.hvml -C -s
+
+// Unary Peano Nats
+data Nat { #Z #S{pred} }
+
+// If-Then-Else
+@if(b t f) = ~b {
+  0: f
+  _: t
+}
+
+// Converts an U32 to a Nat
+@nat(n) = ~n{
+  0: #Z
+  1+p: #S{@nat(p)}
+}
+
+// Converts a Nat to an U32
+@u32(n) = ~n{
+  #Z: 0
+  #S{np}: (+ 1 @u32(np))
+}
+
+// Adds two Nats
+@add(a b) = ~a !b {
+  #Z: b
+  #S{ap}: #S{@add(ap b)}
+}
+
+// Muls two Nats
+@mul(a b) = ~a !b {
+  #Z: #Z
+  #S{ap}: !&1{b0 b1}=b @add(b0 @mul(ap b1))
+}
+
+// Compares two Nats for equality
+@eq(a b) = ~a !b {
+  #Z: ~b{
+    #Z: 1
+    #S{bp}: 0
+  }
+  #S{ap}: ~b{
+    #Z: 0
+    #S{bp}: @eq(ap bp)
+  }
+}
+
+// A superposition of all Nats (pseudo-metavar)
+@X = &0{#Z #S{@X}}
+
+// Solves 'X * 20 = 20000'
+@main = @if(@eq(@mul(@X @nat(20)) @nat(12000)) @u32(@X) *)
+
+// This is quadratic. In the post below, I discuss solutions to make it linear:
+// https://gist.github.com/VictorTaelin/93c327e5b4e752b744d7798687977f8a
+// These solutions are implemented on the branches:
+// - oportunistic_swaps
+// - unordered_superpositions
+// Sadly they don't work as I expected in all cases. More clarity is needed.

@@ -1,0 +1,311 @@
+// Bitstrings
+data Bin { #O{pred} #I{pred} #E }
+
+// Pairs
+data Pair { #Pair{fst snd} }
+
+// If-Then-Else
+@if(b t f) = ~b {
+  0: f
+  _: t
+}
+
+// Not
+@not(a) = ~a {
+  0: 1
+  _: 0
+}
+
+// And
+@and(a b) = ~a {
+  0: 0
+  _: b
+}
+
+// Or
+@or(a b) = ~a {
+  0: b
+  _: 1
+}
+
+// Converts a Bin to an U32
+@u32(b) = ~b{
+  #O{p}: (+ (* 2 @u32(p)) 0)
+  #I{p}: (+ (* 2 @u32(p)) 1)
+  #E: 0
+}
+
+// Converts an U32 to a Bin of given size
+@bin(s n) = ~s{
+  0: #E
+  1+p: !&0{n0 n1}=n ~(% n0 2) !p !n1 {
+    0: #O{@bin(p (/ n1 2))}
+    _: #I{@bin(p (/ n1 2))}
+  }
+}
+
+// Bin Equality
+@eq(a b) = ~a !b {
+  #E: ~b {
+    #O{bp}: 0
+    #I{bp}: 0
+    #E: 1
+  }
+  #O{ap}: ~b{
+    #O{bp}: @eq(ap bp)
+    #I{bp}: 0
+    #E: 0
+  }
+  #I{ap}: ~b{
+    #O{bp}: 0
+    #I{bp}: @eq(ap bp)
+    #E: 0
+  }
+}
+
+// Increments a Bin
+@inc(a) = ~a{
+  #O{p}: #I{p}
+  #I{p}: #O{@inc(p)}
+  #E: #E
+}
+
+// Decrements a Bin
+@dec(a) = ~a{
+  #O{p}: #O{@dec(p)}
+  #I{p}: #I{p}
+  #E: #E
+}
+
+// Adds two Bins
+@add(a b) = ~a !b {
+  #O{ap}: ~b !ap {
+    #O{bp}: #O{@add(ap bp)}
+    #I{bp}: #I{@add(ap bp)}
+    #E: #O{ap}
+  }
+  #I{ap}: ~b !ap {
+    #O{bp}: #I{@add(ap bp)}
+    #I{bp}: #O{@inc(@add(ap bp))}
+    #E: #I{ap}
+  }
+  #E: #E
+}
+
+// Muls two Bins
+@mul(a b) = ~b !a {
+  #E: #E
+  #O{bp}: #O{@mul(a bp)}
+  #I{bp}: !&0{a0 a1}=a @add(a0 #O{@mul(a1 bp)})
+}
+
+// Concatenates two Bins
+@cat(a b) = ~a !b {
+  #O{ap}: #O{@cat(ap b)}
+  #I{ap}: #I{@cat(ap b)}
+  #E: b
+}
+
+// Lt two Bins (a < b)
+@lt(a b) = @lt_go(0 a b)
+
+@lt_go(&k a b) = ~a !b {
+  #E: ~b {
+    #E: &k
+    #O{bp}: 1
+    #I{bp}: 1
+  }
+  #O: λap ~b !ap {
+    #E: 0
+    #O{bp}: @lt_go(&k ap bp)
+    #I{bp}: @lt_go(1 ap bp)
+  }
+  #I: λap ~b !ap {
+    #E: 0
+    #O{bp}: @lt_go(0 ap bp)
+    #I{bp}: @lt_go(&k ap bp)
+  }
+}
+
+// Take the first N bits of a Bin
+@take(n b) = ~n {
+  0: #E
+  1+p: ~b !p {
+    #O{bp}: #O{@take(p bp)}
+    #I{bp}: #I{@take(p bp)}
+    #E: #E
+  }
+}
+
+// Enums all Bins of given size (label 1)
+@all1(s) = ~s{
+  0: #E
+  1+p: !&1{p0 p1}=p &1{
+    #O{@all1(p0)}
+    #I{@all1(p1)}
+  }
+}
+
+// Enums all Bins of given size (label 2)
+@all2(s) = ~s{
+  0: #E
+  1+p: !&2{p0 p1}=p &2{
+    #O{@all2(p0)}
+    #I{@all2(p1)}
+  }
+}
+
+//// 4:
+//@K = 1
+//@H = 2
+//@S = 4
+//@X = @cat(@all1(@H) @bin(@H 0))
+//@Y = @cat(@all2(@H) @bin(@H 0))
+//@A = @cat(@bin(@K 3) @bin(@H 0))
+//@B = @cat(@bin(@H 3) @bin(@H 0))
+//@P = @bin(@S 9)
+
+//// 6:
+//@K = 2
+//@H = 3
+//@S = 6
+//@X = @cat(@all1(@H) @bin(@H 0))
+//@Y = @cat(@all2(@H) @bin(@H 0))
+//@A = @cat(@bin(@K 5) @bin(@H 0))
+//@B = @cat(@bin(@H 5) @bin(@H 0))
+//@P = @bin(@S 25)
+
+//// 8:
+//@K = 3
+//@H = 4
+//@S = 8
+//@X = @cat(@all1(@H) @bin(@H 0))
+//@Y = @cat(@all2(@H) @bin(@H 0))
+//@A = @cat(@bin(@K 13) @bin(@H 0))
+//@B = @cat(@bin(@H 13) @bin(@H 0))
+//@P = @bin(@S 169)
+
+//// 10:
+//@K = 4
+//@H = 5
+//@S = 10
+//@X = @cat(@all1(@H) @bin(@H 0))
+//@Y = @cat(@all2(@H) @bin(@H 0))
+//@A = @cat(@bin(@K 31) @bin(@H 0))
+//@B = @cat(@bin(@H 19) @bin(@H 0))
+//@P = @bin(@S 589)
+
+//// 12:
+//@K = 5
+//@H = 6
+//@S = 12
+//@X = @cat(@all1(@H) @bin(@H 0))
+//@Y = @cat(@all2(@H) @bin(@H 0))
+//@A = @cat(@bin(@K 53) @bin(@H 0))
+//@B = @cat(@bin(@H 37) @bin(@H 0))
+//@P = @bin(@S 1961)
+
+//// 14:
+//@K = 6
+//@H = 7
+//@S = 14
+//@X = @cat(@all1(@H) @bin(@H 0))
+//@Y = @cat(@all2(@H) @bin(@H 0))
+//@A = @cat(@bin(@K 109) @bin(@H 0))
+//@B = @cat(@bin(@H 97) @bin(@H 0))
+//@P = @bin(@S 10573)
+
+//// 16:
+//@K = 7
+//@H = 8
+//@S = 16
+//@X = @cat(@all1(@H) @bin(@H 0))
+//@Y = @cat(@all2(@H) @bin(@H 0))
+//@A = @cat(@bin(@K 173) @bin(@H 0))
+//@B = @cat(@bin(@H 233) @bin(@H 0))
+//@P = @bin(@S 40309)
+
+//// 18:
+//@K = 8
+//@H = 9
+//@S = 18
+//@X = @cat(@all1(@H) @bin(@H 0))
+//@Y = @cat(@all2(@H) @bin(@H 0))
+//@A = @cat(@bin(@K 449) @bin(@H 0))
+//@B = @cat(@bin(@H 389) @bin(@H 0))
+//@P = @bin(@S 174661)
+
+//// 20:
+//@K = 9
+//@H = 10
+//@S = 20
+//@X = @cat(@all1(@H) @bin(@H 0))
+//@Y = @cat(@all2(@H) @bin(@H 0))
+//@A = @cat(@bin(@K 769) @bin(@H 0))
+//@B = @cat(@bin(@H 569) @bin(@H 0))
+//@P = @bin(@S 437561)
+
+//// 22:
+//@K = 10
+//@H = 11
+//@S = 22
+//@X = @cat(@all1(@H) @bin(@H 0))
+//@Y = @cat(@all2(@H) @bin(@H 0))
+//@A = @cat(@bin(@K 1423) @bin(@H 0))
+//@B = @cat(@bin(@H 1229) @bin(@H 0))
+//@P = @bin(@S 1748867)
+
+//// 24:
+//@K = 11
+//@H = 12
+//@S = 24
+//@X = @cat(@all1(@H) @bin(@H 0))
+//@Y = @cat(@all2(@H) @bin(@H 0))
+//@A = @cat(@bin(@K 2437) @bin(@H 0))
+//@B = @cat(@bin(@H 2333) @bin(@H 0))
+//@P = @bin(@S 5685521)
+
+//// 26:
+//@K = 12
+//@H = 13
+//@S = 26
+//@X = @cat(@all1(@H) @bin(@H 0))
+//@Y = @cat(@all2(@H) @bin(@H 0))
+//@A = @cat(@bin(@K 4987) @bin(@H 0))
+//@B = @cat(@bin(@H 6203) @bin(@H 0))
+//@P = @bin(@S 30934361)
+
+//// 28:
+//@K = 13
+//@H = 14
+//@S = 28
+//@X = @cat(@all1(@H) @bin(@H 0))
+//@Y = @cat(@all2(@H) @bin(@H 0))
+//@A = @cat(@bin(@K 13513) @bin(@H 0))
+//@B = @cat(@bin(@H 13721) @bin(@H 0))
+//@P = @bin(@S 185411873)
+
+//// 30:
+//@K = 14
+//@H = 15
+//@S = 30
+//@X = @cat(@all1(@H) @bin(@H 0))
+//@Y = @cat(@all2(@H) @bin(@H 0))
+//@A = @cat(@bin(@K 24923) @bin(@H 0))
+//@B = @cat(@bin(@H 19489) @bin(@H 0))
+//@P = @bin(@S 485724347)
+
+//// 32:
+//@K = 15
+//@H = 16
+//@S = 32
+//@X = @cat(@all1(@H) @bin(@H 0))
+//@Y = @cat(@all2(@H) @bin(@H 0))
+//@A = @cat(@bin(@K 47791) @bin(@H 0))
+//@B = @cat(@bin(@H 54881) @bin(@H 0))
+//@P = @bin(@S 2622817871)
+
+@main = 
+  ! cond = @eq(@mul(@X @Y) @P)
+  ! not1 = @not(@eq(@X @bin(@S 1)))
+  @if(@and(cond not1) λt(t @u32(@X) @u32(@Y)) *)

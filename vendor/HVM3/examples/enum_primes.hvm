@@ -1,0 +1,126 @@
+// Bitstrings
+data Bin { #O{pred} #I{pred} #E }
+
+// If-Then-Else
+@if(b t f) = ~b {
+  0: f
+  _: t
+}
+
+// Converts a Bin to an U32
+@u32(b) = ~b{
+  #O{p}: (+ (* 2 @u32(p)) 0)
+  #I{p}: (+ (* 2 @u32(p)) 1)
+  #E: 0
+}
+
+// Converts an U32 to a Bin of given size
+@bin(s n) = ~s{
+  0: #E
+  1+p: !&0{n0 n1}=n ~(% n0 2) !p !n1 {
+    0: #O{@bin(p (/ n1 2))}
+    _: #I{@bin(p (/ n1 2))}
+  }
+}
+
+// Bin Equality
+@eq(a b) = ~a !b {
+  #E: ~b {
+    #O{bp}: 0
+    #I{bp}: 0
+    #E: 1
+  }
+  #O{ap}: ~b{
+    #O{bp}: @eq(ap bp)
+    #I{bp}: 0
+    #E: 0
+  }
+  #I{ap}: ~b{
+    #O{bp}: 0
+    #I{bp}: @eq(ap bp)
+    #E: 0
+  }
+}
+
+// Increments a Bin
+@inc(a) = ~a{
+  #O{p}: #I{p}
+  #I{p}: #O{@inc(p)}
+  #E: #E
+}
+
+// Decrements a Bin
+@dec(a) = ~a{
+  #O{p}: #O{@dec(p)}
+  #I{p}: #I{p}
+  #E: #E
+}
+
+// Adds two Bins
+@add(a b) = ~a !b {
+  #O{ap}: ~b !ap {
+    #O{bp}: #O{@add(ap bp)}
+    #I{bp}: #I{@add(ap bp)}
+    #E: #E
+  }
+  #I{ap}: ~b !ap {
+    #O{bp}: #I{@add(ap bp)}
+    #I{bp}: #O{@inc(@add(ap bp))}
+    #E: #E
+  }
+  #E: #E
+}
+
+// Muls two Bins
+@mul(a b) = ~b !a {
+  #O{bp}: #O{@mul(a bp)}
+  #I{bp}: !&0{a0 a1}=a @add(a0 #O{@mul(a1 bp)})
+  #E: #E
+}
+
+// Concatenates two Bins
+@cat(a b) = ~a !b {
+  #O{ap}: #O{@cat(ap b)}
+  #I{ap}: #I{@cat(ap b)}
+  #E: b
+}
+
+// Enums all Bins of given size (label 1)
+@all1(s) = ~s{
+  0: #E
+  1+p: !&1{p0 p1}=p &1{ #O{@all1(p0)} #I{@all1(p1)} }
+}
+
+// Enums all Bins of given size (label 2)
+@all2(s) = ~s{
+  0: #E
+  1+p: !&2{p0 p1}=p &2{ #O{@all2(p0)} #I{@all2(p1)} }
+}
+
+// 8:
+@K_A = 3
+@H_A = 4
+@S_A = 8
+@X_A = @cat(@all1(@H_A) @bin(@H_A 0))
+@Y_A = @cat(@all2(@H_A) @bin(@H_A 0))
+@P_A = #I{#O{#O{#I{#O{#I{#O{#I{#E}}}}}}}}
+
+// 20:
+@K_B = 9
+@H_B = 10
+@S_B = 20
+@X_B = @cat(@all1(@H_B) @bin(@H_B 0))
+@Y_B = @cat(@all2(@H_B) @bin(@H_B 0))
+@P_B = #I{#I{#I{#I{#O{#I{#I{#O{#I{#I{#O{#O{#I{#O{#I{#O{#O{#O{#I{#I{#E}}}}}}}}}}}}}}}}}}}}
+
+// 30:
+@K_C = 14
+@H_C = 15
+@S_C = 30
+@X_C = @cat(@all1(@H_C) @bin(@H_C 0))
+@Y_C = @cat(@all2(@H_C) @bin(@H_C 0))
+@P_C = #I{#I{#I{#O{#O{#O{#I{#I{#O{#I{#O{#I{#O{#O{#O{#O{#I{#O{#I{#I{#O{#O{#I{#O{#O{#I{#O{#I{#O{#I{#E}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}
+
+////INJECT//
+
+@main = @if(@eq(@mul(@X_B @Y_B) @P_B) λt(t @u32(@X_B) @u32(@Y_B)) *)

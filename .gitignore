@@ -9,3 +9,8 @@ _build
 *.dyn_hi
 bin/
 .DS_Store
+vendor/HVM2/target/
+vendor/HVM2/hvm
+vendor/HVM3/dist/
+vendor/HVM3/dist-newstyle/
+vendor/HVM3/hvm

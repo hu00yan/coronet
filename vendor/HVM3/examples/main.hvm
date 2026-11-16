@@ -1,0 +1,257 @@
+data List{ #Nil #Cons{head tail} }
+data Foo{ #A #B }
+data Bar{ #C #D }
+
+data Term {
+  #Var{idx}
+  #Pol{bod}
+  #All{inp bod}
+  #Lam{bod}
+  #App{fun arg}
+  #U32
+  #Num{val}
+}
+
+@main = ~ (#Pol{123}) {
+  #Var{idx}: *
+  #Pol{bod}: 123
+  #All{inp bod}: *
+  #Lam{bod}: *
+  #App{fun arg}: *
+  #U32: *
+  #Num{val}: *
+}
+
+////@main = ~ (#A) {
+  ////#A: 1
+  ////#B: 2
+////}
+
+////@main = ~ 3 {
+  ////0: 10
+  ////1: 20
+  ////p: p
+////}
+
+//@main = 
+  //~ [1 2] {
+    //#Cons{a b}: a
+    //#Nil: 0
+  //}
+
+//!@foo(k a) =
+  //! &0{x y} = a
+  //! &1{_ _} = 1
+  //! &2{_ _} = 2
+  //(+ x y)
+//@main = @foo(1 &0{1 2})
+
+//data Foo {
+  //#A{k}
+  //#B{k}
+//}
+
+//@bar(x) = ~ x {
+  //#A{k}: (+ 1 k)
+  //#B{k}: (+ 2 k)
+//}
+
+//@main = @bar(*)
+
+//@foo(n) = ~n { 0: 0 p: (+ 1 @foo(p)) }
+
+////@main = @foo(&0{1000 1000})
+//@main = &0{@foo(1000) @foo(1000)}
+
+// ~ &0{#A{...} #B{...}} {
+//  #A: ...
+//  #B: ...
+// }
+
+//@foo(&0{1 2} x y)
+//-----------------
+//&0{x0 x1}=x
+//&0{y0 y1}=y
+//&0{@foo(1 x0 y0) @foo(2 x1 y1)}
+
+//(&L{x y} arg)
+//-------------
+//&0{arg0 arg1}=arg
+//&{(x arg0) (y arg1)}
+
+//data Foo { #A{a b} #B{a b} #C{a b} #D{a b} }
+
+//@main = ~ 7 {
+  //0: 3
+  //p: p
+//}
+
+//@main = ~ #A{1 2} {
+  //#A{a b}: ["A" a b]
+  //#B{a b}: ["B" a b]
+  //#C{a b}: ["C" a b]
+//}
+
+//@main = λx ~ #D{1 2} {
+  //#A{a b}: ["A" a b]
+  //#C{a b}: ["C" a b]
+  //term: term
+//}
+
+//@main = ~ #A{1 2} {
+  //#A{a b}: ["A" a b]
+  //x: 123
+//}
+
+//data List { #Nil #Cons{head tail} }
+
+//@Foo = #Cons{1 @Foo}
+//@main = 50
+
+//@main = λx
+  //!! @LOG(&{1 (+ x 1)})
+  //123
+
+//@main = λt(t &0{&0{1 2} &0{3 4}} &0{&0{1 2} &0{3 4}})
+
+//λa ((a 1) 1)
+//λa ((a 2) 2)
+//λa ((a 3) 3)
+//λa ((a 4) 4)
+
+//@foo(&a x) = ~ x {
+  //0: &a
+  //p: &a
+//}
+
+//@main = @foo(7 1)
+
+//@main = λa
+  //@DUP((+ 5 7) a λx λy [x y])
+  //@DUP(11 @SUP(10 50 60) λa λb [a b])
+
+//data Tree { #Leaf #Node{lft rgt} }
+
+//@all(s) = ~s {
+  //0: #Leaf
+  //p: &0{ #Leaf #Node{@all(p) @all(p)} }
+//}
+
+//@main = @all(4)
+
+//data Tree { #Leaf #Node{lft rgt} }
+
+//@all(s l) = ~s {
+  //0:
+    //#Leaf
+  //p:
+    //!&0{p p0}=p
+    //!&0{p p1}=p
+    //!&0{l l0}=l
+    //!&0{l l1}=l
+    //!&0{l l2}=l
+    //! lL = (+ (* l1 2) 0)
+    //! lR = (+ (* l2 2) 1)
+    //@SUP(l0 #Leaf #Node{ @all(p0 lL) @all(p1 lR) })
+//}
+
+//@main = @all(4 1)
+
+//@dyn(n lab) = ~n {
+  //0: 0
+  //p: !&0{l0 l1}=lab @SUP(l0 0 @dyn(p (+ l1 1)))
+//}
+
+//@main = @dyn(8 0)
+
+//// Simple Function, `A -> B`
+//@Fun(A B) = %f λx {(f {x::A}) :: B}
+
+//// Dependent Function, `∀(x: A) -> (B x)`
+//@All(A B) = %f λx !&0{x0 x1}=x {(f {x0::A}) :: (B x)}
+
+//// main
+//// : ∀A (A -> A) -> (A -> A)
+//// = λf λx (f x)
+//@main = λA
+  //! &0{A A0} = A
+  //! &0{A A1} = A
+  //! &0{A A2} = A
+  //! &0{A A3} = A
+  //! typ = @Fun(@Fun(A0 A1) @Fun(A2 A3))
+  //! val = λf λx (f x)
+  //{ val :: typ }
+
+//@main = λA λB
+  //! &0{A A0} = A
+  //! &0{A A1} = A
+  //! &0{A A2} = A
+  //! &0{A A3} = A
+  //{  λf λx !&0{f0 f1}=f (f0 (f1 x))
+  //:: @Fun(@Fun(A0 A1) @Fun(A2 A3)) }
+
+//@main = λA λB {λx x :: @Fun(A B)}
+
+//@main = λA λB
+  //!&0{A0 A1}=A
+  //{λa λb (a b) :: %f λa λb {(f {a::A0} {b::B})::A1}}
+
+//@count(n k) = ~n !k {
+  //0: k
+  //p: @count(p (+ k 2))
+//}
+
+//@main = @count(2_000_000_000 0)
+
+//data L { #N #C{h t} }
+
+//@foo = λx λa λb λc ~x !a !b !c {
+  //#N: λt(t a b c)
+  //#C{H T}: λt(t a b c H T)
+//}
+
+//@bar = λx ~x {
+  //0: 10
+  //1+p: p
+//}
+
+////@main = (+ (+ 2 3) 4)
+////@main = (@bar 10)
+////@main = (@foo #C{1 #C{2 #C{3 #N}}} 10 20 30)
+////@main = λx ~x { #N: 0 #C{h t}: λK(K h t) }
+
+////@main = λt(t (+ 1 (+ 2 (+ 3 4))) (+ 1 (+ 2 (+ 3 4))))
+//@main = (+ 1 2)
+
+//@true = λt λf t
+//@false = λt λf f
+//@not = λb ((b @false) @true)
+//@dups = ! &1{ x y } = &0{ #12{} #24{} } &0{ y x }
+//@main = (+ 10 ~7{ 0 1 2 λx x })
+//@main = (* 100 123)
+//@main = λt(t #5{(λx x 7)} λk k)
+//@main = (λa λb(λt λf t &0{a b} &0{b a}) 1 2)
+//@succ = λn λs λz (s n)
+//@zero = λs λz z
+//@mul2 = λn (n λp(@succ (@succ (@mul2 p))) @zero)
+//@main = (@mul2 (@succ (@succ (@succ @zero))))
+//@foo(x y) = #0{y x}
+//@main = @foo(@foo(5 8) @foo(1 2))
+
+//data List { #Nil #Cons{head tail} }
+
+//@sum(xs r) = ~xs{
+  //#Nil: r
+  //#Cons: λhead λtail @sum(tail (+ head r))
+//}
+
+//@range(n xs) = ~n{
+  //0: xs
+  //p: !&0{p0 p1}=p @range(p0 #Cons{p1 xs})
+//}
+
+//@main =
+  //!list = #Cons{0 #Cons{1 #Cons{&0{10 20} #Cons{3 #Cons{4 #Cons{5 #Cons{6 #Cons{7 #Cons{8 #Cons{9 #Nil}}}}}}}}}}
+  //@sum(list 0)
+
+//@main = !&0{a b}=(+ 1 2) λt(t a b)
