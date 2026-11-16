@@ -24,13 +24,15 @@ Expr           ::= Var
                  | LitChar
                  | LitString
                  | Constr
+                 | UnboxedTupleExpr
                  | AppExpr
                  | LamExpr
                  | LetExpr
                  | CaseExpr
 
 AppExpr        ::= Expr AtomExpr
-AtomExpr       ::= Var | LitInt | Constr | "(" Expr ")"
+AtomExpr       ::= Var | LitInt | Constr | UnboxedTupleExpr | "(" Expr ")"
+UnboxedTupleExpr ::= "(#" (Expr ("," Expr)*)? "#)"
 
 LamExpr        ::= "\" Var+ "->" Expr
 
@@ -44,6 +46,7 @@ Pat            ::= "__DEFAULT"
                  | Var
                  | LitInt
                  | ConstrName Var*
+                 | "(#" (Var ("," Var)*)? "#)"
 
 Constr         ::= ConstrName AtomExpr*
 
@@ -76,6 +79,8 @@ CoreLite text directly maps 1-to-1 to the MoonBit AST:
 | **Default Pattern** | `__DEFAULT -> expr` | `Pat::Default(None)` |
 | **Literal Pattern** | `1# -> expr` | `Pat::Lit(Int)` |
 | **Data Pattern** | `Node l r -> expr` | `Pat::Data(String, Array[String])` |
+| **Unboxed Tuple** | `(# a, b #)` | `Expr::Constr("(#,#)", [a, b])` |
+| **Unboxed Tuple Pattern** | `(# x, y #) -> expr` | `Pat::Data("(#,#)", ["x", "y"])` |
 
 ---
 
@@ -307,4 +312,29 @@ ghc -c -O2 -package ghc -fplugin=CoronetPlugin \
 ghc -c -O2 -package ghc -fplugin=CoronetPlugin \
     -fplugin-opt=CoronetPlugin:out=tests/fixtures/heavy/Sha256.core \
     -ifrontend tests/fixtures/heavy/Sha256.hs
+```
+
+---
+
+## 10. Level 3 Primops & Unboxed Tuples (`tests/fixtures/primops/`)
+
+Coronet supports GHC unboxed tuples (`(# ... #)`), unboxed sums (`(# | ... #)`), and low-level primops (`ByteArray#`, `State# RealWorld`, `runRW#`, `quotInt#`, `remInt#`, `newByteArray#`, `readIntArray#`, `writeIntArray#`).
+
+### 10.1 Fixtures
+
+1. **`01_unboxed_tuple.hs`**:
+   - Tests unboxed pair construction `(# quotInt# a b, remInt# a b #)` and unboxed pattern matching `case divModPrim a b of (# q, r #) -> ...`.
+   - Verified output: `123`
+   - Core file: `tests/fixtures/primops/01_unboxed_tuple.core`
+
+2. **`02_io_state.hs`**:
+   - Tests `runRW#`, `State# RealWorld` threading, mutable byte arrays (`newByteArray#`), and array write/read primops (`writeIntArray#`, `readIntArray#`).
+   - Verified output: `63`
+   - Core file: `tests/fixtures/primops/02_io_state.core`
+
+### 10.2 Extraction
+
+```bash
+./frontend/extract_core.sh --plugin tests/fixtures/primops/01_unboxed_tuple.hs tests/fixtures/primops/01_unboxed_tuple.core
+./frontend/extract_core.sh --plugin tests/fixtures/primops/02_io_state.hs tests/fixtures/primops/02_io_state.core
 ```

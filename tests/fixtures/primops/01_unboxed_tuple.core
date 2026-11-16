@@ -1,0 +1,16 @@
+divModPrim
+  = \ a_aD4 b_aD5 ->
+      (# quotInt# a_aD4 b_aD5, remInt# a_aD4 b_aD5 #)
+
+compute
+  = \ a_aD6 b_aD7 ->
+      case divModPrim a_aD6 b_aD7 of ds_dZ4 {
+        (# ipv_sZ9, ipv_sZa #) -> +# (*# ipv_sZ9 10#) ipv_sZa
+      }
+
+result
+  = case divModPrim 123# 10# of ds_dZ4 {
+        (# ipv_sZ9, ipv_sZa #) -> I# (+# (*# ipv_sZ9 10#) ipv_sZa)
+      }
+
+main = result

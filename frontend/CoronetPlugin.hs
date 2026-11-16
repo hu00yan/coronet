@@ -4,7 +4,7 @@ module CoronetPlugin (plugin) where
 import GHC.Plugins
 import GHC.Core
 import GHC.Core.Utils
-import Data.List (isPrefixOf, intercalate, nub)
+import Data.List (isPrefixOf, isSuffixOf, intercalate, nub)
 import System.IO
 import System.Directory (doesFileExist, createDirectoryIfMissing)
 import Control.Monad.IO.Class (liftIO)
@@ -167,9 +167,30 @@ qualifyVarUse currentMod v
              then sanitizeModName curMName ++ "_" ++ occ
              else normalizeVarName occ
 
+isUnboxedTupleOcc :: String -> Bool
+isUnboxedTupleOcc s =
+  "(#" `isPrefixOf` s && "#)" `isSuffixOf` s &&
+  let inner = take (length s - 4) (drop 2 s)
+  in all (\c -> c == ',' || c == ' ') inner
+
+isUnboxedSumOcc :: String -> Bool
+isUnboxedSumOcc s =
+  "(#" `isPrefixOf` s && "#)" `isSuffixOf` s && '|' `elem` s
+
 isPrimitiveName :: String -> Bool
 isPrimitiveName occ =
-  occ `elem` ["I#", "True", "False", "+#", "-#", "*#", "<=#", "==#", "/=#", "<#", ">#", "+", "-", "*"]
+  occ `elem`
+    [ "I#", "W#", "W32#", "W64#", "I64#", "True", "False"
+    , "+#", "-#", "*#", "<=#", "==#", "/=#", "<#", ">#", "+", "-", "*"
+    , "quotInt#", "remInt#", "quotWord#", "remWord#"
+    , "and#", "or#", "xor#", "not#"
+    , "andI#", "orI#", "xorI#", "notI#"
+    , "uncheckedShiftL#", "uncheckedShiftRL#"
+    , "uncheckedIShiftL#", "uncheckedIShiftRL#", "uncheckedIShiftRA#"
+    , "runRW#", "newByteArray#", "readIntArray#", "writeIntArray#"
+    , "readByteArray#", "writeByteArray#"
+    , "State#", "RealWorld"
+    ] || isUnboxedTupleOcc occ || isUnboxedSumOcc occ
 
 renderBind :: Module -> CoreBind -> String
 renderBind currentMod (NonRec b expr) =
@@ -209,7 +230,14 @@ renderExpr currentMod expr = case expr of
         cleanArgs = filter (not . isTypeOrCoercion) args
     in if null cleanArgs
        then renderExpr currentMod headFn
-       else renderExpr currentMod headFn ++ " " ++ unwords (map (renderAtom currentMod) cleanArgs)
+       else
+         case headFn of
+           Var v | isUnboxedTupleOcc (occNameString (getOccName v)) ->
+             "(# " ++ intercalate ", " (map (renderExpr currentMod) cleanArgs) ++ " #)"
+           Var v | isUnboxedSumOcc (occNameString (getOccName v)) ->
+             "(# | " ++ unwords (map (renderExpr currentMod) cleanArgs) ++ " #)"
+           _ ->
+             renderExpr currentMod headFn ++ " " ++ unwords (map (renderAtom currentMod) cleanArgs)
   Lam _ _ ->
     let (bndrs, body) = collectBinders expr
         termBndrs = filter isId bndrs
@@ -242,6 +270,15 @@ renderAtom currentMod expr = case expr of
   App f (Coercion _) -> renderAtom currentMod f
   Cast e _ -> renderAtom currentMod e
   Tick _ e -> renderAtom currentMod e
+  App _ _ ->
+    let (headFn, args) = collectArgs expr
+        cleanArgs = filter (not . isTypeOrCoercion) args
+    in case headFn of
+         Var v | isUnboxedTupleOcc (occNameString (getOccName v)) ->
+           "(# " ++ intercalate ", " (map (renderExpr currentMod) cleanArgs) ++ " #)"
+         Var v | isUnboxedSumOcc (occNameString (getOccName v)) ->
+           "(# | " ++ unwords (map (renderExpr currentMod) cleanArgs) ++ " #)"
+         _ -> "(" ++ renderExpr currentMod expr ++ ")"
   _ -> "(" ++ renderExpr currentMod expr ++ ")"
 
 renderLiteral :: Literal -> String
@@ -266,7 +303,11 @@ renderAlt currentMod (Alt con bndrs e) =
         DataAlt dc ->
           let cname = occNameString (getOccName dc)
               termArgs = [bndrName v | v <- bndrs, isId v]
-          in if null termArgs then cname else cname ++ " " ++ unwords termArgs
+          in if isUnboxedTupleOcc cname
+             then "(# " ++ intercalate ", " termArgs ++ " #)"
+             else if isUnboxedSumOcc cname
+                  then "(# | " ++ unwords termArgs ++ " #)"
+                  else if null termArgs then cname else cname ++ " " ++ unwords termArgs
   in "        " ++ patStr ++ " -> " ++ renderExpr currentMod e
 
 -- Manifest JSON generation and updating
