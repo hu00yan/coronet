@@ -6,6 +6,7 @@ import GHC.Core
 import GHC.Core.Utils
 import GHC.Types.ForeignCall (ForeignCall(..), CCallSpec(..), CCallTarget(..))
 import GHC.Types.Id.Info (IdDetails(..))
+import Data.Char (isAlphaNum, ord)
 import Data.List (isPrefixOf, isSuffixOf, isInfixOf, intercalate, nub)
 import System.IO
 import System.Directory (doesFileExist, createDirectoryIfMissing)
@@ -153,7 +154,21 @@ sanitizeIdent raw
           rep ('/':xs)     = '_' : 'd' : 'i' : 'v' : '_' : rep xs
           rep ('+':xs)     = '_' : 'p' : 'l' : 'u' : 's' : '_' : rep xs
           rep ('-':xs)     = '_' : 'm' : 'i' : 'n' : 'u' : 's' : '_' : rep xs
-          rep (c:xs)       = c : rep xs
+          -- Operators a real package can name: Data.Map.(!?), Data.Set.(\\),
+          -- the (.) method selector `$c.`. CoreLite has no syntax for these,
+          -- so they get a readable escape instead of breaking the parse.
+          rep ('!':xs)     = '_' : 'b' : 'a' : 'n' : 'g' : '_' : rep xs
+          rep ('?':xs)     = '_' : 'q' : 'u' : 'e' : 's' : '_' : rep xs
+          rep ('\\':xs)    = '_' : 'b' : 's' : 'l' : '_' : rep xs
+          rep ('.':xs)     = '_' : 'd' : 'o' : 't' : '_' : rep xs
+          rep ('=':xs)     = '_' : 'e' : 'q' : '_' : rep xs
+          -- Anything else a symbol operator can contain (`=<<`, `>>>`, `<$!>`)
+          -- Characters CoreLite can lex as part of an operator name stay
+          -- literal (this keeps `[]`, `(:)`, `(,)`, `C:Show`, `&&` readable and
+          -- lets the core-lite side keep its constructor table keys).
+          rep (c:xs)
+            | isAlphaNum c || c `elem` "_$#'()[]&|:," = c : rep xs
+            | otherwise = '_' : 'u' : (show (ord c) ++ ('_' : rep xs))
       in rep raw
 
 extractFfiName :: CoreBndr -> Maybe String
