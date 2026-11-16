@@ -129,7 +129,17 @@ fn ident_name(tok : Token) -> String {
 
 fn is_op_char(c : Char) -> Bool {
   c == '+' || c == '-' || c == '*' || c == '/' || c == '<' || c == '>' || c == '=' ||
-  c == '&' || c == '|' || c == '!' || c == '%' || c == '^' || c == '~'
+  c == '&' || c == '|' || c == '!' || c == '?' || c == '%' || c == '^' || c == '~' ||
+  c == ':' || c == '\\'
+}
+
+///| Symbol characters GHC emits inside an occurrence name.
+///| `Data.Map.Internal.!?` reaches CoreLite as `Data_Map_Internal_!?`, so an
+///| alphanumeric identifier may continue with a symbol run. `-` and `>` are
+///| excluded so `\x` followed by `->` still lexes as an arrow.
+fn is_ident_symbol_char(c : Char) -> Bool {
+  c == '!' || c == '?' || c == ':' || c == '\\' || c == '*' || c == '#' || c == '$' ||
+  c == '%' || c == '^' || c == '~' || c == '&' || c == '|' || c == '/' || c == '.'
 }
 
 // ----------------------------------------------------------------------------
@@ -653,7 +663,11 @@ fn Lexer::next_token(self : Lexer) -> Result[Token, String] {
     }
   }
 
-  // Dot operators: .&., .|., .^., etc.
+  // Dot operators: .&., .|., .^., etc., and the bare `.` operator name.
+  if c == '.' && !(self.pos + 1 < self.src.length() && is_op_char(self.char_at(self.pos + 1))) {
+    self.pos = self.pos + 1
+    return Ok(Token::Ident("."))
+  }
   if c == '.' && self.pos + 1 < self.src.length() && is_op_char(self.char_at(self.pos + 1)) {
     let start = self.pos
     while self.pos < self.src.length() {
@@ -675,11 +689,11 @@ fn Lexer::next_token(self : Lexer) -> Result[Token, String] {
   }
 
   // Operators: +, -, *, /, <, >, ==, etc.
-  if c == '+' || c == '-' || c == '*' || c == '/' || c == '<' || c == '>' || c == '=' || c == '&' || c == '|' || c == '!' || c == '%' || c == '^' || c == '~' {
+  if is_op_char(c) {
     let start = self.pos
     while self.pos < self.src.length() {
       let ch = self.char_at(self.pos)
-      if ch == '+' || ch == '-' || ch == '*' || ch == '/' || ch == '<' || ch == '>' || ch == '=' || ch == '&' || ch == '|' || ch == '!' || ch == '%' || ch == '^' || ch == '~' || ch == '#' {
+      if is_op_char(ch) || ch == '#' {
         self.pos = self.pos + 1
       } else {
         break
@@ -694,7 +708,7 @@ fn Lexer::next_token(self : Lexer) -> Result[Token, String] {
     let start = self.pos
     while self.pos < self.src.length() {
       let ch = self.char_at(self.pos)
-      if (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9') || ch == '_' || ch == '\'' || ch == '$' || ch == '*' || ch == '#' {
+      if (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9') || ch == '_' || ch == '\'' || ch == '$' || is_ident_symbol_char(ch) {
         self.pos = self.pos + 1
       } else {
         break
