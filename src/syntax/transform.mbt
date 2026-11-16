@@ -642,6 +642,18 @@ pub fn is_known_builtin(name : String) -> Bool {
     "add_mod" | "mul31_mod" | "_fNumWord32__c" | "divModPrim" => true
     "LT" | "EQ" | "GT" => true
     "dataToTagSmall#" | "dataToTagSmall" | "tagToEnum#" | "tagToEnum" => true
+    // GHC's pointer-identity fast path, which -O inserts into library code.
+    // Only `True` implies anything, so answering "not the same object" is
+    // always a sound approximation; lowering emits the constant 0.
+    "reallyUnsafePtrEquality#" | "reallyUnsafePtrEquality" => true
+    // `lazy x = x` in GHC.Exts: GHC wraps a lazily-bound value to stop strictness
+    // analysis. The net encoding is already lazy, so it is the identity here.
+    "lazy" => true
+    // GHC's `error`/`undefined` crash paths. There is no exception channel in a
+    // pure net, so lowering answers with a defined value; a program that really
+    // takes this path reports a number GHC would never print.
+    "error" | "errorWithoutStackTrace" | "undefined" => true
+    "&&" | "||" | "isTrue#" | "isTrue" => true
     "eqString" | "map" | "filter" | "_plus__plus_" | "concatMap" | "elem" | "notElem" | "fst" | "snd" => true
     "$fEqList_$c_eq_" | "$fEqTuple2" | "$fEqList_$s$c_ne_1" | "$fEqList_$s$fEqList1" => true
     "C:Eq" | "C:Show" | "C:Num" | "C:Ord" | "Eq" | "C_Eq" => true
@@ -671,6 +683,95 @@ pub fn is_known_symbol(
     }
   }
   false
+}
+
+///| Crash primitives whose message argument is never needed.
+fn is_crash_prim_name(name : String) -> Bool {
+  match name {
+    "error" | "errorWithoutStackTrace" | "undefined" | "patError" | "patError#" |
+    "absentError" | "raise#" | "raiseIO#" => true
+    _ => false
+  }
+}
+
+///| Replace `error msg` / `patError msg` / `undefined` with a plain value.
+///|
+///| GHC only needs the message to print a diagnostic and then kill the process,
+///| so the argument is dead code for a pure evaluator: it is usually a chain of
+///| `unpackCString#` constants living in a module the project never compiles.
+///| Dropping it here is what keeps real Core compilable, and it is also what
+///| removes those dangling references from the emitted book.
+pub fn strip_crash_messages(prog : Program) -> Program {
+  fn rewrite(expr : Expr) -> Expr {
+    match expr {
+      App(_, _) => {
+        let (head, args) = expr.unwind_app()
+        match head {
+          Var(name) =>
+            if is_crash_prim_name(name) && args.length() > 0 {
+              return LitInt(0)
+            }
+          _ => ()
+        }
+        let mut rebuilt = rewrite(head)
+        for a in args {
+          rebuilt = App(rebuilt, rewrite(a))
+        }
+        rebuilt
+      }
+      Lam(p, body) => Lam(p, rewrite(body))
+      Let(bind, body) => {
+        match bind {
+          NonRec(n, v) => Let(NonRec(n, rewrite(v)), rewrite(body))
+          Rec(pairs) => {
+            let new_pairs : Array[(String, Expr)] = []
+            for p in pairs {
+              new_pairs.push((p.0, rewrite(p.1)))
+            }
+            Let(Rec(new_pairs), rewrite(body))
+          }
+        }
+      }
+      Case(scrut, binder, alts) => {
+        let new_alts : Array[Alt] = []
+        for alt in alts {
+          new_alts.push({ pat: alt.pat, expr: rewrite(alt.expr) })
+        }
+        Case(rewrite(scrut), binder, new_alts)
+      }
+      Constr(c, args) => {
+        let new_args : Array[Expr] = []
+        for a in args {
+          new_args.push(rewrite(a))
+        }
+        Constr(c, new_args)
+      }
+      _ => expr
+    }
+  }
+
+  let new_binds : Array[Bind] = []
+  for b in prog.binds {
+    match b {
+      NonRec(n, e) => new_binds.push(NonRec(n, rewrite(e)))
+      Rec(pairs) => {
+        let new_pairs : Array[(String, Expr)] = []
+        for p in pairs {
+          new_pairs.push((p.0, rewrite(p.1)))
+        }
+        new_binds.push(Rec(new_pairs))
+      }
+    }
+  }
+  Program::new(new_binds)
+}
+
+///| Free variables of one expression, in first-seen order. Used by
+///| `coronet --report-gaps` to name what a Core unit still depends on.
+pub fn expr_free_vars(expr : Expr) -> Array[String] {
+  let acc : Array[String] = []
+  collect_expr_free_vars_rec(expr, [], acc)
+  acc
 }
 
 fn collect_expr_free_vars_rec(
