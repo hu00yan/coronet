@@ -1,0 +1,184 @@
+diff -ruN --exclude=.git --exclude=target --exclude=dist-newstyle --exclude=.DS_Store /tmp/hvm2-clone/build.rs vendor/HVM2/build.rs
+--- /tmp/hvm2-clone/build.rs	2026-11-16 23:25:16
++++ vendor/HVM2/build.rs	2026-11-16 23:55:09
+@@ -12,7 +12,7 @@
+       .file("src/run.c")
+       .opt_level(3)
+       .warnings(false)
+-      .define("TPC_L2", &*tpcl2.to_string())
++      .define("TPC_L2", &*std::env::var("HVM_TPC_L2").unwrap_or(tpcl2.to_string()))
+       .define("IO", None)
+       .try_compile("hvm-c") {
+     Ok(_) => println!("cargo:rustc-cfg=feature=\"c\""),
+diff -ruN --exclude=.git --exclude=target --exclude=dist-newstyle --exclude=.DS_Store /tmp/hvm2-clone/src/hvm.c vendor/HVM2/src/hvm.c
+--- /tmp/hvm2-clone/src/hvm.c	2026-11-16 23:25:16
++++ vendor/HVM2/src/hvm.c	2026-11-17 01:04:22
+@@ -177,6 +177,22 @@
+   Pair hbag_buf[HLEN]; // high-priority redexes
+ } TM;
+ 
++// CORONET-DIAG: per-def/per-rule interaction counters, enabled by HVM_DIAG=1.
++static _Atomic u64 G_DEF_ITRS[0x4000];
++static _Atomic u64 G_RULE_ITRS[8];
++static _Atomic u64 G_DIAG_TOTAL;
++static _Atomic u64 G_DIAG_ITRS;
++static _Atomic u64 G_TID_ITRS[TPC];
++static int G_DIAG = -1;
++static int diag_on(void) {
++  if (G_DIAG < 0) {
++    char* e = getenv("HVM_DIAG");
++    G_DIAG = (e != NULL && e[0] >= '1' && e[0] <= '2') ? (e[0] - '0') : 0;
++  }
++  return G_DIAG;
++}
++// CORONET-DIAG end
++
+ // Debugger
+ // --------
+ 
+@@ -901,6 +917,10 @@
+   }
+   link_pair(net, tm, new_pair(adjust_port(net, tm, def->root), b));
+ 
++  // CORONET-DIAG
++  if (diag_on() == 1) atomic_fetch_add_explicit(&G_DEF_ITRS[fid], 1, memory_order_relaxed);
++  // CORONET-DIAG end
++
+   return true;
+ }
+ #endif
+@@ -1093,6 +1113,9 @@
+ 
+     // Dispatches interaction rule.
+     bool success;
++    // CORONET-DIAG
++    if (diag_on() == 1) { atomic_fetch_add_explicit(&G_RULE_ITRS[rule], 1, memory_order_relaxed); atomic_fetch_add_explicit(&G_DIAG_TOTAL, 1, memory_order_relaxed); }
++    // CORONET-DIAG end
+     switch (rule) {
+       case LINK: success = interact_link(net, tm, a, b); break;
+       #ifdef COMPILED
+@@ -1115,6 +1138,7 @@
+     // Else, increments the interaction count.
+     } else if (rule != LINK) {
+       tm->itrs += 1;
++      if (diag_on() == 1) atomic_fetch_add_explicit(&G_DIAG_ITRS, 1, memory_order_relaxed);
+     }
+   }
+ 
+@@ -1181,6 +1205,7 @@
+   sync_threads();
+ 
+   atomic_fetch_add(&net->itrs, tm->itrs);
++  if (diag_on()) atomic_fetch_add_explicit(&G_TID_ITRS[tm->tid], tm->itrs, memory_order_relaxed);
+   tm->itrs = 0;
+ }
+ 
+@@ -1783,6 +1808,37 @@
+   printf("- ITRS: %" PRIu64 "\n", itrs);
+   printf("- TIME: %.2fs\n", duration);
+   printf("- MIPS: %.2f\n", (double)itrs / duration / 1000000.0);
++
++  // CORONET-DIAG
++  if (diag_on() == 2) {
++    printf("- TID_ITRS:");
++    for (u32 t = 0; t < TPC; t++) {
++      printf(" %u=%" PRIu64, t, atomic_load(&G_TID_ITRS[t]));
++    }
++    printf("\n");
++  }
++  if (diag_on() == 1) {
++    static const char* RULE_NAMES[8] = {"LINK","CALL","VOID","ERAS","ANNI","COMM","OPER","SWIT"};
++    printf("- RULE_ITRS: total=%" PRIu64 " itrs_inc=%" PRIu64 " LINK=%" PRIu64, atomic_load(&G_DIAG_TOTAL), atomic_load(&G_DIAG_ITRS), atomic_load(&G_RULE_ITRS[0]));
++    for (int r = 1; r < 8; r++) {
++      u64 v = atomic_load(&G_RULE_ITRS[r]);
++      if (v > 0) printf(" %s=%" PRIu64, RULE_NAMES[r], v);
++    }
++    printf("\n");
++    printf("- TID_ITRS:");
++    for (u32 t = 0; t < TPC; t++) {
++      printf(" %u=%" PRIu64, t, atomic_load(&G_TID_ITRS[t]));
++    }
++    printf("\n");
++    printf("- DEF_ITRS:\n");
++    for (u32 d = 0; d < book->defs_len; d++) {
++      u64 v = atomic_load(&G_DEF_ITRS[d]);
++      if (v > 0) {
++        printf("  %s %" PRIu64 "\n", book->defs_buf[d].name, v);
++      }
++    }
++  }
++  // CORONET-DIAG end
+ 
+   // Frees everything
+   free_static_tms();
+diff -ruN --exclude=.git --exclude=target --exclude=dist-newstyle --exclude=.DS_Store /tmp/hvm2-clone/src/hvm.rs vendor/HVM2/src/hvm.rs
+--- /tmp/hvm2-clone/src/hvm.rs	2026-11-16 23:25:16
++++ vendor/HVM2/src/hvm.rs	2026-11-17 01:29:33
+@@ -656,18 +656,8 @@
+     let def = &book.defs[fid];
+ 
+     // Copy Optimization.
+-    if b.get_tag() == DUP {
+-      if def.safe {
+-        return self.interact_eras(net, a, b);
+-      } else {
+-        // TODO:
+-        // Currently, we'll not allow copying of REFs with DUPs. While this is perfectly valid on
+-        // IC semantics (i.e., if the user know what they're doing), this can lead to unsound
+-        // reductions when compiling λ-terms to HVM. So, for now, we'll just disable this feature,
+-        // and consider it undefined behavior. We should add a `--unsafe` flag that allows it.
+-        println!("ERROR: attempt to clone a non-affine global reference.\n");
+-        std::process::exit(0);
+-      }
++    if def.safe && b.get_tag() == DUP {
++      return self.interact_eras(net, a, b);
+     }
+ 
+     // Allocates needed nodes and vars.
+diff -ruN --exclude=.git --exclude=dist-newstyle --exclude=dist --exclude=.DS_Store /tmp/hvm3-clone/HVM.cabal vendor/HVM3/HVM.cabal
+--- /tmp/hvm3-clone/HVM.cabal	2026-11-16 23:25:20
++++ vendor/HVM3/HVM.cabal	2026-11-16 23:28:24
+@@ -17,12 +17,12 @@
+ 
+ library
+     default-language: GHC2024
+-    build-depends:    base ^>=4.21.0.0,
+-                      mtl ^>=2.3.1,
+-                      containers ^>=0.7,
+-                      parsec ^>=3.1.17.0,
+-                      hs-highlight ^>= 1.0.5,
+-                      ansi-terminal == 1.1.1,
++    build-depends:    base >=4.21 && <5,
++                      mtl >=2.3,
++                      containers >=0.7 && <0.9,
++                      parsec >=3.1,
++                      hs-highlight >= 1.0.5,
++                      ansi-terminal >= 1.1,
+                       file-embed,
+                       process,
+                       libffi,
+@@ -50,8 +50,8 @@
+ 
+ executable hvm
+     default-language: GHC2024
+-    build-depends:    base ^>=4.21.0.0,
+-                      containers ^>=0.7,
++    build-depends:    base >=4.21 && <5,
++                      containers >=0.7 && <0.9,
+                       network
+     main-is:          Main.hs
+     build-depends:    HVM
+diff -ruN --exclude=.git --exclude=dist-newstyle --exclude=dist --exclude=.DS_Store /tmp/hvm3-clone/src/HVM/Runtime.c vendor/HVM3/src/HVM/Runtime.c
+--- /tmp/hvm3-clone/src/HVM/Runtime.c	2026-11-16 23:25:20
++++ vendor/HVM3/src/HVM/Runtime.c	2026-11-16 23:28:10
+@@ -58,6 +58,10 @@
+ #include "runtime/reduce/opy_w32.c"
+ #include "runtime/reduce/opy_una.c"
+ 
++// REF
++#include "runtime/reduce/ref.c"
++#include "runtime/reduce/ref_sup.c"
++
+ // Primitives
+ #include "runtime/prim/SUP.c"
+ #include "runtime/prim/DUP.c"
