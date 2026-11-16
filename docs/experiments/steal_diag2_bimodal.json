@@ -1,0 +1,754 @@
+[
+ {
+  "exe": "book.t1",
+  "wall_s": 0.5687,
+  "rc": 0,
+  "itrs": 22884287,
+  "result": "352",
+  "tid_itrs": [
+   18767533,
+   4116754
+  ],
+  "load1": ":06  up 1 day, 10:34, 2 users, load averages: 7.18 4.46 4.49",
+  "round": 0
+ },
+ {
+  "exe": "book.t2",
+  "wall_s": 0.6039,
+  "rc": 0,
+  "itrs": 22884287,
+  "result": "352",
+  "tid_itrs": [
+   22880422,
+   2338,
+   822,
+   705
+  ],
+  "load1": ":06  up 1 day, 10:34, 2 users, load averages: 7.18 4.46 4.49",
+  "round": 0
+ },
+ {
+  "exe": "book.t3",
+  "wall_s": 0.2906,
+  "rc": 0,
+  "itrs": 22884287,
+  "result": "352",
+  "tid_itrs": [
+   0,
+   11,
+   2851,
+   22880349,
+   995,
+   81,
+   0,
+   0
+  ],
+  "load1": ":06  up 1 day, 10:34, 2 users, load averages: 7.18 4.46 4.49",
+  "round": 0
+ },
+ {
+  "exe": "book.t1",
+  "wall_s": 0.2029,
+  "rc": 0,
+  "itrs": 22884287,
+  "result": "352",
+  "tid_itrs": [
+   16174021,
+   6710266
+  ],
+  "load1": ":06  up 1 day, 10:34, 2 users, load averages: 7.18 4.46 4.49",
+  "round": 1
+ },
+ {
+  "exe": "book.t2",
+  "wall_s": 0.1592,
+  "rc": 0,
+  "itrs": 22884287,
+  "result": "352",
+  "tid_itrs": [
+   12352283,
+   3856793,
+   3413836,
+   3261375
+  ],
+  "load1": ":06  up 1 day, 10:34, 2 users, load averages: 7.18 4.46 4.49",
+  "round": 1
+ },
+ {
+  "exe": "book.t3",
+  "wall_s": 0.2596,
+  "rc": 0,
+  "itrs": 22884287,
+  "result": "352",
+  "tid_itrs": [
+   690431,
+   260097,
+   455088,
+   1470050,
+   15559414,
+   1040393,
+   1808107,
+   1600707
+  ],
+  "load1": ":06  up 1 day, 10:34, 2 users, load averages: 7.18 4.46 4.49",
+  "round": 1
+ },
+ {
+  "exe": "book.t1",
+  "wall_s": 0.1824,
+  "rc": 0,
+  "itrs": 22884287,
+  "result": "352",
+  "tid_itrs": [
+   13883954,
+   9000333
+  ],
+  "load1": ":06  up 1 day, 10:34, 2 users, load averages: 7.18 4.46 4.49",
+  "round": 2
+ },
+ {
+  "exe": "book.t2",
+  "wall_s": 0.092,
+  "rc": 0,
+  "itrs": 22884287,
+  "result": "352",
+  "tid_itrs": [
+   5520273,
+   5308729,
+   5894138,
+   6161147
+  ],
+  "load1": ":06  up 1 day, 10:34, 2 users, load averages: 7.18 4.46 4.49",
+  "round": 2
+ },
+ {
+  "exe": "book.t3",
+  "wall_s": 0.2654,
+  "rc": 0,
+  "itrs": 22884287,
+  "result": "352",
+  "tid_itrs": [
+   283749,
+   271401,
+   134277,
+   548231,
+   258280,
+   535639,
+   699831,
+   20152879
+  ],
+  "load1": ":06  up 1 day, 10:34, 2 users, load averages: 7.18 4.46 4.49",
+  "round": 2
+ },
+ {
+  "exe": "book.t1",
+  "wall_s": 0.1993,
+  "rc": 0,
+  "itrs": 22884287,
+  "result": "352",
+  "tid_itrs": [
+   15840843,
+   7043444
+  ],
+  "load1": ":06  up 1 day, 10:34, 2 users, load averages: 7.18 4.46 4.49",
+  "round": 3
+ },
+ {
+  "exe": "book.t2",
+  "wall_s": 0.2853,
+  "rc": 0,
+  "itrs": 22884287,
+  "result": "352",
+  "tid_itrs": [
+   943755,
+   20972748,
+   543415,
+   424369
+  ],
+  "load1": ":06  up 1 day, 10:34, 2 users, load averages: 7.18 4.46 4.49",
+  "round": 3
+ },
+ {
+  "exe": "book.t3",
+  "wall_s": 0.1062,
+  "rc": 0,
+  "itrs": 22884287,
+  "result": "352",
+  "tid_itrs": [
+   4883301,
+   4418143,
+   2256198,
+   2156019,
+   297165,
+   1578721,
+   3906649,
+   3388091
+  ],
+  "load1": ":06  up 1 day, 10:34, 2 users, load averages: 7.18 4.46 4.49",
+  "round": 3
+ },
+ {
+  "exe": "book.t1",
+  "wall_s": 0.4285,
+  "rc": 0,
+  "itrs": 22884287,
+  "result": "352",
+  "tid_itrs": [
+   22884279,
+   8
+  ],
+  "load1": ":06  up 1 day, 10:34, 2 users, load averages: 7.18 4.46 4.49",
+  "round": 4
+ },
+ {
+  "exe": "book.t2",
+  "wall_s": 0.2558,
+  "rc": 0,
+  "itrs": 22884287,
+  "result": "352",
+  "tid_itrs": [
+   76926,
+   2510274,
+   20288031,
+   9056
+  ],
+  "load1": ":06  up 1 day, 10:34, 2 users, load averages: 7.18 4.46 4.49",
+  "round": 4
+ },
+ {
+  "exe": "book.t3",
+  "wall_s": 0.2604,
+  "rc": 0,
+  "itrs": 22884287,
+  "result": "352",
+  "tid_itrs": [
+   267602,
+   2186321,
+   20224978,
+   1661,
+   72726,
+   25085,
+   75544,
+   30370
+  ],
+  "load1": ":06  up 1 day, 10:34, 2 users, load averages: 7.18 4.46 4.49",
+  "round": 4
+ },
+ {
+  "exe": "book.t1",
+  "wall_s": 0.1643,
+  "rc": 0,
+  "itrs": 22884287,
+  "result": "352",
+  "tid_itrs": [
+   11648535,
+   11235752
+  ],
+  "load1": ":06  up 1 day, 10:34, 2 users, load averages: 7.18 4.46 4.49",
+  "round": 5
+ },
+ {
+  "exe": "book.t2",
+  "wall_s": 0.2043,
+  "rc": 0,
+  "itrs": 22884287,
+  "result": "352",
+  "tid_itrs": [
+   2939929,
+   15899558,
+   1264623,
+   2780177
+  ],
+  "load1": ":06  up 1 day, 10:34, 2 users, load averages: 7.18 4.46 4.49",
+  "round": 5
+ },
+ {
+  "exe": "book.t3",
+  "wall_s": 0.1073,
+  "rc": 0,
+  "itrs": 22884287,
+  "result": "352",
+  "tid_itrs": [
+   1347566,
+   997501,
+   1561961,
+   1788180,
+   2912646,
+   3632912,
+   4885518,
+   5758003
+  ],
+  "load1": ":06  up 1 day, 10:34, 2 users, load averages: 7.18 4.46 4.49",
+  "round": 5
+ },
+ {
+  "exe": "book.t1",
+  "wall_s": 0.282,
+  "rc": 0,
+  "itrs": 22884287,
+  "result": "352",
+  "tid_itrs": [
+   22775278,
+   109009
+  ],
+  "load1": ":06  up 1 day, 10:34, 2 users, load averages: 7.18 4.46 4.49",
+  "round": 6
+ },
+ {
+  "exe": "book.t2",
+  "wall_s": 0.3726,
+  "rc": 0,
+  "itrs": 22884287,
+  "result": "352",
+  "tid_itrs": [
+   22883854,
+   6,
+   11,
+   416
+  ],
+  "load1": ":06  up 1 day, 10:34, 2 users, load averages: 7.18 4.46 4.49",
+  "round": 6
+ },
+ {
+  "exe": "book.t3",
+  "wall_s": 0.1212,
+  "rc": 0,
+  "itrs": 22884287,
+  "result": "352",
+  "tid_itrs": [
+   1477389,
+   3889820,
+   5409603,
+   4261231,
+   3508504,
+   2312824,
+   1502759,
+   522157
+  ],
+  "load1": ":06  up 1 day, 10:34, 2 users, load averages: 7.80 4.63 4.55",
+  "round": 6
+ },
+ {
+  "exe": "book.t1",
+  "wall_s": 0.2839,
+  "rc": 0,
+  "itrs": 22884287,
+  "result": "352",
+  "tid_itrs": [
+   22880917,
+   3370
+  ],
+  "load1": ":06  up 1 day, 10:34, 2 users, load averages: 7.80 4.63 4.55",
+  "round": 7
+ },
+ {
+  "exe": "book.t2",
+  "wall_s": 0.1141,
+  "rc": 0,
+  "itrs": 22884287,
+  "result": "352",
+  "tid_itrs": [
+   3059053,
+   7789958,
+   7423881,
+   4611395
+  ],
+  "load1": ":06  up 1 day, 10:34, 2 users, load averages: 7.80 4.63 4.55",
+  "round": 7
+ },
+ {
+  "exe": "book.t3",
+  "wall_s": 0.2618,
+  "rc": 0,
+  "itrs": 22884287,
+  "result": "352",
+  "tid_itrs": [
+   131943,
+   886807,
+   1227959,
+   20222723,
+   4518,
+   27991,
+   142556,
+   239790
+  ],
+  "load1": ":06  up 1 day, 10:34, 2 users, load averages: 7.80 4.63 4.55",
+  "round": 7
+ },
+ {
+  "exe": "book.t1",
+  "wall_s": 0.4562,
+  "rc": 0,
+  "itrs": 22884287,
+  "result": "352",
+  "tid_itrs": [
+   5,
+   22884282
+  ],
+  "load1": ":06  up 1 day, 10:34, 2 users, load averages: 7.80 4.63 4.55",
+  "round": 8
+ },
+ {
+  "exe": "book.t2",
+  "wall_s": 0.2841,
+  "rc": 0,
+  "itrs": 22884287,
+  "result": "352",
+  "tid_itrs": [
+   22774333,
+   7601,
+   14184,
+   88169
+  ],
+  "load1": ":06  up 1 day, 10:34, 2 users, load averages: 7.80 4.63 4.55",
+  "round": 8
+ },
+ {
+  "exe": "book.t3",
+  "wall_s": 0.1332,
+  "rc": 0,
+  "itrs": 22884287,
+  "result": "352",
+  "tid_itrs": [
+   1337345,
+   894149,
+   380589,
+   1522136,
+   3510677,
+   5580458,
+   6027067,
+   3631866
+  ],
+  "load1": ":06  up 1 day, 10:34, 2 users, load averages: 7.80 4.63 4.55",
+  "round": 8
+ },
+ {
+  "exe": "book.t1",
+  "wall_s": 0.4189,
+  "rc": 0,
+  "itrs": 22884287,
+  "result": "352",
+  "tid_itrs": [
+   5,
+   22884282
+  ],
+  "load1": ":06  up 1 day, 10:34, 2 users, load averages: 7.80 4.63 4.55",
+  "round": 9
+ },
+ {
+  "exe": "book.t2",
+  "wall_s": 0.1232,
+  "rc": 0,
+  "itrs": 22884287,
+  "result": "352",
+  "tid_itrs": [
+   5700791,
+   4762669,
+   6523071,
+   5897756
+  ],
+  "load1": ":06  up 1 day, 10:34, 2 users, load averages: 7.80 4.63 4.55",
+  "round": 9
+ },
+ {
+  "exe": "book.t3",
+  "wall_s": 0.1325,
+  "rc": 0,
+  "itrs": 22884287,
+  "result": "352",
+  "tid_itrs": [
+   3115149,
+   1695731,
+   1541578,
+   3179866,
+   3598689,
+   1810956,
+   5835485,
+   2106833
+  ],
+  "load1": ":06  up 1 day, 10:34, 2 users, load averages: 7.80 4.63 4.55",
+  "round": 9
+ },
+ {
+  "exe": "book.t1",
+  "wall_s": 0.4462,
+  "rc": 0,
+  "itrs": 22884287,
+  "result": "352",
+  "tid_itrs": [
+   22884280,
+   7
+  ],
+  "load1": ":06  up 1 day, 10:34, 2 users, load averages: 7.80 4.63 4.55",
+  "round": 10
+ },
+ {
+  "exe": "book.t2",
+  "wall_s": 0.2625,
+  "rc": 0,
+  "itrs": 22884287,
+  "result": "352",
+  "tid_itrs": [
+   7838,
+   73414,
+   2495762,
+   20307273
+  ],
+  "load1": ":06  up 1 day, 10:34, 2 users, load averages: 7.80 4.63 4.55",
+  "round": 10
+ },
+ {
+  "exe": "book.t3",
+  "wall_s": 0.1018,
+  "rc": 0,
+  "itrs": 22884287,
+  "result": "352",
+  "tid_itrs": [
+   6050773,
+   4910977,
+   3133476,
+   2009523,
+   1175249,
+   519069,
+   1474484,
+   3610736
+  ],
+  "load1": ":06  up 1 day, 10:34, 2 users, load averages: 7.80 4.63 4.55",
+  "round": 10
+ },
+ {
+  "exe": "book.t1",
+  "wall_s": 0.4561,
+  "rc": 0,
+  "itrs": 22884287,
+  "result": "352",
+  "tid_itrs": [
+   22884280,
+   7
+  ],
+  "load1": ":06  up 1 day, 10:34, 2 users, load averages: 7.80 4.63 4.55",
+  "round": 11
+ },
+ {
+  "exe": "book.t2",
+  "wall_s": 0.0921,
+  "rc": 0,
+  "itrs": 22884287,
+  "result": "352",
+  "tid_itrs": [
+   5324332,
+   5733810,
+   6000226,
+   5825919
+  ],
+  "load1": ":06  up 1 day, 10:34, 2 users, load averages: 7.80 4.63 4.55",
+  "round": 11
+ },
+ {
+  "exe": "book.t3",
+  "wall_s": 0.2184,
+  "rc": 0,
+  "itrs": 22884287,
+  "result": "352",
+  "tid_itrs": [
+   564292,
+   216832,
+   191155,
+   519181,
+   1606851,
+   1513615,
+   16564574,
+   1707787
+  ],
+  "load1": ":06  up 1 day, 10:34, 2 users, load averages: 7.80 4.63 4.55",
+  "round": 11
+ },
+ {
+  "exe": "book.t1",
+  "wall_s": 0.2528,
+  "rc": 0,
+  "itrs": 22884287,
+  "result": "352",
+  "tid_itrs": [
+   2958554,
+   19925733
+  ],
+  "load1": ":06  up 1 day, 10:34, 2 users, load averages: 7.80 4.63 4.55",
+  "round": 12
+ },
+ {
+  "exe": "book.t2",
+  "wall_s": 0.4726,
+  "rc": 0,
+  "itrs": 22884287,
+  "result": "352",
+  "tid_itrs": [
+   4,
+   2,
+   2,
+   22884279
+  ],
+  "load1": ":06  up 1 day, 10:34, 2 users, load averages: 7.80 4.63 4.55",
+  "round": 12
+ },
+ {
+  "exe": "book.t3",
+  "wall_s": 0.0838,
+  "rc": 0,
+  "itrs": 22884287,
+  "result": "352",
+  "tid_itrs": [
+   3487517,
+   1788547,
+   2142868,
+   2726327,
+   3056588,
+   2977780,
+   3994106,
+   2710554
+  ],
+  "load1": ":06  up 1 day, 10:34, 2 users, load averages: 7.80 4.63 4.55",
+  "round": 12
+ },
+ {
+  "exe": "book.t1",
+  "wall_s": 0.4067,
+  "rc": 0,
+  "itrs": 22884287,
+  "result": "352",
+  "tid_itrs": [
+   22884279,
+   8
+  ],
+  "load1": ":06  up 1 day, 10:34, 2 users, load averages: 7.50 4.62 4.55",
+  "round": 13
+ },
+ {
+  "exe": "book.t2",
+  "wall_s": 0.193,
+  "rc": 0,
+  "itrs": 22884287,
+  "result": "352",
+  "tid_itrs": [
+   4432140,
+   14947934,
+   1337654,
+   2166559
+  ],
+  "load1": ":06  up 1 day, 10:34, 2 users, load averages: 7.50 4.62 4.55",
+  "round": 13
+ },
+ {
+  "exe": "book.t3",
+  "wall_s": 0.2891,
+  "rc": 0,
+  "itrs": 22884287,
+  "result": "352",
+  "tid_itrs": [
+   0,
+   11,
+   38510,
+   22844647,
+   339,
+   780,
+   0,
+   0
+  ],
+  "load1": ":06  up 1 day, 10:34, 2 users, load averages: 7.50 4.62 4.55",
+  "round": 13
+ },
+ {
+  "exe": "book.t1",
+  "wall_s": 0.421,
+  "rc": 0,
+  "itrs": 22884287,
+  "result": "352",
+  "tid_itrs": [
+   22884279,
+   8
+  ],
+  "load1": ":06  up 1 day, 10:34, 2 users, load averages: 7.50 4.62 4.55",
+  "round": 14
+ },
+ {
+  "exe": "book.t2",
+  "wall_s": 0.17,
+  "rc": 0,
+  "itrs": 22884287,
+  "result": "352",
+  "tid_itrs": [
+   2946920,
+   3913099,
+   13294939,
+   2729329
+  ],
+  "load1": ":06  up 1 day, 10:34, 2 users, load averages: 7.50 4.62 4.55",
+  "round": 14
+ },
+ {
+  "exe": "book.t3",
+  "wall_s": 0.2415,
+  "rc": 0,
+  "itrs": 22884287,
+  "result": "352",
+  "tid_itrs": [
+   1329107,
+   1257865,
+   17644374,
+   318704,
+   275125,
+   265219,
+   306493,
+   1487400
+  ],
+  "load1": ":06  up 1 day, 10:34, 2 users, load averages: 7.50 4.62 4.55",
+  "round": 14
+ },
+ {
+  "exe": "book.t1",
+  "wall_s": 0.4874,
+  "rc": 0,
+  "itrs": 22884287,
+  "result": "352",
+  "tid_itrs": [
+   22884279,
+   8
+  ],
+  "load1": ":06  up 1 day, 10:34, 2 users, load averages: 7.50 4.62 4.55",
+  "round": 15
+ },
+ {
+  "exe": "book.t2",
+  "wall_s": 0.293,
+  "rc": 0,
+  "itrs": 22884287,
+  "result": "352",
+  "tid_itrs": [
+   3587,
+   4545,
+   6420,
+   22869735
+  ],
+  "load1": ":06  up 1 day, 10:34, 2 users, load averages: 7.50 4.62 4.55",
+  "round": 15
+ },
+ {
+  "exe": "book.t3",
+  "wall_s": 0.2935,
+  "rc": 0,
+  "itrs": 22884287,
+  "result": "352",
+  "tid_itrs": [
+   0,
+   11,
+   46632,
+   22835779,
+   1750,
+   115,
+   0,
+   0
+  ],
+  "load1": ":06  up 1 day, 10:34, 2 users, load averages: 7.50 4.62 4.55",
+  "round": 15
+ }
+]
