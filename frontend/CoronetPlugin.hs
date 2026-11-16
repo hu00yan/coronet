@@ -129,13 +129,39 @@ mentionsIo expr = case expr of
   Tick _ e -> mentionsIo e
   _ -> False
 
+isStandAloneOperator :: String -> Bool
+isStandAloneOperator s =
+  s `elem`
+    [ "+", "-", "*", "/", "==", "/=", "<", "<=", ">", ">="
+    , "+#", "-#", "*#", "*H#", "==#", "/=#", "<#", "<=#", ">#", ">=#"
+    ]
+
+sanitizeIdent :: String -> String
+sanitizeIdent raw
+  | isStandAloneOperator raw = raw
+  | isUnboxedTupleOcc raw || isUnboxedSumOcc raw = raw
+  | otherwise =
+      let rep [] = []
+          rep ('/':'=':xs) = '_' : 'n' : 'e' : '_' : rep xs
+          rep ('=':'=':xs) = '_' : 'e' : 'q' : '_' : rep xs
+          rep ('<':'=':xs) = '_' : 'l' : 'e' : '_' : rep xs
+          rep ('>':'=':xs) = '_' : 'g' : 'e' : '_' : rep xs
+          rep ('<':xs)     = '_' : 'l' : 't' : '_' : rep xs
+          rep ('>':xs)     = '_' : 'g' : 't' : '_' : rep xs
+          rep ('/':xs)     = '_' : 'd' : 'i' : 'v' : '_' : rep xs
+          rep ('+':xs)     = '_' : 'p' : 'l' : 'u' : 's' : '_' : rep xs
+          rep ('-':xs)     = '_' : 'm' : 'i' : 'n' : 'u' : 's' : '_' : rep xs
+          rep (c:xs)       = c : rep xs
+      in rep raw
+
 bndrName :: CoreBndr -> String
 bndrName b =
   let name = varName b
       occ = occNameString (getOccName b)
-  in if isExternalName name || occ == "main" || occ == "result"
-     then occ
-     else showSDocUnsafe (ppr b)
+      raw = if isExternalName name || occ == "main" || occ == "result"
+            then occ
+            else showSDocUnsafe (ppr b)
+  in sanitizeIdent raw
 
 qualifyTopBinder :: Module -> CoreBndr -> String
 qualifyTopBinder currentMod b =

@@ -1,0 +1,2056 @@
+lvl_s4z8
+  = "tests/packages/ghc/GhcCompiler.hs:13:19-20|case"#
+
+lvl_s49a
+  = patError lvl_s4z8
+
+$c_eq__a2Bs
+  = \ a_a1Gn b_a1Go ->
+      case dataToTagSmall# a_a1Gn of a#_a1Gp {
+        __DEFAULT -> case dataToTagSmall# b_a1Go of b#_a1Gq {
+        __DEFAULT -> case /=# a#_a1Gp b#_a1Gq of ds_d322 {
+        __DEFAULT -> case a_a1Gn of wild_X1 {
+        LitInt bx_d33r -> case b_a1Go of wild_X2 {
+        LitInt bx_d33t -> tagToEnum# (==# bx_d33r bx_d33t);
+        LitBool ipv_s3a1 -> case lvl_s49a of wild_48_0 {
+
+      }
+      };
+        LitBool a1_a1Gt -> case b_a1Go of wild_X2 {
+        LitInt ipv_s3a3 -> case lvl_s49a of wild_48_0 {
+
+      };
+        LitBool b1_a1Gu -> case dataToTagSmall# a1_a1Gt of a#_a3a7 {
+        __DEFAULT -> case dataToTagSmall# b1_a1Gu of b#_a3a8 {
+        __DEFAULT -> tagToEnum# (==# a#_a3a7 b#_a3a8)
+      }
+      }
+      }
+      };
+        1# -> False
+      }
+      }
+      }
+
+lvl_s4za
+  = "tests/packages/ghc/GhcCompiler.hs:19:19-20|case"#
+
+lvl_s49e
+  = patError lvl_s4za
+
+$c_eq__a2zM
+  = \ a_a1G9 b_a1Ga ->
+      case dataToTagSmall# a_a1G9 of a#_a1Gb {
+        __DEFAULT -> case dataToTagSmall# b_a1Ga of b#_a1Gc {
+        __DEFAULT -> case /=# a#_a1Gb b#_a1Gc of ds_d31L {
+        __DEFAULT -> case a_a1G9 of wild_X1 {
+        CDataAlt a1_a1Gd -> case b_a1Ga of wild_X2 {
+        __DEFAULT -> case lvl_s49e of wild_48_0 {
+
+      };
+        CDataAlt b1_a1Ge -> eqString a1_a1Gd b1_a1Ge
+      };
+        CLitAlt a1_a1Gf -> case b_a1Ga of wild_X2 {
+        __DEFAULT -> case lvl_s49e of wild_48_0 {
+
+      };
+        CLitAlt b1_a1Gg -> $c_eq__a2Bs a1_a1Gf b1_a1Gg
+      };
+        CDEFAULT -> True
+      };
+        1# -> False
+      }
+      }
+      }
+
+lvl_s4zc
+  = "tests/packages/ghc/GhcCompiler.hs:37:19-20|case"#
+
+lvl_s49E
+  = patError lvl_s4zc
+
+lvl_s4zi
+  = "tests/packages/ghc/GhcCompiler.hs:28:19-20|case"#
+
+lvl_s49s
+  = patError lvl_s4zi
+
+Rec {
+$c_ne__a2vD
+  = \ eta_B0 eta_B1 ->
+      case $c_eq__a2tQ eta_B0 eta_B1 of wild_a33m {
+        False -> True;
+        True -> False
+      };
+$c_eq__a2yp
+  = \ ds_d31I ds_d31J ->
+      case ds_d31I of wild_X1E {
+        CAlt a1_a1FX a2_a1FY a3_a1FZ -> case ds_d31J of wild_X1 {
+        CAlt b1_a1G0 b2_a1G1 b3_a1G2 -> case $c_eq__a2zM a1_a1FX b1_a1G0 of wild_a3cM {
+        False -> False;
+        True -> case $fEqList_$c_eq_ $fEqList_$s$fEqList1 a2_a1FY b2_a1G1 of wild_X1F {
+        False -> False;
+        True -> $c_eq__a2tQ a3_a1FZ b3_a1G2
+      }
+      }
+      }
+      };
+$c_ne__a2yN
+  = \ eta_B0 eta_B1 ->
+      case $c_eq__a2yp eta_B0 eta_B1 of wild_a33m {
+        False -> True;
+        True -> False
+      };
+$fEqCoreAlt
+  = C:Eq $c_eq__a2yp $c_ne__a2yN;
+$fEqCoreExpr
+  = C:Eq $c_eq__a2tQ $c_ne__a2vD;
+$dEq_a2Cy
+  = $fEqTuple2 $fEqList_$s$fEqList1 $fEqCoreExpr;
+$c_eq__a2wF
+  = \ a_a1FI b_a1FJ ->
+      case dataToTagSmall# a_a1FI of a#_a1FK {
+        __DEFAULT -> case dataToTagSmall# b_a1FJ of b#_a1FL {
+        __DEFAULT -> case /=# a#_a1FK b#_a1FL of ds_d31v {
+        __DEFAULT -> case a_a1FI of wild_X1 {
+        CNonRec a1_a1FM a2_a1FN -> case b_a1FJ of wild_X2 {
+        CNonRec b1_a1FO b2_a1FP -> case eqString a1_a1FM b1_a1FO of wild_a3cM {
+        False -> False;
+        True -> $c_eq__a2tQ a2_a1FN b2_a1FP
+      };
+        CRec ipv_s3cR -> case lvl_s49s of wild_48_0 {
+
+      }
+      };
+        CRec a1_a1FQ -> case b_a1FJ of wild_X2 {
+        CNonRec ipv_s3cT ipv_s3cU -> case lvl_s49s of wild_48_0 {
+
+      };
+        CRec b1_a1FR -> $fEqList_$c_eq_ $dEq_a2Cy a1_a1FQ b1_a1FR
+      }
+      };
+        1# -> False
+      }
+      }
+      };
+$c_eq__a2tQ
+  = \ a_a1Fb b_a1Fc ->
+      case dataToTagSmall# a_a1Fb of a#_a1Fd {
+        __DEFAULT -> case dataToTagSmall# b_a1Fc of b#_a1Fe {
+        __DEFAULT -> case /=# a#_a1Fd b#_a1Fe of ds_d316 {
+        __DEFAULT -> case a_a1Fb of wild_X1 {
+        CVar a1_a1Ff -> case b_a1Fc of wild_X2 {
+        __DEFAULT -> case lvl_s49E of wild_48_0 {
+
+      };
+        CVar b1_a1Fg -> eqString a1_a1Ff b1_a1Fg
+      };
+        CLit a1_a1Fh -> case b_a1Fc of wild_X2 {
+        __DEFAULT -> case lvl_s49E of wild_48_0 {
+
+      };
+        CLit b1_a1Fi -> $c_eq__a2Bs a1_a1Fh b1_a1Fi
+      };
+        CApp a1_a1Fj a2_a1Fk -> case b_a1Fc of wild_X2 {
+        __DEFAULT -> case lvl_s49E of wild_48_0 {
+
+      };
+        CApp b1_a1Fl b2_a1Fm -> case $c_eq__a2tQ a1_a1Fj b1_a1Fl of wild_a3cM {
+        False -> False;
+        True -> $c_eq__a2tQ a2_a1Fk b2_a1Fm
+      }
+      };
+        CLam a1_a1Fn a2_a1Fo -> case b_a1Fc of wild_X2 {
+        __DEFAULT -> case lvl_s49E of wild_48_0 {
+
+      };
+        CLam b1_a1Fp b2_a1Fq -> case eqString a1_a1Fn b1_a1Fp of wild_a3cM {
+        False -> False;
+        True -> $c_eq__a2tQ a2_a1Fo b2_a1Fq
+      }
+      };
+        CLet a1_a1Fr a2_a1Fs -> case b_a1Fc of wild_X2 {
+        __DEFAULT -> case lvl_s49E of wild_48_0 {
+
+      };
+        CLet b1_a1Ft b2_a1Fu -> case $c_eq__a2wF a1_a1Fr b1_a1Ft of wild_a3cM {
+        False -> False;
+        True -> $c_eq__a2tQ a2_a1Fs b2_a1Fu
+      }
+      };
+        CCase a1_a1Fv a2_a1Fw a3_a1Fx -> case b_a1Fc of wild_X2 {
+        __DEFAULT -> case lvl_s49E of wild_48_0 {
+
+      };
+        CCase b1_a1Fy b2_a1Fz b3_a1FA -> case $c_eq__a2tQ a1_a1Fv b1_a1Fy of wild_a3cM {
+        False -> False;
+        True -> case eqString a2_a1Fw b2_a1Fz of wild_X3 {
+        False -> False;
+        True -> $fEqList_$c_eq_ $fEqCoreAlt a3_a1Fx b3_a1FA
+      }
+      }
+      }
+      };
+        1# -> False
+      }
+      }
+      };
+end Rec }
+
+lvl_s4zk
+  = "tests/packages/ghc/GhcCompiler.hs:196:19-20|case"#
+
+lvl_s49o
+  = patError lvl_s4zk
+
+Rec {
+$c_ne__a2rI
+  = \ eta_B0 eta_B1 ->
+      case $c_eq__a2qo eta_B0 eta_B1 of wild_a33m {
+        False -> True;
+        True -> False
+      };
+$fEqValue
+  = C:Eq $c_eq__a2qo $c_ne__a2rI;
+$dEq_a2Cr
+  = $fEqTuple2 $fEqList_$s$fEqList1 $fEqValue;
+$c_eq__a2qo
+  = \ a_a1Ed b_a1Ee ->
+      case dataToTagSmall# a_a1Ed of a#_a1Ey {
+        __DEFAULT -> case dataToTagSmall# b_a1Ee of b#_a1Ez {
+        __DEFAULT -> case /=# a#_a1Ey b#_a1Ez of ds_d30N {
+        __DEFAULT -> case a_a1Ed of wild_X1 {
+        VInt bx_d33e -> case b_a1Ee of wild_X2 {
+        __DEFAULT -> case lvl_s49o of wild_48_0 {
+
+      };
+        VInt bx_d33g -> tagToEnum# (==# bx_d33e bx_d33g)
+      };
+        VBool a1_a1EC -> case b_a1Ee of wild_X2 {
+        __DEFAULT -> case lvl_s49o of wild_48_0 {
+
+      };
+        VBool b1_a1ED -> case dataToTagSmall# a1_a1EC of a#_a3a7 {
+        __DEFAULT -> case dataToTagSmall# b1_a1ED of b#_a3a8 {
+        __DEFAULT -> tagToEnum# (==# a#_a3a7 b#_a3a8)
+      }
+      }
+      };
+        VClosure a1_a1EE a2_a1EF a3_a1EG -> case b_a1Ee of wild_X2 {
+        __DEFAULT -> case lvl_s49o of wild_48_0 {
+
+      };
+        VClosure b1_a1EH b2_a1EI b3_a1EJ -> case $fEqList_$c_eq_ $dEq_a2Cr a1_a1EE b1_a1EH of wild_a3cM {
+        False -> False;
+        True -> case eqString a2_a1EF b2_a1EI of wild_X3 {
+        False -> False;
+        True -> $c_eq__a2tQ a3_a1EG b3_a1EJ
+      }
+      }
+      };
+        VConstr a1_a1EK a2_a1EL -> case b_a1Ee of wild_X2 {
+        __DEFAULT -> case lvl_s49o of wild_48_0 {
+
+      };
+        VConstr b1_a1EM b2_a1EN -> case eqString a1_a1EK b1_a1EM of wild_a3cM {
+        False -> False;
+        True -> $fEqList_$c_eq_ $fEqValue a2_a1EL b2_a1EN
+      }
+      }
+      };
+        1# -> False
+      }
+      }
+      };
+end Rec }
+
+lvl_s4zo
+  = "LitInt "#
+
+lvl_s4zq
+  = "LitBool "#
+
+$cshowsPrec_a2AG
+  = \ a_s4uM ds_s4uQ eta_s4uR ->
+      case a_s4uM of wild_X1E {
+        I# ww_s4uO -> $w$cshowsPrec_s4uS ww_s4uO ds_s4uQ eta_s4uR
+      }
+
+lvl_s4le
+  = "CDEFAULT"#
+
+lvl_s49V
+  = unpackCString# lvl_s4le
+
+lvl_s4zs
+  = "CDataAlt "#
+
+lvl_s4zu
+  = "CLitAlt "#
+
+$cshowsPrec_a2yY
+  = \ a_a1G3 ds_d31K eta_B0 ->
+      case ds_d31K of wild_X1E {
+        CDataAlt b1_a1G4 -> case a_a1G3 of wild_a4kV {
+        I# x_a4kW -> case >=# x_a4kW 11# of lwild_s4lf {
+        __DEFAULT -> unpackAppendCString# lvl_s4zs (: $fShowCallStack12 (showLitString b1_a1G4 (: $fShowCallStack12 eta_B0)));
+        1# -> : $fShowCallStack3 (unpackAppendCString# lvl_s4zs (: $fShowCallStack12 (showLitString b1_a1G4 (: $fShowCallStack12 (: $fShowCallStack2 eta_B0)))))
+      }
+      };
+        CLitAlt b1_a1G7 -> case a_a1G3 of wild_a4kV {
+        I# x_a4kW -> case >=# x_a4kW 11# of lwild_s4lg {
+        __DEFAULT -> unpackAppendCString# lvl_s4zu ($w$cshowsPrec_s4uS 11# b1_a1G7 eta_B0);
+        1# -> : $fShowCallStack3 (unpackAppendCString# lvl_s4zu ($w$cshowsPrec_s4uS 11# b1_a1G7 (: $fShowCallStack2 eta_B0)))
+      }
+      };
+        CDEFAULT -> unpackAppendCString# lvl_s4le eta_B0
+      }
+
+lvl_s4zN
+  = "CCase "#
+
+lvl_s4zL
+  = "CLet "#
+
+lvl_s4zJ
+  = "CLam "#
+
+lvl_s4zH
+  = "CApp "#
+
+lvl_s4zF
+  = "CLit "#
+
+lvl_s4zD
+  = "CVar "#
+
+lvl_s4zB
+  = "CRec "#
+
+lvl_s4zz
+  = "CNonRec "#
+
+lvl_s4zw
+  = "CAlt "#
+
+Rec {
+$cshowsPrec_a2rT
+  = \ a_s4vz ds_s4vD eta_s4vE ->
+      case a_s4vz of wild_X1E {
+        I# ww_s4vB -> $w$cshowsPrec_s4vF ww_s4vB ds_s4vD eta_s4vE
+      };
+$w$cshowsPrec_s4vc
+  = \ ww_s4v8 ds_s4va eta_s4vb ->
+      case ds_s4va of wild_X1E {
+        CAlt b1_a1FT b2_a1FU b3_a1FV -> let p_s47M = \ z_a1FW ->
+      unpackAppendCString# lvl_s4zw (case b1_a1FT of wild_X1F {
+        CDataAlt b1_a1G4 -> : $fShowCallStack3 (unpackAppendCString# lvl_s4zs (: $fShowCallStack12 (showLitString b1_a1G4 (: $fShowCallStack12 (: $fShowCallStack2 (: showSpace1 ($fShowList_$s$cshowList1 b2_a1FU (: showSpace1 ($w$cshowsPrec_s4vF 11# b3_a1FV z_a1FW)))))))));
+        CLitAlt b1_a1G7 -> : $fShowCallStack3 (unpackAppendCString# lvl_s4zu ($w$cshowsPrec_s4uS 11# b1_a1G7 (: $fShowCallStack2 (: showSpace1 ($fShowList_$s$cshowList1 b2_a1FU (: showSpace1 ($w$cshowsPrec_s4vF 11# b3_a1FV z_a1FW)))))));
+        CDEFAULT -> unpackAppendCString# lvl_s4le (: showSpace1 ($fShowList_$s$cshowList1 b2_a1FU (: showSpace1 ($w$cshowsPrec_s4vF 11# b3_a1FV z_a1FW))))
+      }) in case >=# ww_s4v8 11# of lwild_s4lm {
+        __DEFAULT -> p_s47M eta_s4vb;
+        1# -> : $fShowCallStack3 (p_s47M (: $fShowCallStack2 eta_s4vb))
+      }
+      };
+lvl_s4al
+  = \ ds_s4va eta_s4vb ->
+      $w$cshowsPrec_s4vc 0# ds_s4va eta_s4vb;
+$cshowList_a2ye
+  = \ ls_a33x s_a33y ->
+      showList__ lvl_s4al ls_a33x s_a33y;
+$cshow_a2tx
+  = \ x_a33C ->
+      $w$cshowsPrec_s4vF 0# x_a33C [];
+lvl_s4an
+  = \ ds_s4vD eta_s4vE ->
+      $w$cshowsPrec_s4vF 0# ds_s4vD eta_s4vE;
+$cshowList_a2tF
+  = \ ls_a33x s_a33y ->
+      showList__ lvl_s4an ls_a33x s_a33y;
+$fShowCoreExpr
+  = C:Show $cshowsPrec_a2rT $cshow_a2tx $cshowList_a2tF;
+$w$cshowsPrec_s4vt
+  = \ ww_s4vp ds_s4vr eta_s4vs ->
+      case ds_s4vr of wild_X1E {
+        CNonRec b1_a1FC b2_a1FD -> case >=# ww_s4vp 11# of lwild_s4ln {
+        __DEFAULT -> unpackAppendCString# lvl_s4zz (: $fShowCallStack12 (showLitString b1_a1FC (: $fShowCallStack12 (: showSpace1 ($w$cshowsPrec_s4vF 11# b2_a1FD eta_s4vs)))));
+        1# -> : $fShowCallStack3 (unpackAppendCString# lvl_s4zz (: $fShowCallStack12 (showLitString b1_a1FC (: $fShowCallStack12 (: showSpace1 ($w$cshowsPrec_s4vF 11# b2_a1FD (: $fShowCallStack2 eta_s4vs)))))))
+      };
+        CRec b1_a1FG -> case >=# ww_s4vp 11# of lwild_s4lo {
+        __DEFAULT -> unpackAppendCString# lvl_s4zB ($fShowTuple2_$cshowList $fShowList_$s$fShowList1 $fShowCoreExpr b1_a1FG eta_s4vs);
+        1# -> : $fShowCallStack3 (unpackAppendCString# lvl_s4zB ($fShowTuple2_$cshowList $fShowList_$s$fShowList1 $fShowCoreExpr b1_a1FG (: $fShowCallStack2 eta_s4vs)))
+      }
+      };
+$w$cshowsPrec_s4vF
+  = \ ww_s4vB ds_s4vD eta_s4vE ->
+      case ds_s4vD of wild_X1E {
+        CVar b1_a1EP -> case >=# ww_s4vB 11# of lwild_s4lp {
+        __DEFAULT -> unpackAppendCString# lvl_s4zD (: $fShowCallStack12 (showLitString b1_a1EP (: $fShowCallStack12 eta_s4vE)));
+        1# -> : $fShowCallStack3 (unpackAppendCString# lvl_s4zD (: $fShowCallStack12 (showLitString b1_a1EP (: $fShowCallStack12 (: $fShowCallStack2 eta_s4vE)))))
+      };
+        CLit b1_a1ES -> case >=# ww_s4vB 11# of lwild_s4lq {
+        __DEFAULT -> unpackAppendCString# lvl_s4zF ($w$cshowsPrec_s4uS 11# b1_a1ES eta_s4vE);
+        1# -> : $fShowCallStack3 (unpackAppendCString# lvl_s4zF ($w$cshowsPrec_s4uS 11# b1_a1ES (: $fShowCallStack2 eta_s4vE)))
+      };
+        CApp b1_a1EV b2_a1EW -> case >=# ww_s4vB 11# of lwild_s4lr {
+        __DEFAULT -> unpackAppendCString# lvl_s4zH ($w$cshowsPrec_s4vF 11# b1_a1EV (: showSpace1 ($w$cshowsPrec_s4vF 11# b2_a1EW eta_s4vE)));
+        1# -> : $fShowCallStack3 (unpackAppendCString# lvl_s4zH ($w$cshowsPrec_s4vF 11# b1_a1EV (: showSpace1 ($w$cshowsPrec_s4vF 11# b2_a1EW (: $fShowCallStack2 eta_s4vE)))))
+      };
+        CLam b1_a1EZ b2_a1F0 -> case >=# ww_s4vB 11# of lwild_s4ls {
+        __DEFAULT -> unpackAppendCString# lvl_s4zJ (: $fShowCallStack12 (showLitString b1_a1EZ (: $fShowCallStack12 (: showSpace1 ($w$cshowsPrec_s4vF 11# b2_a1F0 eta_s4vE)))));
+        1# -> : $fShowCallStack3 (unpackAppendCString# lvl_s4zJ (: $fShowCallStack12 (showLitString b1_a1EZ (: $fShowCallStack12 (: showSpace1 ($w$cshowsPrec_s4vF 11# b2_a1F0 (: $fShowCallStack2 eta_s4vE)))))))
+      };
+        CLet b1_a1F3 b2_a1F4 -> case >=# ww_s4vB 11# of lwild_s4lt {
+        __DEFAULT -> unpackAppendCString# lvl_s4zL ($w$cshowsPrec_s4vt 11# b1_a1F3 (: showSpace1 ($w$cshowsPrec_s4vF 11# b2_a1F4 eta_s4vE)));
+        1# -> : $fShowCallStack3 (unpackAppendCString# lvl_s4zL ($w$cshowsPrec_s4vt 11# b1_a1F3 (: showSpace1 ($w$cshowsPrec_s4vF 11# b2_a1F4 (: $fShowCallStack2 eta_s4vE)))))
+      };
+        CCase b1_a1F7 b2_a1F8 b3_a1F9 -> let p_s482 = \ z_a1Fa ->
+      unpackAppendCString# lvl_s4zN ($w$cshowsPrec_s4vF 11# b1_a1F7 (: showSpace1 (: $fShowCallStack12 (showLitString b2_a1F8 (: $fShowCallStack12 (: showSpace1 ($cshowList_a2ye b3_a1F9 z_a1Fa))))))) in case >=# ww_s4vB 11# of lwild_s4lu {
+        __DEFAULT -> p_s482 eta_s4vE;
+        1# -> : $fShowCallStack3 (p_s482 (: $fShowCallStack2 eta_s4vE))
+      }
+      };
+end Rec }
+
+$cshowsPrec_a2vO
+  = \ a_s4vn ds_s4vr eta_s4vs ->
+      case a_s4vn of wild_X1E {
+        I# ww_s4vp -> $w$cshowsPrec_s4vt ww_s4vp ds_s4vr eta_s4vs
+      }
+
+$cshowsPrec_a2xF
+  = \ a_s4v6 ds_s4va eta_s4vb ->
+      case a_s4v6 of wild_X1E {
+        I# ww_s4v8 -> $w$cshowsPrec_s4vc ww_s4v8 ds_s4va eta_s4vb
+      }
+
+lvl_s4zT
+  = "VConstr "#
+
+lvl_s4zS
+  = "VClosure "#
+
+lvl_s4zQ
+  = "VBool "#
+
+lvl_s4zO
+  = "VInt "#
+
+lvl_s4aU
+  = I# 0#
+
+lvl_s4aW
+  = I# 1#
+
+toInt
+  = \ ds_d2Mt ->
+      case ds_d2Mt of wild_X1E {
+        __DEFAULT -> lvl_s4aU;
+        VInt bx_d32g -> I# bx_d32g;
+        VBool ds_d2MB -> case ds_d2MB of wild_X1 {
+        False -> lvl_s4aU;
+        True -> lvl_s4aW
+      }
+      }
+
+workload1_s4lz
+  = "dead1"#
+
+workload1_s33K
+  = unpackCString# workload1_s4lz
+
+workload1_s4lA
+  = "*"#
+
+workload1_s33L
+  = unpackCString# workload1_s4lA
+
+workload1_s33M
+  = CVar workload1_s33L
+
+workload1_s33O
+  = LitInt 10#
+
+workload1_s33P
+  = CLit workload1_s33O
+
+workload1_s33Q
+  = CApp workload1_s33M workload1_s33P
+
+workload1_s33S
+  = LitInt 20#
+
+workload1_s33T
+  = CLit workload1_s33S
+
+workload1_s33U
+  = CApp workload1_s33Q workload1_s33T
+
+workload1_s33V
+  = CNonRec workload1_s33K workload1_s33U
+
+workload1_s4lB
+  = "dead2"#
+
+workload1_s33W
+  = unpackCString# workload1_s4lB
+
+workload1_s4lC
+  = "+"#
+
+workload1_s33X
+  = unpackCString# workload1_s4lC
+
+workload1_s33Y
+  = CVar workload1_s33X
+
+workload1_s340
+  = LitInt 42#
+
+workload1_s341
+  = CLit workload1_s340
+
+workload1_s342
+  = CApp workload1_s33Y workload1_s341
+
+workload1_s344
+  = LitInt 8#
+
+workload1_s345
+  = CLit workload1_s344
+
+workload1_s346
+  = CApp workload1_s342 workload1_s345
+
+workload1_s347
+  = CNonRec workload1_s33W workload1_s346
+
+workload1_s34f
+  = CApp workload1_s33Y workload1_s33P
+
+workload1_s34j
+  = CApp workload1_s34f workload1_s33T
+
+workload1_s34k
+  = CApp workload1_s33M workload1_s34j
+
+workload1_s4lF
+  = "-"#
+
+workload1_s34l
+  = unpackCString# workload1_s4lF
+
+workload1_s34m
+  = CVar workload1_s34l
+
+workload1_s34o
+  = LitInt 50#
+
+workload1_s34p
+  = CLit workload1_s34o
+
+workload1_s34q
+  = CApp workload1_s34m workload1_s34p
+
+workload1_s34s
+  = LitInt 45#
+
+workload1_s34t
+  = CLit workload1_s34s
+
+workload1_s34u
+  = CApp workload1_s34q workload1_s34t
+
+workload1_s34v
+  = CApp workload1_s34k workload1_s34u
+
+workload1_s34w
+  = CLet workload1_s347 workload1_s34v
+
+workload1
+  = CLet workload1_s33V workload1_s34w
+
+workload2_s4lG
+  = "compose"#
+
+workload2_s34x
+  = unpackCString# workload2_s4lG
+
+workload2_s4lH
+  = "f"#
+
+workload2_s34y
+  = unpackCString# workload2_s4lH
+
+workload2_s4lI
+  = "g"#
+
+workload2_s34z
+  = unpackCString# workload2_s4lI
+
+workload2_s4lJ
+  = "x"#
+
+workload2_s34A
+  = unpackCString# workload2_s4lJ
+
+workload2_s34C
+  = CVar workload2_s34y
+
+workload2_s34E
+  = CVar workload2_s34z
+
+workload2_s34G
+  = CVar workload2_s34A
+
+workload2_s34H
+  = CApp workload2_s34E workload2_s34G
+
+workload2_s34I
+  = CApp workload2_s34C workload2_s34H
+
+workload2_s34J
+  = CLam workload2_s34A workload2_s34I
+
+workload2_s34K
+  = CLam workload2_s34z workload2_s34J
+
+workload2_s34L
+  = CLam workload2_s34y workload2_s34K
+
+workload2_s34M
+  = CNonRec workload2_s34x workload2_s34L
+
+workload2_s4lN
+  = "double"#
+
+workload2_s34N
+  = unpackCString# workload2_s4lN
+
+workload2_s34T
+  = CApp workload1_s33M workload2_s34G
+
+workload2_s34V
+  = LitInt 2#
+
+workload2_s34W
+  = CLit workload2_s34V
+
+workload2_s34X
+  = CApp workload2_s34T workload2_s34W
+
+workload2_s34Y
+  = CLam workload2_s34A workload2_s34X
+
+workload2_s34Z
+  = CNonRec workload2_s34N workload2_s34Y
+
+workload2_s4lR
+  = "inc"#
+
+workload2_s350
+  = unpackCString# workload2_s4lR
+
+workload2_s356
+  = CApp workload1_s33Y workload2_s34G
+
+workload2_s358
+  = LitInt 1#
+
+workload2_s359
+  = CLit workload2_s358
+
+workload2_s35a
+  = CApp workload2_s356 workload2_s359
+
+workload2_s35b
+  = CLam workload2_s34A workload2_s35a
+
+workload2_s35c
+  = CNonRec workload2_s350 workload2_s35b
+
+workload2_s35e
+  = CVar workload2_s34x
+
+workload2_s35g
+  = CVar workload2_s34N
+
+workload2_s35h
+  = CApp workload2_s35e workload2_s35g
+
+workload2_s35j
+  = CVar workload2_s350
+
+workload2_s35k
+  = CApp workload2_s35h workload2_s35j
+
+workload2_s35o
+  = CApp workload2_s35k workload1_s33P
+
+workload2_s35p
+  = CLet workload2_s35c workload2_s35o
+
+workload2_s35q
+  = CLet workload2_s34Z workload2_s35p
+
+workload2
+  = CLet workload2_s34M workload2_s35q
+
+workload3_s4lY
+  = "fib"#
+
+workload3_s4lZ
+  = unpackCString# workload3_s4lY
+
+workload3_s4m0
+  = "n"#
+
+workload3_s4m1
+  = unpackCString# workload3_s4m0
+
+workload3_s4m2
+  = "<"#
+
+workload3_s4m3
+  = unpackCString# workload3_s4m2
+
+workload3_s4m4
+  = CVar workload3_s4m3
+
+workload3_s4m7
+  = CVar workload3_s4m1
+
+workload3_s4m8
+  = CApp workload3_s4m4 workload3_s4m7
+
+workload3_s4mc
+  = CApp workload3_s4m8 workload2_s34W
+
+workload3_s4md
+  = "cond"#
+
+workload3_s4me
+  = unpackCString# workload3_s4md
+
+workload3_s4pp
+  = "True"#
+
+workload3_s4pq
+  = unpackCString# workload3_s4pp
+
+workload3_s4pr
+  = CDataAlt workload3_s4pq
+
+workload3_s4pv
+  = CAlt workload3_s4pr [] workload3_s4m7
+
+workload3_s4pw
+  = "False"#
+
+workload3_s4px
+  = unpackCString# workload3_s4pw
+
+workload3_s4py
+  = CDataAlt workload3_s4px
+
+workload3_s4pE
+  = CVar workload3_s4lZ
+
+workload3_s4pL
+  = CApp workload1_s34m workload3_s4m7
+
+workload3_s4pP
+  = CApp workload3_s4pL workload2_s359
+
+workload3_s4pQ
+  = CApp workload3_s4pE workload3_s4pP
+
+workload3_s4pR
+  = CApp workload1_s33Y workload3_s4pQ
+
+workload3_s4q5
+  = CApp workload3_s4pL workload2_s34W
+
+workload3_s4q6
+  = CApp workload3_s4pE workload3_s4q5
+
+workload3_s4q7
+  = CApp workload3_s4pR workload3_s4q6
+
+workload3_s4q8
+  = CAlt workload3_s4py [] workload3_s4q7
+
+workload3_s4q9
+  = : workload3_s4q8 []
+
+workload3_s4mf
+  = : workload3_s4pv workload3_s4q9
+
+workload3_s4mg
+  = CCase workload3_s4mc workload3_s4me workload3_s4mf
+
+workload3_s4mh
+  = CLam workload3_s4m1 workload3_s4mg
+
+workload3_s4mi
+  = (,) workload3_s4lZ workload3_s4mh
+
+workload3_s35r
+  = : workload3_s4mi []
+
+workload3_s35s
+  = CRec workload3_s35r
+
+workload3_s35y
+  = CApp workload3_s4pE workload1_s33P
+
+workload3
+  = CLet workload3_s35s workload3_s35y
+
+workload4_s4mk
+  = "insert"#
+
+workload4_s4ml
+  = unpackCString# workload4_s4mk
+
+workload4_s4mm
+  = "tree"#
+
+workload4_s4mn
+  = unpackCString# workload4_s4mm
+
+workload4_s4ms
+  = CVar workload4_s4mn
+
+workload4_s4mt
+  = "t"#
+
+workload4_s4mu
+  = unpackCString# workload4_s4mt
+
+workload4_s4qa
+  = "Leaf"#
+
+workload4_s4qb
+  = unpackCString# workload4_s4qa
+
+workload4_s4qc
+  = CDataAlt workload4_s4qb
+
+workload4_s4qd
+  = "Node"#
+
+workload4_s4qe
+  = unpackCString# workload4_s4qd
+
+workload4_s4qf
+  = CVar workload4_s4qe
+
+workload4_s4qi
+  = CVar workload4_s4qb
+
+workload4_s4qj
+  = CApp workload4_s4qf workload4_s4qi
+
+workload4_s4qn
+  = CApp workload4_s4qj workload2_s34G
+
+workload4_s4qr
+  = CApp workload4_s4qn workload4_s4qi
+
+workload4_s4qs
+  = CAlt workload4_s4qc [] workload4_s4qr
+
+workload4_s4qv
+  = CDataAlt workload4_s4qe
+
+workload4_s4qw
+  = "left"#
+
+workload4_s4qx
+  = unpackCString# workload4_s4qw
+
+workload4_s4qy
+  = "val"#
+
+workload4_s4qz
+  = unpackCString# workload4_s4qy
+
+workload4_s4qA
+  = "right"#
+
+workload4_s4qB
+  = unpackCString# workload4_s4qA
+
+workload4_s4qC
+  = : workload4_s4qB []
+
+workload4_s4qD
+  = : workload4_s4qz workload4_s4qC
+
+workload4_s4qE
+  = : workload4_s4qx workload4_s4qD
+
+workload4_s4qL
+  = CApp workload3_s4m4 workload2_s34G
+
+workload4_s4qO
+  = CVar workload4_s4qz
+
+workload4_s4qP
+  = CApp workload4_s4qL workload4_s4qO
+
+workload4_s4qQ
+  = "cmp"#
+
+workload4_s4qR
+  = unpackCString# workload4_s4qQ
+
+workload4_s4r0
+  = CVar workload4_s4ml
+
+workload4_s4r3
+  = CVar workload4_s4qx
+
+workload4_s4r4
+  = CApp workload4_s4r0 workload4_s4r3
+
+workload4_s4r8
+  = CApp workload4_s4r4 workload2_s34G
+
+workload4_s4r9
+  = CApp workload4_s4qf workload4_s4r8
+
+workload4_s4rd
+  = CApp workload4_s4r9 workload4_s4qO
+
+workload4_s4rg
+  = CVar workload4_s4qB
+
+workload4_s4rh
+  = CApp workload4_s4rd workload4_s4rg
+
+workload4_s4ri
+  = CAlt workload3_s4pr [] workload4_s4rh
+
+workload4_s4rs
+  = CApp workload4_s4qf workload4_s4r3
+
+workload4_s4rw
+  = CApp workload4_s4rs workload4_s4qO
+
+workload4_s4rD
+  = CApp workload4_s4r0 workload4_s4rg
+
+workload4_s4rH
+  = CApp workload4_s4rD workload2_s34G
+
+workload4_s4rI
+  = CApp workload4_s4rw workload4_s4rH
+
+workload4_s4rJ
+  = CAlt workload3_s4py [] workload4_s4rI
+
+workload4_s4rK
+  = : workload4_s4rJ []
+
+workload4_s4rL
+  = : workload4_s4ri workload4_s4rK
+
+workload4_s4rM
+  = CCase workload4_s4qP workload4_s4qR workload4_s4rL
+
+workload4_s4rN
+  = CAlt workload4_s4qv workload4_s4qE workload4_s4rM
+
+workload4_s4rO
+  = : workload4_s4rN []
+
+workload4_s4mv
+  = : workload4_s4qs workload4_s4rO
+
+workload4_s4mw
+  = CCase workload4_s4ms workload4_s4mu workload4_s4mv
+
+workload4_s4mx
+  = CLam workload2_s34A workload4_s4mw
+
+workload4_s4my
+  = CLam workload4_s4mn workload4_s4mx
+
+workload4_s4mz
+  = (,) workload4_s4ml workload4_s4my
+
+workload4_s4mA
+  = "lookup"#
+
+workload4_s4mB
+  = unpackCString# workload4_s4mA
+
+workload4_s4rT
+  = LitInt 0#
+
+workload4_s4rU
+  = CLit workload4_s4rT
+
+workload4_s4rV
+  = CAlt workload4_s4qc [] workload4_s4rU
+
+workload4_s4s8
+  = "=="#
+
+workload4_s4s9
+  = unpackCString# workload4_s4s8
+
+workload4_s4sa
+  = CVar workload4_s4s9
+
+workload4_s4se
+  = CApp workload4_s4sa workload2_s34G
+
+workload4_s4si
+  = CApp workload4_s4se workload4_s4qO
+
+workload4_s4sj
+  = "eq"#
+
+workload4_s4sk
+  = unpackCString# workload4_s4sj
+
+workload4_s4sr
+  = CAlt workload3_s4pr [] workload4_s4qO
+
+workload4_s4sG
+  = "lt"#
+
+workload4_s4sH
+  = unpackCString# workload4_s4sG
+
+workload4_s4sN
+  = CVar workload4_s4mB
+
+workload4_s4sR
+  = CApp workload4_s4sN workload4_s4r3
+
+workload4_s4sV
+  = CApp workload4_s4sR workload2_s34G
+
+workload4_s4sW
+  = CAlt workload3_s4pr [] workload4_s4sV
+
+workload4_s4t6
+  = CApp workload4_s4sN workload4_s4rg
+
+workload4_s4ta
+  = CApp workload4_s4t6 workload2_s34G
+
+workload4_s4tb
+  = CAlt workload3_s4py [] workload4_s4ta
+
+workload4_s4tc
+  = : workload4_s4tb []
+
+workload4_s4td
+  = : workload4_s4sW workload4_s4tc
+
+workload4_s4te
+  = CCase workload4_s4qP workload4_s4sH workload4_s4td
+
+workload4_s4tf
+  = CAlt workload3_s4py [] workload4_s4te
+
+workload4_s4tg
+  = : workload4_s4tf []
+
+workload4_s4th
+  = : workload4_s4sr workload4_s4tg
+
+workload4_s4ti
+  = CCase workload4_s4si workload4_s4sk workload4_s4th
+
+workload4_s4tj
+  = CAlt workload4_s4qv workload4_s4qE workload4_s4ti
+
+workload4_s4tk
+  = : workload4_s4tj []
+
+workload4_s4mL
+  = : workload4_s4rV workload4_s4tk
+
+workload4_s4mM
+  = CCase workload4_s4ms workload4_s4mu workload4_s4mL
+
+workload4_s4mN
+  = CLam workload2_s34A workload4_s4mM
+
+workload4_s4mO
+  = CLam workload4_s4mn workload4_s4mN
+
+workload4_s4mP
+  = (,) workload4_s4mB workload4_s4mO
+
+workload4_s4mQ
+  = : workload4_s4mP []
+
+workload4_s35z
+  = : workload4_s4mz workload4_s4mQ
+
+workload4_s35A
+  = CRec workload4_s35z
+
+workload4_s4mR
+  = "t0"#
+
+workload4_s35B
+  = unpackCString# workload4_s4mR
+
+workload4_s35E
+  = CNonRec workload4_s35B workload4_s4qi
+
+workload4_s4mT
+  = "t1"#
+
+workload4_s35F
+  = unpackCString# workload4_s4mT
+
+workload4_s35J
+  = CVar workload4_s35B
+
+workload4_s35K
+  = CApp workload4_s4r0 workload4_s35J
+
+workload4_s35M
+  = LitInt 15#
+
+workload4_s35N
+  = CLit workload4_s35M
+
+workload4_s35O
+  = CApp workload4_s35K workload4_s35N
+
+workload4_s35P
+  = CNonRec workload4_s35F workload4_s35O
+
+workload4_s4mW
+  = "t2"#
+
+workload4_s35Q
+  = unpackCString# workload4_s4mW
+
+workload4_s35U
+  = CVar workload4_s35F
+
+workload4_s35V
+  = CApp workload4_s4r0 workload4_s35U
+
+workload4_s35Z
+  = CApp workload4_s35V workload1_s33P
+
+workload4_s360
+  = CNonRec workload4_s35Q workload4_s35Z
+
+workload4_s4mZ
+  = "t3"#
+
+workload4_s361
+  = unpackCString# workload4_s4mZ
+
+workload4_s365
+  = CVar workload4_s35Q
+
+workload4_s366
+  = CApp workload4_s4r0 workload4_s365
+
+workload4_s36a
+  = CApp workload4_s366 workload1_s33T
+
+workload4_s36b
+  = CNonRec workload4_s361 workload4_s36a
+
+workload4_s4n2
+  = "t4"#
+
+workload4_s36c
+  = unpackCString# workload4_s4n2
+
+workload4_s36g
+  = CVar workload4_s361
+
+workload4_s36h
+  = CApp workload4_s4r0 workload4_s36g
+
+workload4_s36j
+  = LitInt 5#
+
+workload4_s36k
+  = CLit workload4_s36j
+
+workload4_s36l
+  = CApp workload4_s36h workload4_s36k
+
+workload4_s36m
+  = CNonRec workload4_s36c workload4_s36l
+
+workload4_s4n5
+  = "t5"#
+
+workload4_s36n
+  = unpackCString# workload4_s4n5
+
+workload4_s36r
+  = CVar workload4_s36c
+
+workload4_s36s
+  = CApp workload4_s4r0 workload4_s36r
+
+workload4_s36u
+  = LitInt 12#
+
+workload4_s36v
+  = CLit workload4_s36u
+
+workload4_s36w
+  = CApp workload4_s36s workload4_s36v
+
+workload4_s36x
+  = CNonRec workload4_s36n workload4_s36w
+
+workload4_s36D
+  = CVar workload4_s36n
+
+workload4_s36E
+  = CApp workload4_s4sN workload4_s36D
+
+workload4_s36I
+  = CApp workload4_s36E workload4_s36v
+
+workload4_s36J
+  = CApp workload1_s33Y workload4_s36I
+
+workload4_s36S
+  = CApp workload4_s36E workload1_s33T
+
+workload4_s36T
+  = CApp workload4_s36J workload4_s36S
+
+workload4_s36U
+  = CLet workload4_s36x workload4_s36T
+
+workload4_s36V
+  = CLet workload4_s36m workload4_s36U
+
+workload4_s36W
+  = CLet workload4_s36b workload4_s36V
+
+workload4_s36X
+  = CLet workload4_s360 workload4_s36W
+
+workload4_s36Y
+  = CLet workload4_s35P workload4_s36X
+
+workload4_s36Z
+  = CLet workload4_s35E workload4_s36Y
+
+workload4
+  = CLet workload4_s35A workload4_s36Z
+
+lvl_s4ix
+  = \ ds_s4uQ eta_s4uR ->
+      $w$cshowsPrec_s4uS 0# ds_s4uQ eta_s4uR
+
+$cshowList_a2Bh
+  = \ ls_a33x s_a33y ->
+      showList__ lvl_s4ix ls_a33x s_a33y
+
+$cshow_a2B9
+  = \ x_a33C ->
+      $w$cshowsPrec_s4uS 0# x_a33C []
+
+$fShowLiteral
+  = C:Show $cshowsPrec_a2AG $cshow_a2B9 $cshowList_a2Bh
+
+lvl_s4iA
+  = $cshowsPrec_a2yY lvl_s4aU
+
+$cshowList_a2zB
+  = \ ls_a33x s_a33y ->
+      showList__ lvl_s4iA ls_a33x s_a33y
+
+lvl_s4zW
+  = : $fShowCallStack12 []
+
+$cshow_a2zt
+  = \ x_a33C ->
+      case x_a33C of wild_X1E {
+        CDataAlt b1_a1G4 -> unpackAppendCString# lvl_s4zs (: $fShowCallStack12 (showLitString b1_a1G4 lvl_s4zW));
+        CLitAlt b1_a1G7 -> unpackAppendCString# lvl_s4zu ($w$cshowsPrec_s4uS 11# b1_a1G7 []);
+        CDEFAULT -> lvl_s49V
+      }
+
+$fShowAltCon
+  = C:Show $cshowsPrec_a2yY $cshow_a2zt $cshowList_a2zB
+
+$cshow_a2wm
+  = \ x_a33C ->
+      $w$cshowsPrec_s4vt 0# x_a33C []
+
+lvl_s4iE
+  = \ ds_s4vr eta_s4vs ->
+      $w$cshowsPrec_s4vt 0# ds_s4vr eta_s4vs
+
+$cshowList_a2wu
+  = \ ls_a33x s_a33y ->
+      showList__ lvl_s4iE ls_a33x s_a33y
+
+$fShowCoreBind
+  = C:Show $cshowsPrec_a2vO $cshow_a2wm $cshowList_a2wu
+
+$cshow_a2y6
+  = \ x_a33C ->
+      $w$cshowsPrec_s4vc 0# x_a33C []
+
+$fShowCoreAlt
+  = C:Show $cshowsPrec_a2xF $cshow_a2y6 $cshowList_a2ye
+
+$c_ne__a2Cb
+  = \ eta_B0 eta_B1 ->
+      case dataToTagSmall# eta_B0 of a#_a1Gp {
+        __DEFAULT -> case dataToTagSmall# eta_B1 of b#_a1Gq {
+        __DEFAULT -> case /=# a#_a1Gp b#_a1Gq of ds_d322 {
+        __DEFAULT -> case eta_B0 of wild_X1 {
+        LitInt bx_d33r -> case eta_B1 of wild_X2 {
+        LitInt bx_d33t -> case ==# bx_d33r bx_d33t of lwild_s4nt {
+        __DEFAULT -> True;
+        1# -> False
+      };
+        LitBool ipv_s3a1 -> case lvl_s49a of wild_48_0 {
+
+      }
+      };
+        LitBool a1_a1Gt -> case eta_B1 of wild_X2 {
+        LitInt ipv_s3a3 -> case lvl_s49a of wild_48_0 {
+
+      };
+        LitBool b1_a1Gu -> case dataToTagSmall# a1_a1Gt of a#_a3a7 {
+        __DEFAULT -> case dataToTagSmall# b1_a1Gu of b#_a3a8 {
+        __DEFAULT -> case ==# a#_a3a7 b#_a3a8 of lwild_s4nu {
+        __DEFAULT -> True;
+        1# -> False
+      }
+      }
+      }
+      }
+      };
+        1# -> True
+      }
+      }
+      }
+
+$fEqLiteral
+  = C:Eq $c_eq__a2Bs $c_ne__a2Cb
+
+lvl_s4iH
+  = VInt 0#
+
+Rec {
+lookupEnv
+  = \ v_a1ek ds_d2MG ->
+      case ds_d2MG of wild_X1E {
+        [] -> lvl_s4iH;
+        : ds_d2MN rest_a1eo -> case ds_d2MN of wild_X1 {
+        (,) k_a1em val_a1en -> case eqString v_a1ek k_a1em of wild_X2 {
+        False -> lookupEnv v_a1ek rest_a1eo;
+        True -> val_a1en
+      }
+      }
+      };
+end Rec }
+
+lvl_s4jb
+  = VBool False
+
+lvl_s4j2
+  = VConstr workload4_s4qb []
+
+lvl_s4iY
+  = VConstr workload4_s4qe []
+
+lvl_s4iU
+  = VBool True
+
+Rec {
+eval
+  = \ env_a1ep expr_a1eq ->
+      case expr_a1eq of wild_X1E {
+        CVar ds_d2RE -> case eqString ds_d2RE workload3_s4px of wild_X1 {
+        False -> case eqString ds_d2RE workload4_s4qb of wild_X2 {
+        False -> case eqString ds_d2RE workload4_s4qe of wild_X3 {
+        False -> case eqString ds_d2RE workload3_s4pq of wild_X4 {
+        False -> lookupEnv ds_d2RE env_a1ep;
+        True -> lvl_s4iU
+      };
+        True -> lvl_s4iY
+      };
+        True -> lvl_s4j2
+      };
+        True -> lvl_s4jb
+      };
+        CLit ds_d2RF -> case ds_d2RF of wild_X1 {
+        LitInt bx_d32i -> VInt bx_d32i;
+        LitBool b_a1f5 -> VBool b_a1f5
+      };
+        CApp ds_d2Rv b_a1eG -> let fail_s48e = \ ds_d2RS ->
+      case eval env_a1ep ds_d2Rv of wild_X1 {
+        __DEFAULT -> lvl_s4iH;
+        VClosure cEnv_a1fb param_a1fc body_a1fd -> eval (: ((,) param_a1fc (eval env_a1ep b_a1eG)) cEnv_a1fb) body_a1fd;
+        VConstr cName_a1fe args_a1ff -> VConstr cName_a1fe (_plus__plus_ args_a1ff (: (eval env_a1ep b_a1eG) []))
+      } in case ds_d2Rv of wild_X1 {
+        __DEFAULT -> fail_s48e (##);
+        CApp ds_d2Rw a_a1eF -> case ds_d2Rw of wild_X2 {
+        __DEFAULT -> fail_s48e (##);
+        CVar ds_d2Rx -> let fail_s48m = \ ds_d2RW ->
+      case eqString ds_d2Rx workload4_s4s9 of wild_X3 {
+        False -> case ds_d2Rx of wild_X4 {
+        [] -> fail_s48e (##);
+        : ds_d2RB ds_d2RC -> case ds_d2RB of wild_X5 {
+        C# ds_d2RD -> case ds_d2RD of ds_X6 {
+        __DEFAULT -> fail_s48e (##);
+        '<' -> case ds_d2RC of wild_X7 {
+        [] -> case eval env_a1ep a_a1eF of wild_X8 {
+        __DEFAULT -> lvl_s4jb;
+        VInt bx_d32A -> case eval env_a1ep b_a1eG of wild_X9 {
+        __DEFAULT -> lvl_s4jb;
+        VInt bx_d32C -> VBool (tagToEnum# (<# bx_d32A bx_d32C))
+      }
+      };
+        : ipv_s3ay ipv_s3az -> fail_s48e (##)
+      };
+        '>' -> case ds_d2RC of wild_X7 {
+        [] -> case eval env_a1ep a_a1eF of wild_X8 {
+        __DEFAULT -> lvl_s4jb;
+        VInt bx_d32E -> case eval env_a1ep b_a1eG of wild_X9 {
+        __DEFAULT -> lvl_s4jb;
+        VInt bx_d32G -> VBool (tagToEnum# (># bx_d32E bx_d32G))
+      }
+      };
+        : ipv_s3aB ipv_s3aC -> fail_s48e (##)
+      }
+      }
+      }
+      };
+        True -> case eval env_a1ep a_a1eF of wild_X4 {
+        __DEFAULT -> lvl_s4jb;
+        VInt bx_d32w -> case eval env_a1ep b_a1eG of wild_X5 {
+        __DEFAULT -> lvl_s4jb;
+        VInt bx_d32y -> VBool (tagToEnum# (==# bx_d32w bx_d32y))
+      }
+      }
+      } in case ds_d2Rx of wild_X3 {
+        [] -> fail_s48m (##);
+        : ds_d2Ry ds_d2Rz -> case ds_d2Ry of wild_X4 {
+        C# ds_d2RA -> case ds_d2RA of ds_X5 {
+        __DEFAULT -> fail_s48m (##);
+        '*' -> case ds_d2Rz of wild_X6 {
+        [] -> case eval env_a1ep a_a1eF of wild_X7 {
+        __DEFAULT -> lvl_s4iH;
+        VInt bx_d32k -> case eval env_a1ep b_a1eG of wild_X8 {
+        __DEFAULT -> lvl_s4iH;
+        VInt bx_d32m -> VInt (*# bx_d32k bx_d32m)
+      }
+      };
+        : ipv_s3aF ipv_s3aO -> fail_s48m (##)
+      };
+        '+' -> case ds_d2Rz of wild_X6 {
+        [] -> case eval env_a1ep a_a1eF of wild_X7 {
+        __DEFAULT -> lvl_s4iH;
+        VInt bx_d32o -> case eval env_a1ep b_a1eG of wild_X8 {
+        __DEFAULT -> lvl_s4iH;
+        VInt bx_d32q -> VInt (+# bx_d32o bx_d32q)
+      }
+      };
+        : ipv_s3aQ ipv_s3aZ -> fail_s48m (##)
+      };
+        '-' -> case ds_d2Rz of wild_X6 {
+        [] -> case eval env_a1ep a_a1eF of wild_X7 {
+        __DEFAULT -> lvl_s4iH;
+        VInt bx_d32s -> case eval env_a1ep b_a1eG of wild_X8 {
+        __DEFAULT -> lvl_s4iH;
+        VInt bx_d32u -> VInt (-# bx_d32s bx_d32u)
+      }
+      };
+        : ipv_s3b1 ipv_s3ba -> fail_s48m (##)
+      }
+      }
+      }
+      }
+      }
+      };
+        CLam x_a1f6 body_a1f7 -> VClosure env_a1ep x_a1f6 body_a1f7;
+        CLet ds_d2RG body_a1fi -> case ds_d2RG of wild_X1 {
+        CNonRec x_a1fg e_a1fh -> eval (: ((,) x_a1fg (eval env_a1ep e_a1fh)) env_a1ep) body_a1fi;
+        CRec bs_a1fk -> eval (let Rec { recEnv_s48u = let Rec { go1_a4tq = \ ds_a4tr ->
+      case ds_a4tr of wild_a4ts {
+        [] -> env_a1ep;
+        : y_a4tu ys_a4tv -> : (case y_a4tu of wild_X2 {
+        (,) k_a1fn e_a1fo -> (,) k_a1fn (eval recEnv_s48u e_a1fo)
+      }) (go1_a4tq ys_a4tv)
+      } end Rec } in go1_a4tq bs_a1fk end Rec } in recEnv_s48u) body_a1fi
+      };
+        CCase scrut_a1fp b_a1fq alts_a1fr -> let val_s48w = eval env_a1ep scrut_a1fp in matchAlts_s4jk (: ((,) b_a1fq val_s48w) env_a1ep) val_s48w alts_a1fr
+      };
+matchAlts_s4jk
+  = \ ds_d2RX ds_d2RY ds_d2RZ ->
+      case ds_d2RZ of wild_X4 {
+        [] -> lvl_s4iH;
+        : ds_d2TL rest_a1ex -> case ds_d2TL of wild_X5 {
+        CAlt con_a1eu vars_a1ev body_a1ew -> case con_a1eu of wild_X6 {
+        CDataAlt ds_d2TA -> let fail_s48C = \ ds_d2TK ->
+      let fail_s48A = \ ds_d2TI ->
+      case ds_d2RY of wild_X7 {
+        __DEFAULT -> matchAlts_s4jk ds_d2RX wild_X7 rest_a1ex;
+        VConstr cName'_a1eB vals_a1eC -> case eqString ds_d2TA cName'_a1eB of wild_X8 {
+        False -> matchAlts_s4jk ds_d2RX wild_X7 rest_a1ex;
+        True -> eval (let Rec { go_a4tL = \ ds_a4tM _ys_a4tN ->
+      case ds_a4tM of wild_a4tO {
+        [] -> ds_d2RX;
+        : ipv_a4tQ ipv1_a4tR -> case _ys_a4tN of wild1_a4tT {
+        [] -> ds_d2RX;
+        : ipv2_a4tV ipv3_a4tW -> : ((,) ipv_a4tQ ipv2_a4tV) (go_a4tL ipv1_a4tR ipv3_a4tW)
+      }
+      } end Rec } in go_a4tL vars_a1ev vals_a1eC) body_a1ew
+      }
+      } in case eqString ds_d2TA workload3_s4pq of wild_X7 {
+        False -> fail_s48A (##);
+        True -> case ds_d2RY of wild_X8 {
+        __DEFAULT -> fail_s48A (##);
+        VBool ds_d2TC -> case ds_d2TC of wild_X9 {
+        False -> fail_s48A (##);
+        True -> eval ds_d2RX body_a1ew
+      }
+      }
+      } in case eqString ds_d2TA workload3_s4px of wild_X7 {
+        False -> fail_s48C (##);
+        True -> case ds_d2RY of wild_X8 {
+        __DEFAULT -> fail_s48C (##);
+        VBool ds_d2TB -> case ds_d2TB of wild_X9 {
+        False -> eval ds_d2RX body_a1ew;
+        True -> fail_s48C (##)
+      }
+      }
+      };
+        CLitAlt ds_d2Tz -> case ds_d2Tz of wild_X7 {
+        LitInt bx_d32I -> case ds_d2RY of wild_X8 {
+        __DEFAULT -> matchAlts_s4jk ds_d2RX wild_X8 rest_a1ex;
+        VInt bx_d32K -> case ==# bx_d32I bx_d32K of lwild_s4o0 {
+        __DEFAULT -> matchAlts_s4jk ds_d2RX wild_X8 rest_a1ex;
+        1# -> eval ds_d2RX body_a1ew
+      }
+      };
+        LitBool ipv_s3c0 -> matchAlts_s4jk ds_d2RX ds_d2RY rest_a1ex
+      };
+        CDEFAULT -> eval ds_d2RX body_a1ew
+      }
+      }
+      };
+end Rec }
+
+$c_ne__a2Av
+  = \ eta_B0 eta_B1 ->
+      case $c_eq__a2zM eta_B0 eta_B1 of wild_a33m {
+        False -> True;
+        True -> False
+      }
+
+$fEqAltCon
+  = C:Eq $c_eq__a2zM $c_ne__a2Av
+
+lvl_s4zY
+  = "tests/packages/ghc/GhcCompiler.hs:(117,5)-(121,54)|function findLitAlt"#
+
+lvl_s4jI
+  = patError lvl_s4zY
+
+Rec {
+findAlt_s4ju
+  = \ ds_d2WP ds_d2WQ ->
+      case ds_d2WQ of wild_X3 {
+        [] -> workload4_s4rU;
+        : ds_d2X1 rest_a19H -> case ds_d2X1 of wild_X4 {
+        CAlt c_a19F ds_d2X2 e_a19G -> case $c_eq__a2zM c_a19F ds_d2WP of wild_X5 {
+        False -> case c_a19F of lwild_s4kB {
+        __DEFAULT -> findAlt_s4ju ds_d2WP rest_a19H;
+        CDEFAULT -> constFold e_a19G
+      };
+        True -> constFold e_a19G
+      }
+      }
+      };
+lvl_s4jB
+  = \ ds_d2W4 ->
+      case ds_d2W4 of wild_X2 {
+        CAlt c_a1cZ vs_a1d0 e_a1d1 -> CAlt c_a1cZ vs_a1d0 (constFold e_a1d1)
+      };
+lvl_s4jA
+  = \ ds_d2W0 ->
+      case ds_d2W0 of wild_X2 {
+        (,) k_a1cU v_a1cV -> (,) k_a1cU (constFold v_a1cV)
+      };
+constFold
+  = \ expr_a19B ->
+      case expr_a19B of wild_X1E {
+        __DEFAULT -> wild_X1E;
+        CApp ds_d2Wb ds_d2Wc -> case ds_d2Wb of wild_X1 {
+        __DEFAULT -> CApp (constFold wild_X1) (constFold ds_d2Wc);
+        CApp ds_d2Wd ds_d2We -> case ds_d2Wd of wild_X2 {
+        __DEFAULT -> CApp (constFold wild_X1) (constFold ds_d2Wc);
+        CVar ds_d2Wf -> let fail_s48K = \ ds_d2WM ->
+      let fail_s48I = \ ds_d2WK ->
+      case ds_d2Wf of wild_X3 {
+        [] -> CApp (constFold wild_X1) (constFold ds_d2Wc);
+        : ds_d2Wr ds_d2Ws -> case ds_d2Wr of wild_X4 {
+        C# ds_d2Wt -> case ds_d2Wt of ds_X5 {
+        __DEFAULT -> CApp (constFold wild_X1) (constFold ds_d2Wc);
+        '<' -> case ds_d2Ws of wild_X6 {
+        [] -> case ds_d2We of wild_X7 {
+        __DEFAULT -> CApp (constFold wild_X1) (constFold ds_d2Wc);
+        CLit ds_d2Wu -> case ds_d2Wu of wild_X8 {
+        LitInt bx_d332 -> case ds_d2Wc of wild_X9 {
+        __DEFAULT -> CApp (constFold wild_X1) (constFold wild_X9);
+        CLit ds_d2Wv -> case ds_d2Wv of wild_Xa {
+        LitInt bx_d334 -> CLit (LitBool (tagToEnum# (<# bx_d332 bx_d334)));
+        LitBool ipv_s3c5 -> CApp (constFold wild_X1) (constFold wild_X9)
+      }
+      };
+        LitBool ipv_s3c7 -> CApp (constFold wild_X1) (constFold ds_d2Wc)
+      }
+      };
+        : ipv_s3c4 ipv_s3c9 -> CApp (constFold wild_X1) (constFold ds_d2Wc)
+      };
+        '>' -> case ds_d2Ws of wild_X6 {
+        [] -> case ds_d2We of wild_X7 {
+        __DEFAULT -> CApp (constFold wild_X1) (constFold ds_d2Wc);
+        CLit ds_d2Ww -> case ds_d2Ww of wild_X8 {
+        LitInt bx_d336 -> case ds_d2Wc of wild_X9 {
+        __DEFAULT -> CApp (constFold wild_X1) (constFold wild_X9);
+        CLit ds_d2Wx -> case ds_d2Wx of wild_Xa {
+        LitInt bx_d338 -> CLit (LitBool (tagToEnum# (># bx_d336 bx_d338)));
+        LitBool ipv_s3cc -> CApp (constFold wild_X1) (constFold wild_X9)
+      }
+      };
+        LitBool ipv_s3ce -> CApp (constFold wild_X1) (constFold ds_d2Wc)
+      }
+      };
+        : ipv_s3cb ipv_s3cg -> CApp (constFold wild_X1) (constFold ds_d2Wc)
+      }
+      }
+      }
+      } in case eqString ds_d2Wf workload4_s4s9 of wild_X3 {
+        False -> fail_s48I (##);
+        True -> case ds_d2We of wild_X4 {
+        __DEFAULT -> fail_s48I (##);
+        CLit ds_d2Wp -> case ds_d2Wp of wild_X5 {
+        LitInt bx_d32Y -> case ds_d2Wc of wild_X6 {
+        __DEFAULT -> fail_s48I (##);
+        CLit ds_d2Wq -> case ds_d2Wq of wild_X7 {
+        LitInt bx_d330 -> CLit (LitBool (tagToEnum# (==# bx_d32Y bx_d330)));
+        LitBool ipv_s3ci -> fail_s48I (##)
+      }
+      };
+        LitBool ipv_s3ck -> fail_s48I (##)
+      }
+      }
+      } in case ds_d2Wf of wild_X3 {
+        [] -> fail_s48K (##);
+        : ds_d2Wg ds_d2Wh -> case ds_d2Wg of wild_X4 {
+        C# ds_d2Wi -> case ds_d2Wi of ds_X5 {
+        __DEFAULT -> fail_s48K (##);
+        '*' -> case ds_d2Wh of wild_X6 {
+        [] -> case ds_d2We of wild_X7 {
+        __DEFAULT -> fail_s48K (##);
+        CLit ds_d2Wj -> case ds_d2Wj of wild_X8 {
+        LitInt bx_d32M -> case ds_d2Wc of wild_X9 {
+        __DEFAULT -> fail_s48K (##);
+        CLit ds_d2Wk -> case ds_d2Wk of wild_Xa {
+        LitInt bx_d32O -> CLit (LitInt (*# bx_d32M bx_d32O));
+        LitBool ipv_s3co -> fail_s48K (##)
+      }
+      };
+        LitBool ipv_s3cq -> fail_s48K (##)
+      }
+      };
+        : ipv_s3cn ipv_s3cs -> fail_s48K (##)
+      };
+        '+' -> case ds_d2Wh of wild_X6 {
+        [] -> case ds_d2We of wild_X7 {
+        __DEFAULT -> fail_s48K (##);
+        CLit ds_d2Wl -> case ds_d2Wl of wild_X8 {
+        LitInt bx_d32Q -> case ds_d2Wc of wild_X9 {
+        __DEFAULT -> fail_s48K (##);
+        CLit ds_d2Wm -> case ds_d2Wm of wild_Xa {
+        LitInt bx_d32S -> CLit (LitInt (+# bx_d32Q bx_d32S));
+        LitBool ipv_s3cv -> fail_s48K (##)
+      }
+      };
+        LitBool ipv_s3cx -> fail_s48K (##)
+      }
+      };
+        : ipv_s3cu ipv_s3cz -> fail_s48K (##)
+      };
+        '-' -> case ds_d2Wh of wild_X6 {
+        [] -> case ds_d2We of wild_X7 {
+        __DEFAULT -> fail_s48K (##);
+        CLit ds_d2Wn -> case ds_d2Wn of wild_X8 {
+        LitInt bx_d32U -> case ds_d2Wc of wild_X9 {
+        __DEFAULT -> fail_s48K (##);
+        CLit ds_d2Wo -> case ds_d2Wo of wild_Xa {
+        LitInt bx_d32W -> CLit (LitInt (-# bx_d32U bx_d32W));
+        LitBool ipv_s3cC -> fail_s48K (##)
+      }
+      };
+        LitBool ipv_s3cE -> fail_s48K (##)
+      }
+      };
+        : ipv_s3cB ipv_s3cG -> fail_s48K (##)
+      }
+      }
+      }
+      }
+      }
+      };
+        CLam x_a1cN b_a1cO -> CLam x_a1cN (constFold b_a1cO);
+        CLet ds_d2WC b_a1cR -> case ds_d2WC of wild_X1 {
+        CNonRec x_a1cP e_a1cQ -> CLet (CNonRec x_a1cP (constFold e_a1cQ)) (constFold b_a1cR);
+        CRec bs_a1cS -> CLet (CRec (map lvl_s4jA bs_a1cS)) (constFold b_a1cR)
+      };
+        CCase ds_d2Wy ds_d2Wz alts_a1cH -> case ds_d2Wy of wild_X1 {
+        __DEFAULT -> CCase (constFold wild_X1) ds_d2Wz (map lvl_s4jB alts_a1cH);
+        CLit ds_d2WA -> case ds_d2WA of wild_X2 {
+        LitInt bx_d33a -> findLitAlt_s4jE wild_X2 alts_a1cH;
+        LitBool ds_d2WB -> case ds_d2WB of wild_X3 {
+        False -> findAlt_s4ju workload3_s4py alts_a1cH;
+        True -> findAlt_s4ju workload3_s4pr alts_a1cH
+      }
+      }
+      }
+      };
+findLitAlt_s4jE
+  = \ ds_d2X9 ds_d2Xa ->
+      case ds_d2Xa of wild_X3 {
+        [] -> workload4_s4rU;
+        : ds_d2Xs rest_a19L -> case ds_d2Xs of wild_X4 {
+        CAlt ds_d2Xt ds_d2Xu e_a19K -> case ds_d2Xt of wild_X5 {
+        CDataAlt ipv_s3cI -> case lvl_s4jI of wild_48_0 {
+
+      };
+        CLitAlt l'_a19J -> case dataToTagSmall# ds_d2X9 of a#_a1Gp {
+        __DEFAULT -> case dataToTagSmall# l'_a19J of b#_a1Gq {
+        __DEFAULT -> case /=# a#_a1Gp b#_a1Gq of ds_d322 {
+        __DEFAULT -> let $j_s4oa = constFold e_a19K in case ds_d2X9 of wild_X1 {
+        LitInt bx_d33r -> case l'_a19J of wild_X2 {
+        LitInt bx_d33t -> case ==# bx_d33r bx_d33t of lwild_s4ob {
+        __DEFAULT -> findLitAlt_s4jE wild_X1 rest_a19L;
+        1# -> $j_s4oa
+      };
+        LitBool ipv_s3a1 -> case lvl_s49a of wild_48_0 {
+
+      }
+      };
+        LitBool a1_a1Gt -> case l'_a19J of wild_X2 {
+        LitInt ipv_s3a3 -> case lvl_s49a of wild_48_0 {
+
+      };
+        LitBool b1_a1Gu -> case dataToTagSmall# a1_a1Gt of a#_a3a7 {
+        __DEFAULT -> case dataToTagSmall# b1_a1Gu of b#_a3a8 {
+        __DEFAULT -> case ==# a#_a3a7 b#_a3a8 of lwild_s4oc {
+        __DEFAULT -> findLitAlt_s4jE wild_X1 rest_a19L;
+        1# -> $j_s4oa
+      }
+      }
+      }
+      }
+      };
+        1# -> findLitAlt_s4jE ds_d2X9 rest_a19L
+      }
+      }
+      };
+        CDEFAULT -> constFold e_a19K
+      }
+      }
+      };
+end Rec }
+
+$c_ne__a2xu
+  = \ eta_B0 eta_B1 ->
+      case $c_eq__a2wF eta_B0 eta_B1 of wild_a33m {
+        False -> True;
+        True -> False
+      }
+
+$fEqCoreBind
+  = C:Eq $c_eq__a2wF $c_ne__a2xu
+
+Rec {
+subst
+  = \ x_a198 s_a199 expr_a19a ->
+      case expr_a19a of wild_X1E {
+        CVar v_a19b -> case eqString v_a19b x_a198 of wild_X1 {
+        False -> wild_X1E;
+        True -> s_a199
+      };
+        CLit l_a19c -> wild_X1E;
+        CApp f_a19d a_a19e -> CApp (subst x_a198 s_a199 f_a19d) (subst x_a198 s_a199 a_a19e);
+        CLam v_a19f b_a19g -> case eqString v_a19f x_a198 of wild_X1 {
+        False -> CLam v_a19f (subst x_a198 s_a199 b_a19g);
+        True -> wild_X1E
+      };
+        CLet ds_d2Yh b_a19j -> case ds_d2Yh of wild_X1 {
+        CNonRec v_a19h e_a19i -> case eqString v_a19h x_a198 of wild_X2 {
+        False -> CLet (CNonRec v_a19h (subst x_a198 s_a199 e_a19i)) (subst x_a198 s_a199 b_a19j);
+        True -> CLet (CNonRec v_a19h (subst x_a198 s_a199 e_a19i)) b_a19j
+      };
+        CRec bs_a19l -> let $j_s4ul = CLet (CRec (map (\ ds_d2Y3 ->
+      case ds_d2Y3 of wild_X3 {
+        (,) k_a19p v_a19q -> (,) k_a19p (subst x_a198 s_a199 v_a19q)
+      }) bs_a19l)) b_a19j in let $j_s4uk = CLet (CRec (map (\ ds_d2Y7 ->
+      case ds_d2Y7 of wild_X3 {
+        (,) k_a19r v_a19s -> (,) k_a19r (subst x_a198 s_a199 v_a19s)
+      }) bs_a19l)) (subst x_a198 s_a199 b_a19j) in let Rec { go1_a4tq = \ ds_a4tr ->
+      case ds_a4tr of wild_a4ts {
+        [] -> $j_s4uk;
+        : y_a4tu ys_a4tv -> case y_a4tu of wild_a4pl {
+        (,) x_a4pm ds1_a4pn -> case eqString x_a198 x_a4pm of wild_a3dL {
+        False -> go1_a4tq ys_a4tv;
+        True -> $j_s4ul
+      }
+      }
+      } end Rec } in go1_a4tq bs_a19l
+      };
+        CCase scrut_a19t b_a19u alts_a19v -> case eqString b_a19u x_a198 of wild_X1 {
+        False -> CCase (subst x_a198 s_a199 scrut_a19t) b_a19u (map (\ ds_d2Yi ->
+      case ds_d2Yi of wild_X2 {
+        CAlt con_a19x vars_a19y e_a19z -> case elem $fEqList_$s$fEqList1 x_a198 vars_a19y of wild_X3 {
+        False -> CAlt con_a19x vars_a19y (subst x_a198 s_a199 e_a19z);
+        True -> wild_X2
+      }
+      }) alts_a19v);
+        True -> CCase (subst x_a198 s_a199 scrut_a19t) b_a19u alts_a19v
+      }
+      };
+end Rec }
+
+Rec {
+lvl_s4jR
+  = \ ds_d2YN ->
+      case ds_d2YN of wild_X2 {
+        (,) k_a1dk v_a1dl -> (,) k_a1dk (betaReduce v_a1dl)
+      };
+lvl_s4jS
+  = \ ds_d2YR ->
+      case ds_d2YR of wild_X1 {
+        CAlt c_a1dp vs_a1dq e_a1dr -> CAlt c_a1dp vs_a1dq (betaReduce e_a1dr)
+      };
+betaReduce
+  = \ expr_a1d3 ->
+      case expr_a1d3 of wild_X1E {
+        __DEFAULT -> wild_X1E;
+        CApp ds_d2YY arg_a1d6 -> case ds_d2YY of wild_X1 {
+        __DEFAULT -> case betaReduce wild_X1 of wild_X2 {
+        __DEFAULT -> CApp wild_X2 (betaReduce arg_a1d6);
+        CLam x_a1db body_a1dc -> betaReduce (subst x_a1db (betaReduce arg_a1d6) body_a1dc)
+      };
+        CLam x_a1d4 body_a1d5 -> betaReduce (subst x_a1d4 (betaReduce arg_a1d6) body_a1d5)
+      };
+        CLam x_a1dd b_a1de -> CLam x_a1dd (betaReduce b_a1de);
+        CLet ds_d2YZ b_a1dh -> case ds_d2YZ of wild_X1 {
+        CNonRec x_a1df e_a1dg -> CLet (CNonRec x_a1df (betaReduce e_a1dg)) (betaReduce b_a1dh);
+        CRec bs_a1di -> CLet (CRec (map lvl_s4jR bs_a1di)) (betaReduce b_a1dh)
+      };
+        CCase s_a1dm b_a1dn alts_a1do -> CCase (betaReduce s_a1dm) b_a1dn (map lvl_s4jS alts_a1do)
+      };
+end Rec }
+
+Rec {
+lvl_s4jT
+  = \ ds_d2Zr ->
+      case ds_d2Zr of wild_X2 {
+        (,) k_a1dF v_a1dG -> (,) k_a1dF (inlineBndr v_a1dG)
+      };
+lvl_s4jU
+  = \ ds_d2Zz ->
+      case ds_d2Zz of wild_X1 {
+        CAlt c_a1dO vs_a1dP e_a1dQ -> CAlt c_a1dO vs_a1dP (inlineBndr e_a1dQ)
+      };
+inlineBndr
+  = \ expr_a1dt ->
+      case expr_a1dt of wild_X1E {
+        __DEFAULT -> wild_X1E;
+        CApp f_a1dH a_a1dI -> CApp (inlineBndr f_a1dH) (inlineBndr a_a1dI);
+        CLam x_a1dJ b_a1dK -> CLam x_a1dJ (inlineBndr b_a1dK);
+        CLet ds_d2ZG b_a1dw -> case ds_d2ZG of wild_X1 {
+        CNonRec x_a1du ds_d2ZH -> case ds_d2ZH of wild_X2 {
+        __DEFAULT -> CLet (CNonRec x_a1du (inlineBndr wild_X2)) (inlineBndr b_a1dw);
+        CVar v_a1dv -> inlineBndr (subst x_a1du wild_X2 b_a1dw);
+        CLit l_a1dy -> inlineBndr (subst x_a1du wild_X2 b_a1dw)
+      };
+        CRec bs_a1dD -> CLet (CRec (map lvl_s4jT bs_a1dD)) (inlineBndr b_a1dw)
+      };
+        CCase s_a1dL b_a1dM alts_a1dN -> CCase (inlineBndr s_a1dL) b_a1dM (map lvl_s4jU alts_a1dN)
+      };
+end Rec }
+
+Rec {
+freeVars
+  = \ expr_aWc ->
+      case expr_aWc of wild_X1E {
+        CVar v_aWd -> : v_aWd [];
+        CLit ds_d30b -> [];
+        CApp f_aWe a_aWf -> _plus__plus_ (freeVars f_aWe) (freeVars a_aWf);
+        CLam x_aWh b_aWi -> filter (\ v_B2 ->
+      $fEqList_$s$c_ne_1 v_B2 x_aWh) (freeVars b_aWi);
+        CLet ds_d30c b_aXX -> case ds_d30c of wild_X1 {
+        CNonRec x_aXV e_aXW -> _plus__plus_ (freeVars e_aXW) (filter (\ v_B2 ->
+      $fEqList_$s$c_ne_1 v_B2 x_aXV) (freeVars b_aXX));
+        CRec bs_aXY -> let v_s48O = map fst bs_aXY in let z_a4to = filter (\ v_B2 ->
+      case elem $fEqList_$s$fEqList1 v_B2 v_s48O of wild_a3eb {
+        False -> True;
+        True -> False
+      }) (freeVars b_aXX) in let Rec { go1_a4tq = \ ds_a4tr ->
+      case ds_a4tr of wild_a4ts {
+        [] -> z_a4to;
+        : y_a4tu ys_a4tv -> case y_a4tu of wild_a3ey {
+        (,) ds1_a3ez y_a3eA -> let z_X1F = go1_a4tq ys_a4tv in let Rec { go1_X1G = \ ds_X1H ->
+      case ds_X1H of wild_X1I {
+        [] -> z_X1F;
+        : y_X1J ys_X1K -> case elem $fEqList_$s$fEqList1 y_X1J v_s48O of wild_a3eb {
+        False -> : y_X1J (go1_X1G ys_X1K);
+        True -> go1_X1G ys_X1K
+      }
+      } end Rec } in go1_X1G (freeVars y_a3eA)
+      }
+      } end Rec } in go1_a4tq bs_aXY
+      };
+        CCase s_a193 b_a194 alts_a195 -> _plus__plus_ (freeVars s_a193) (let Rec { go1_a4tq = \ ds_a4tr ->
+      case ds_a4tr of wild_a4ts {
+        [] -> [];
+        : y_a4tu ys_a4tv -> case y_a4tu of wild_X1 {
+        CAlt ds_d30a vars_a196 e_a197 -> let z_X1F = go1_a4tq ys_a4tv in let Rec { go1_X1G = \ ds_X1H ->
+      case ds_X1H of wild_X1I {
+        [] -> z_X1F;
+        : y_X1J ys_X1K -> case elem $fEqList_$s$fEqList1 y_X1J (: b_a194 vars_a196) of wild_a3eb {
+        False -> : y_X1J (go1_X1G ys_X1K);
+        True -> go1_X1G ys_X1K
+      }
+      } end Rec } in go1_X1G (freeVars e_a197)
+      }
+      } end Rec } in go1_a4tq alts_a195)
+      };
+end Rec }
+
+Rec {
+lvl_s4jV
+  = \ ds_d30p ->
+      case ds_d30p of wild_X3 {
+        (,) k_a1e3 v_a1e4 -> (,) k_a1e3 (dce v_a1e4)
+      };
+lvl_s4jW
+  = \ ds_d30A ->
+      case ds_d30A of wild_X1 {
+        CAlt c_a1ec vs_a1ed e_a1ee -> CAlt c_a1ec vs_a1ed (dce e_a1ee)
+      };
+dce
+  = \ expr_a1dS ->
+      case expr_a1dS of wild_X1E {
+        __DEFAULT -> wild_X1E;
+        CApp f_a1e5 a_a1e6 -> CApp (dce f_a1e5) (dce a_a1e6);
+        CLam x_a1e7 b_a1e8 -> CLam x_a1e7 (dce b_a1e8);
+        CLet ds_d30H b_a1dV -> case ds_d30H of wild_X1 {
+        CNonRec x_a1dT e_a1dU -> let b'_s48W = dce b_a1dV in case elem $fEqList_$s$fEqList1 x_a1dT (freeVars b'_s48W) of wild_X2 {
+        False -> b'_s48W;
+        True -> CLet (CNonRec x_a1dT (dce e_a1dU)) b'_s48W
+      };
+        CRec bs_a1dX -> let b'_s48Y = dce b_a1dV in let fvs_s490 = freeVars b'_s48Y in case filter (\ ds_d30t ->
+      case ds_d30t of wild_X2 {
+        (,) k_a1e2 ds_d30v -> elem $fEqList_$s$fEqList1 k_a1e2 fvs_s490
+      }) bs_a1dX of wild_a3eF {
+        [] -> b'_s48Y;
+        : ds1_a3eH ds2_a3eI -> CLet (CRec (map lvl_s4jV wild_a3eF)) b'_s48Y
+      }
+      };
+        CCase s_a1e9 b_a1ea alts_a1eb -> CCase (dce s_a1e9) b_a1ea (map lvl_s4jW alts_a1eb)
+      };
+end Rec }
+
+optimizePass
+  = \ x_a3eu ->
+      dce (inlineBndr (betaReduce (constFold x_a3eu)))
+
+optimize
+  = \ expr_a1eg ->
+      dce (inlineBndr (betaReduce (constFold (dce (inlineBndr (betaReduce (constFold (optimizePass expr_a1eg))))))))
+
+$wrunBenchmark_s4yM
+  = \ expr_s4yK ->
+      case optimize expr_s4yK of opt_a1fw {
+        __DEFAULT -> case eval [] opt_a1fw of val_a1fx {
+        __DEFAULT -> 0#;
+        VInt bx_d32g -> bx_d32g;
+        VBool ds_d2MB -> case ds_d2MB of wild_X1 {
+        False -> 0#;
+        True -> 1#
+      }
+      }
+      }
+
+runBenchmark
+  = \ expr_s4yK ->
+      case $wrunBenchmark_s4yM expr_s4yK of ww_s4z3 {
+        __DEFAULT -> I# ww_s4z3
+      }
+
+$j_s4A3
+  = \ ipv_s3eK ->
+      case optimize workload3 of opt_X1E {
+        __DEFAULT -> let $j_s4kF = \ ipv_s3eM ->
+      case optimize workload2 of opt_X1F {
+        __DEFAULT -> let $j_s4kE = \ ipv_s3eO ->
+      case optimize workload1 of opt_X1G {
+        __DEFAULT -> let $j_s4kD = \ ipv_s3eQ ->
+      I# (remInt# (+# (+# (+# (*# ipv_s3eQ 10007#) (*# ipv_s3eO 1009#)) (*# ipv_s3eM 101#)) ipv_s3eK) 1000000007#) in case eval [] opt_X1G of val_a1fx {
+        __DEFAULT -> $j_s4kD 0#;
+        VInt bx_d32g -> $j_s4kD bx_d32g;
+        VBool ds_d2MB -> case ds_d2MB of wild_X1 {
+        False -> $j_s4kD 0#;
+        True -> $j_s4kD 1#
+      }
+      }
+      } in case eval [] opt_X1F of val_a1fx {
+        __DEFAULT -> $j_s4kE 0#;
+        VInt bx_d32g -> $j_s4kE bx_d32g;
+        VBool ds_d2MB -> case ds_d2MB of wild_X1 {
+        False -> $j_s4kE 0#;
+        True -> $j_s4kE 1#
+      }
+      }
+      } in case eval [] opt_X1E of val_a1fx {
+        __DEFAULT -> $j_s4kF 0#;
+        VInt bx_d32g -> $j_s4kF bx_d32g;
+        VBool ds_d2MB -> case ds_d2MB of wild_X1 {
+        False -> $j_s4kF 0#;
+        True -> $j_s4kF 1#
+      }
+      }
+      }
+
+result
+  = case optimize workload4 of opt_a1fw {
+        __DEFAULT -> case eval [] opt_a1fw of val_a1fx {
+        __DEFAULT -> $j_s4A3 0#;
+        VInt bx_d32g -> $j_s4A3 bx_d32g;
+        VBool ds_d2MB -> case ds_d2MB of wild_X1 {
+        False -> $j_s4A3 0#;
+        True -> $j_s4A3 1#
+      }
+      }
+      }
+
+main = result

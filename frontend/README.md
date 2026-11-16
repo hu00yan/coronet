@@ -368,3 +368,39 @@ Coronet supports full GHC primops coverage and real package workloads from the H
    - Exercises 100 key-value insertions, tree rotations, recursive key lookups, and cumulative fold.
    - Verified reference output (`runghc`): `10570`
    - Core extraction: `tests/packages/map_core.core`
+
+---
+
+## 12. Level 4 Milestone: Self-Compiling GHC Core Pipeline (`tests/packages/ghc/`)
+
+Level 4 is the summit of the Coronet compiler roadmap: compiling a full pure Haskell implementation of a GHC Core compiler and optimizer through Coronet.
+
+### 12.1 `GhcCompiler.hs` Architecture
+
+- **Core Intermediate Representation**:
+  * `CoreExpr`: `CVar`, `CLit`, `CApp`, `CLam`, `CLet`, `CCase`
+  * `CoreBind`: `CNonRec`, `CRec`
+  * `CoreAlt`: `CAlt AltCon [Var] CoreExpr`
+  * `Literal`: `LitInt`, `LitBool`
+- **GHC Optimization Pipeline**:
+  * Constant folding (`constFold`): arithmetic evaluation (`+`, `-`, `*`), relational evaluations (`==`, `<`, `>`), and constant case branch selection.
+  * Beta reduction (`betaReduce`): inline application of closures `(\x -> body) arg -> subst x arg body`.
+  * Inlining (`inlineBndr`): inlines simple variable and literal bindings.
+  * Dead code elimination (`dce`): eliminates unused non-recursive and recursive let bindings.
+- **Normalizer / Evaluator**:
+  * Environment-based interpreter to WHNF / Normal Form.
+- **Benchmark Workloads**:
+  1. Arithmetic with dead code & constant folding
+  2. Higher-order function composition & beta reduction
+  3. Recursive Fibonacci in Core
+  4. Binary search tree insertion and lookup
+- **Verification**:
+  * Reference output (`runghc`): `1528835`
+  * Compiled (`ghc -O2`): `1528835`
+  * Extracted Core: `tests/packages/ghc/GhcCompiler.core` (54 KB)
+
+### 12.2 Extraction Command
+
+```bash
+./frontend/extract_core.sh --plugin tests/packages/ghc/GhcCompiler.hs tests/packages/ghc/GhcCompiler.core
+```
