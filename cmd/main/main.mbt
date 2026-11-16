@@ -19,6 +19,7 @@ struct CliArgs {
   lto : Bool
   prune : Bool
   mid_stats : Bool
+  report_gaps : Bool
 }
 
 ///|
@@ -48,6 +49,8 @@ fn print_usage() -> Unit {
     #|  --no-lto                     Keep all linked top-level bindings
     #|  --no-prune                   Keep definitions @main cannot reach, unmerged
     #|  --mid-stats                  Report what the middle-end removed
+    #|  --report-gaps                List references the input never defines
+    #|                               (frontend/harness gap inventory)
     #|  -h, --help                   Show this help message and exit
   )
   println(usage)
@@ -61,6 +64,7 @@ fn parse_cli_args(args : Array[String]) -> CliArgs {
   let mut lto = true
   let mut prune = true
   let mut mid_stats = false
+  let mut report_gaps = false
   let mut i = 1
   while i < args.length() {
     let arg = args[i]
@@ -83,6 +87,8 @@ fn parse_cli_args(args : Array[String]) -> CliArgs {
       prune = false
     } else if arg == "--mid-stats" {
       mid_stats = true
+    } else if arg == "--report-gaps" {
+      report_gaps = true
     } else if arg == "--target" {
       i = i + 1
       if i >= args.length() {
@@ -137,7 +143,7 @@ fn parse_cli_args(args : Array[String]) -> CliArgs {
     }
   }
 
-  { input_files, target: tgt, output_file, lto, prune, mid_stats }
+  { input_files, target: tgt, output_file, lto, prune, mid_stats, report_gaps }
 }
 
 ///|
@@ -169,6 +175,46 @@ async fn handle_metal_target(program : @syntax.Program, output_file : String?, p
         println(hvm2_code)
       }
     }
+  }
+}
+
+///| Print every reference the linked program never defines.
+///| A name that reaches lowering without a definition becomes a dangling `@ref`
+///| in the emitted book, which each runtime reports differently; naming them up
+///| front is what makes a real-world failure diagnosable.
+fn report_gap_inventory(program : @syntax.Program) -> Unit {
+  let defined : Array[String] = []
+  for b in program.binds {
+    match b {
+      NonRec(n, _) => defined.push(n)
+      Rec(pairs) =>
+        for p in pairs {
+          defined.push(p.0)
+        }
+    }
+  }
+  let missing : Array[String] = []
+  let references : Array[String] = []
+  for bp in program.all_bindings() {
+    let refs = @syntax.expr_free_vars(bp.1)
+    for fv in refs {
+      if defined.contains(fv) || @syntax.is_known_builtin(fv) {
+        continue
+      }
+      let first = fv[0]
+      if (first >= 'A' && first <= 'Z') || first == ':' || first == '(' {
+        continue
+      }
+      if missing.contains(fv) {
+        continue
+      }
+      missing.push(fv)
+      references.push(bp.0)
+    }
+  }
+  println("gap inventory: \{defined.length()} defined, \{missing.length()} undefined reference(s)")
+  for i in 0..<missing.length() {
+    println("  undefined: \{missing[i]}  (needed by \{references[i]})")
   }
 }
 
@@ -270,13 +316,18 @@ async fn main {
   } else {
     @syntax.link_programs(programs)
   }
+  let mid_input = @syntax.strip_crash_messages(linked)
   let mid_stats = @mid.MidStats::new()
   let program = if cli.mid_stats {
-    let optimized = @mid.optimize(linked, mid_stats)
+    let optimized = @mid.optimize(mid_input, mid_stats)
     println("middle-end: \{mid_stats}")
     optimized
   } else {
-    @mid.optimize(linked, mid_stats)
+    @mid.optimize(mid_input, mid_stats)
+  }
+
+  if cli.report_gaps {
+    report_gap_inventory(program)
   }
 
   if cli.target == "gpu" || cli.target == "cuda" || cli.target == "hip" {
