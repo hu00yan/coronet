@@ -91,3 +91,90 @@ test "capture is refused rather than performed" {
   assert_false(prog.to_string().contains("\\x -> x"))
 }
 
+
+///|
+test "a computed CAF read by a recursive loop becomes a threaded parameter" {
+  let prog = optimized(
+    #|m = build Tip
+    #|loop = \ i acc -> case i of { 0# -> acc; __DEFAULT -> loop i (+ acc (find i m)) }
+    #|main = loop 3# 0#
+  )
+  let text = prog.to_string()
+  // the loop now takes the CAF as a leading parameter and passes it on
+  assert_true(text.contains("loop __mid_caf_m"))
+  // the threaded binder appears at the loop binder, the find argument, and the
+  // recursive call -- the CAF name itself stays at the loop entry only
+  let mut occurrences = 0
+  let needle = "__mid_caf_m"
+  let mut from = 0
+  while from + needle.length() <= text.length() {
+    if text[from:from + needle.length()] == needle {
+      occurrences = occurrences + 1
+      from = from + needle.length()
+    } else {
+      from = from + 1
+    }
+  }
+  assert_true(occurrences == 3)
+}
+
+///|
+test "a non-recursive caller of a threaded loop supplies the CAF itself" {
+  let stats = MidStats::new()
+  let prog = optimize(
+    parse(
+      #|m = build Tip
+      #|loop = \ i acc -> case i of { 0# -> acc; __DEFAULT -> loop i (+ acc (find i m)) }
+      #|main = start (loop 3# 0#)
+    ),
+    stats,
+  )
+  assert_true(stats.cafs_threaded == 1)
+  assert_true(prog.to_string().contains("loop m"))
+}
+
+///|
+test "a CAF returned as a value threads fine; a member passed as a value does not" {
+  // reading the CAF as a value inside the loop is the shape the pass fixes
+  let stats = MidStats::new()
+  let prog = optimize(
+    parse(
+      #|m = build Tip
+      #|f = \ i -> case i of { 0# -> m; __DEFAULT -> g i }
+      #|g = \ i -> f i
+      #|main = f 3#
+    ),
+    stats,
+  )
+  assert_true(stats.cafs_threaded == 1)
+  assert_true(prog.to_string().contains("f m 3#"))
+  // a cycle member passed as a value would change meaning at its application
+  // site, so that cycle is left alone
+  let stats2 = MidStats::new()
+  let _prog2 = optimize(
+    parse(
+      #|m = build Tip
+      #|f = \ i -> apply g i
+      #|g = \ i -> f i
+      #|apply = \ h x -> h x
+      #|main = f 3#
+    ),
+    stats2,
+  )
+  assert_true(stats2.cafs_threaded == 0)
+}
+
+///|
+test "trivial and lambda-valued bindings are never threaded" {
+  let stats = MidStats::new()
+  let _prog = optimize(
+    parse(
+      #|lit = 5#
+      #|fn = \ x -> + x 1#
+      #|loop = \ i -> case i of { 0# -> 0#; __DEFAULT -> loop (+ i (find lit fn)) }
+      #|main = loop 3#
+    ),
+    stats,
+  )
+  assert_true(stats.cafs_threaded == 0)
+}

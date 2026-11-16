@@ -16,6 +16,7 @@ pub(all) struct MidStats {
   mut alts_merged : Int
   mut binds_merged : Int
   mut binds_pruned : Int
+  mut cafs_threaded : Int
 }
 
 pub fn MidStats::new() -> MidStats {
@@ -26,12 +27,13 @@ pub fn MidStats::new() -> MidStats {
     alts_merged: 0,
     binds_merged: 0,
     binds_pruned: 0,
+    cafs_threaded: 0,
   }
 }
 
 pub impl Show for MidStats with output(self, logger) {
   logger.write_string(
-    "dead lets \{self.dead_lets}, inlined lets \{self.inlined_lets}, cases reduced \{self.cases_reduced}, alternatives merged \{self.alts_merged}, binds merged \{self.binds_merged}, binds pruned \{self.binds_pruned}",
+    "dead lets \{self.dead_lets}, inlined lets \{self.inlined_lets}, cases reduced \{self.cases_reduced}, alternatives merged \{self.alts_merged}, binds merged \{self.binds_merged}, binds pruned \{self.binds_pruned}, cafs threaded \{self.cafs_threaded}",
   )
 }
 
@@ -807,13 +809,499 @@ pub fn prune_top_bindings(prog : @syntax.Program, stats : MidStats) -> @syntax.P
 }
 
 // ----------------------------------------------------------------------------
-// Pipeline
+// Pass 7: thread computed top-level bindings through the recursive loops that
+// read them
 // ----------------------------------------------------------------------------
+
+///| A reference to a computed top-level binding (`m = go ... Tip`, a CAF)
+///| lowers to a REF that re-expands on every activation of the net containing
+///| it. When that net sits on a recursive loop, the whole computation reruns
+///| per iteration. Adding the CAF as an explicit parameter to every definition
+///| of the loop's call cycle turns those re-expansions into one shared value:
+///| the wire is computed once and the lowerer's linearize step inserts the DUP
+///| nodes that clone it to each iteration.
+///
+///| The pass is conservative: a cycle is threaded only when every member is
+///| referenced in head-of-application position (never passed as a value), no
+///| member is itself an alias, and the binding is worth sharing (computed,
+///| non-recursive, not a lambda). Substitution inserts a fresh binder, so it
+///| cannot capture, and top_names membership is untouched.
+
+///| Walk `expr`, recording which top-level names are called (head of an
+///| application) and which are used as values.
+fn scan_top_refs(
+  expr : @syntax.Expr,
+  tops : Array[String],
+  calls : Array[String],
+  value_uses : Array[String],
+  is_head : Bool
+) -> Unit {
+  match expr {
+    Var(n) =>
+      if is_top_name(n, tops) {
+        if is_head {
+          if !array_contains(calls, n) {
+            calls.push(n)
+          }
+        } else if !array_contains(value_uses, n) {
+          value_uses.push(n)
+        }
+      }
+    LitInt(_) | LitChar(_) | LitString(_) => ()
+    App(f, a) => {
+      scan_top_refs(f, tops, calls, value_uses, true)
+      scan_top_refs(a, tops, calls, value_uses, false)
+    }
+    Lam(_, body) => scan_top_refs(body, tops, calls, value_uses, false)
+    Let(bind, body) =>
+      match bind {
+        NonRec(_, v) => {
+          scan_top_refs(v, tops, calls, value_uses, false)
+          scan_top_refs(body, tops, calls, value_uses, false)
+        }
+        Rec(pairs) => {
+          for pair in pairs {
+            scan_top_refs(pair.1, tops, calls, value_uses, false)
+          }
+          scan_top_refs(body, tops, calls, value_uses, false)
+        }
+      }
+    Case(scrut, _, alts) => {
+      scan_top_refs(scrut, tops, calls, value_uses, false)
+      for alt in alts {
+        scan_top_refs(alt.expr, tops, calls, value_uses, false)
+      }
+    }
+    Constr(_, args) =>
+      for a in args {
+        scan_top_refs(a, tops, calls, value_uses, false)
+      }
+  }
+}
+
+fn is_top_name(name : String, tops : Array[String]) -> Bool {
+  array_contains(tops, name)
+}
+
+///| Per-binding call edges over top-level names, in the order of `nodes`.
+fn build_call_graph(
+  prog : @syntax.Program
+) -> (Array[String], Array[Array[String]]) {
+  let nodes : Array[String] = []
+  for bind in prog.binds {
+    match bind {
+      NonRec(name, _) => nodes.push(name)
+      Rec(pairs) => for pair in pairs {
+        nodes.push(pair.0)
+      }
+    }
+  }
+  let adj : Array[Array[String]] = []
+  for _i in nodes {
+    adj.push([])
+  }
+  for bind in prog.binds {
+    match bind {
+      NonRec(name, expr) => {
+        let calls : Array[String] = []
+        scan_top_refs(expr, nodes, calls, [], false)
+        adj[node_index(nodes, name)].clear()
+        for c in calls {
+          adj[node_index(nodes, name)].push(c)
+        }
+      }
+      Rec(pairs) =>
+        for pair in pairs {
+          let calls : Array[String] = []
+          scan_top_refs(pair.1, nodes, calls, [], false)
+          adj[node_index(nodes, pair.0)].clear()
+          for c in calls {
+            adj[node_index(nodes, pair.0)].push(c)
+          }
+        }
+    }
+  }
+  (nodes, adj)
+}
+
+fn node_index(nodes : Array[String], name : String) -> Int {
+  match index_of_str(nodes, name) {
+    Some(i) => i
+    None => panic()
+  }
+}
+
+///| Tarjan strongly connected components over the call graph.
+fn tarjan_sccs(nodes : Array[String], adj : Array[Array[String]]) -> Array[Array[String]] {
+  let n = nodes.length()
+  let index_arr : Array[Int] = []
+  let low_arr : Array[Int] = []
+  let on_stack : Array[Bool] = []
+  for _i in 0..<n {
+    index_arr.push(-1)
+    low_arr.push(-1)
+    on_stack.push(false)
+  }
+  let stack : Array[Int] = []
+  let counter : Array[Int] = [0]
+  let out : Array[Array[String]] = []
+  for start = 0; start < n; start = start + 1 {
+    if index_arr[start] == -1 {
+      tarjan_dfs(
+        start, nodes, adj, index_arr, low_arr, on_stack, stack, counter, out,
+      )
+    }
+  }
+  out
+}
+
+fn tarjan_dfs(
+  v : Int,
+  nodes : Array[String],
+  adj : Array[Array[String]],
+  index_arr : Array[Int],
+  low_arr : Array[Int],
+  on_stack : Array[Bool],
+  stack : Array[Int],
+  counter : Array[Int],
+  out : Array[Array[String]]
+) -> Unit {
+  index_arr[v] = counter[0]
+  low_arr[v] = counter[0]
+  counter[0] = counter[0] + 1
+  stack.push(v)
+  on_stack[v] = true
+  for w_name in adj[v] {
+    let w = node_index(nodes, w_name)
+    if index_arr[w] == -1 {
+      tarjan_dfs(
+        w, nodes, adj, index_arr, low_arr, on_stack, stack, counter, out,
+      )
+      if low_arr[w] < low_arr[v] {
+        low_arr[v] = low_arr[w]
+      }
+    } else if on_stack[w] {
+      if index_arr[w] < low_arr[v] {
+        low_arr[v] = index_arr[w]
+      }
+    }
+  }
+  if low_arr[v] == index_arr[v] {
+    let scc : Array[String] = []
+    while stack.length() > 0 {
+      let w = stack[stack.length() - 1]
+      let _ignored = stack.pop()
+      on_stack[w] = false
+      scc.push(nodes[w])
+      if w == v {
+        break
+      }
+    }
+    out.push(scc)
+  }
+}
+
+///| A component repeats work only when it can run again: self-recursion or a
+///| mutual-recursion cycle.
+fn scc_is_cyclic(scc : Array[String], nodes : Array[String], adj : Array[Array[String]]) -> Bool {
+  if scc.length() > 1 {
+    return true
+  }
+  let v = node_index(nodes, scc[0])
+  array_contains(adj[v], scc[0])
+}
+
+///| Rewrite every application chain whose head is in `targets` so the head is
+///| applied to `insert` first.
+fn extend_calls(
+  expr : @syntax.Expr,
+  targets : Array[String],
+  insert : @syntax.Expr
+) -> @syntax.Expr {
+  match expr {
+    App(_, _) => {
+      let (head, args) = expr.unwind_app()
+      let is_target = match head {
+        Var(n) => args.length() > 0 && array_contains(targets, n)
+        _ => false
+      }
+      if is_target {
+        let mut chain : @syntax.Expr = App(head, insert)
+        for arg in args {
+          chain = App(chain, extend_calls(arg, targets, insert))
+        }
+        chain
+      } else {
+        let head2 = extend_calls(head, targets, insert)
+        let mut chain : @syntax.Expr = head2
+        for arg in args {
+          chain = App(chain, extend_calls(arg, targets, insert))
+        }
+        chain
+      }
+    }
+    Lam(p, body) => Lam(p, extend_calls(body, targets, insert))
+    Let(bind, body) =>
+      match bind {
+        NonRec(n, v) =>
+          Let(NonRec(n, extend_calls(v, targets, insert)), extend_calls(body, targets, insert))
+        Rec(pairs) => {
+          let new_pairs : Array[(String, @syntax.Expr)] = []
+          for pair in pairs {
+            new_pairs.push((pair.0, extend_calls(pair.1, targets, insert)))
+          }
+          Let(Rec(new_pairs), extend_calls(body, targets, insert))
+        }
+      }
+    Case(scrut, binder, alts) => {
+      let new_alts : Array[@syntax.Alt] = []
+      for alt in alts {
+        new_alts.push({ pat: alt.pat, expr: extend_calls(alt.expr, targets, insert) })
+      }
+      Case(extend_calls(scrut, targets, insert), binder, new_alts)
+    }
+    Constr(c, args) => {
+      let new_args : Array[@syntax.Expr] = []
+      for a in args {
+        new_args.push(extend_calls(a, targets, insert))
+      }
+      Constr(c, new_args)
+    }
+    _ => expr
+  }
+}
+
+///| Names no binding may shadow, for the threaded CAF parameter.
+fn collect_all_binders(prog : @syntax.Program) -> Array[String] {
+  let names : Array[String] = []
+  for bind in prog.binds {
+    match bind {
+      NonRec(name, expr) => {
+        names.push(name)
+        collect_binders(expr, names)
+      }
+      Rec(pairs) =>
+        for pair in pairs {
+          names.push(pair.0)
+          collect_binders(pair.1, names)
+        }
+    }
+  }
+  names
+}
+
+fn fresh_name(base : String, taken : Array[String]) -> String {
+  let mut candidate = base
+  let mut i = 0
+  while array_contains(taken, candidate) {
+    candidate = "\{base}_\{i}"
+    i = i + 1
+  }
+  candidate
+}
+
+///| Is this binding worth threading? Only computed values pay off: re-running
+///| a literal, an alias, or a lambda per iteration costs no recomputation.
+fn caf_worth_sharing(expr : @syntax.Expr) -> Bool {
+  match expr {
+    Var(_) | LitInt(_) | LitChar(_) | LitString(_) => false
+    Lam(_, _) => false
+    Constr(_, args) => {
+      let mut any = false
+      for a in args {
+        if caf_worth_sharing(a) {
+          any = true
+        }
+      }
+      any
+    }
+    App(_, _) | Let(_, _) | Case(_, _, _) => true
+  }
+}
+
+///| A cycle member may only gain a parameter when every reference to it is a
+///| call. A member passed as a value would change meaning at its application
+///| site, so the whole cycle is left alone.
+fn scc_members_called_only(
+  prog : @syntax.Program,
+  members : Array[String]
+) -> Bool {
+  let uses : Array[String] = []
+  for bind in prog.binds {
+    match bind {
+      NonRec(_, expr) => scan_top_refs(expr, members, [], uses, false)
+      Rec(pairs) =>
+        for pair in pairs {
+          scan_top_refs(pair.1, members, [], uses, false)
+        }
+    }
+  }
+  uses.length() == 0
+}
+
+///| Does any cycle member alias another binding (`D = Var(E)`)? Such a member
+///| cannot receive a parameter.
+fn scc_member_is_alias(prog : @syntax.Program, member : String) -> Bool {
+  for bind in prog.binds {
+    match bind {
+      NonRec(name, expr) =>
+        if name == member {
+          match expr {
+            Var(_) => return true
+            _ => return false
+          }
+        }
+      Rec(pairs) =>
+        for pair in pairs {
+          if pair.0 == member {
+            match pair.1 {
+              Var(_) => return true
+              _ => return false
+            }
+          }
+        }
+    }
+  }
+  false
+}
+
+fn binding_expr(prog : @syntax.Program, member : String) -> @syntax.Expr? {
+  for bind in prog.binds {
+    match bind {
+      NonRec(name, e) => if name == member { return Some(e) }
+      Rec(pairs) =>
+        for pair in pairs {
+          if pair.0 == member { return Some(pair.1) }
+        }
+    }
+  }
+  None
+}
+
+///| Thread `caf` through the cycle `scc`: every member gains the CAF as a
+///| leading parameter, internal recursive calls pass it on, and external
+///| callers supply the CAF itself.
+fn thread_one(
+  prog : @syntax.Program,
+  caf : String,
+  scc : Array[String],
+  stats : MidStats
+) -> @syntax.Program {
+  let taken = collect_all_binders(prog)
+  let param = fresh_name("__mid_caf_" + caf, taken)
+  let members : Array[String] = []
+  for m in scc {
+    members.push(m)
+  }
+  let new_binds : Array[@syntax.Bind] = []
+  for bind in prog.binds {
+    match bind {
+      NonRec(name, expr) => {
+        if array_contains(members, name) {
+          let expr1 = @syntax.substitute_var(expr, caf, Var(param))
+          let expr2 = extend_calls(expr1, members, Var(param))
+          new_binds.push(NonRec(name, Lam(param, expr2)))
+        } else {
+          new_binds.push(NonRec(name, extend_calls(expr, members, Var(caf))))
+        }
+      }
+      Rec(pairs) => {
+        let new_pairs : Array[(String, @syntax.Expr)] = []
+        for pair in pairs {
+          if array_contains(members, pair.0) {
+            let expr1 = @syntax.substitute_var(pair.1, caf, Var(param))
+            let expr2 = extend_calls(expr1, members, Var(param))
+            new_pairs.push((pair.0, Lam(param, expr2)))
+          } else {
+            new_pairs.push((pair.0, extend_calls(pair.1, members, Var(caf))))
+          }
+        }
+        new_binds.push(Rec(new_pairs))
+      }
+    }
+  }
+  stats.cafs_threaded = stats.cafs_threaded + 1
+  @syntax.Program::new(new_binds)
+}
+
+///| Run the sharing pass to a fixpoint: threading a cycle makes its external
+///| callers reference the CAF, and a caller that is itself inside another loop
+///| needs threading too.
+pub fn thread_caf_sharing(prog : @syntax.Program, stats : MidStats) -> @syntax.Program {
+  let mut current = prog
+  let processed : Array[String] = []
+  for _round = 0; _round < 3; _round = _round + 1 {
+    let (nodes, adj) = build_call_graph(current)
+    let sccs = tarjan_sccs(nodes, adj)
+    let mut changed = false
+    for scc in sccs {
+      if !scc_is_cyclic(scc, nodes, adj) {
+        continue
+      }
+      let mut skip = false
+      for m in scc {
+        if scc_member_is_alias(current, m) {
+          skip = true
+        }
+      }
+      if skip || !scc_members_called_only(current, scc) {
+        continue
+      }
+      let refs : Array[String] = []
+      for m in scc {
+        match binding_expr(current, m) {
+          Some(expr) => scan_top_refs(expr, nodes, refs, refs, false)
+          None => ()
+        }
+      }
+      for caf in refs {
+        if array_contains(scc, caf) {
+          continue
+        }
+        match binding_expr(current, caf) {
+          Some(caf_expr) => {
+            if !caf_worth_sharing(caf_expr) {
+              continue
+            }
+          }
+          None => continue
+        }
+        let key = caf + "|" + join_names(scc)
+        if array_contains(processed, key) {
+          continue
+        }
+        processed.push(key)
+        current = thread_one(current, caf, scc, stats)
+        changed = true
+      }
+    }
+    if !changed {
+      break
+    }
+  }
+  current
+}
+
+fn join_names(names : Array[String]) -> String {
+  let buf = StringBuilder()
+  for i, n in names {
+    if i > 0 {
+      buf.write_string(",")
+    }
+    buf.write_string(n)
+  }
+  buf.to_string()
+}
+
+fn array_contains(arr : Array[String], target : String) -> Bool {
+  index_of_str(arr, target) is Some(_)
+}
 
 ///| Run the middle-end. Passes run to a fixpoint so a reduction that exposes a
 ///| dead binding or a duplicate body is picked up in the same compile.
 pub fn optimize(prog : @syntax.Program, stats : MidStats) -> @syntax.Program {
   let mut current = prune_top_bindings(prog, stats)
+  current = thread_caf_sharing(current, stats)
   let counter : Array[Int] = [0]
   for pass = 0; pass < 3; pass = pass + 1 {
     let before = stats.dead_lets +

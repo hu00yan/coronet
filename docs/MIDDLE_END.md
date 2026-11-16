@@ -37,6 +37,7 @@ a branch of one scrutinee. Two representations carry that shape:
 | Pass | What it removes |
 | --- | --- |
 | `prune_top_bindings` | top-level bindings no entry point reaches |
+| `thread_caf_sharing` | re-expansion of a computed top-level binding once per iteration of the recursive loop that reads it |
 | `prune_dead_lets` | `let` bindings their body never reads |
 | `inline_trivial_lets` | `let x = y` / `let x = lit` wires, refusing when substitution would capture |
 | `reduce_known_cases` | `case` on a constructor or literal, plus the alternatives that cannot be taken |
@@ -71,6 +72,15 @@ package: HVM2 `ITRS` for `map_core` is 10 999 753 both ways, for `GhcCompiler`
 11 044 486 both ways. What shrank is the artifact and the work needed to build
 and load it, not the reduction a program performs. Cutting runtime interactions
 needs a different encoding, not a smaller book.
+
+`thread_caf_sharing` is the one pass that does cut runtime interactions. A
+computed top-level binding (a CAF) lowers to a REF that re-expands on every
+activation of the net containing it; when that net is a recursive loop, the
+computation reruns per iteration. Threading the CAF as an explicit parameter
+through the loop's call cycle makes the lowerer insert DUP nodes that share
+one evaluation. Measured on the HVM2 C runtime: `map300` 135 290 287 →
+2 134 946 ITRS (63x), `map_core` 10 999 753 → 317 025 (35x), same results,
+every other input unchanged.
 
 ## Invariants a pass must preserve
 
