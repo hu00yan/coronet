@@ -262,13 +262,14 @@ map300; the medians differ only by machine drift, the mins do not. The
 steal path only runs when a thread's own bag is empty, so single-thread
 evaluations pay one extra branch per idle event.
 
-With the fix, nqueens9 reaches 4.7x at 8t (eval median 0.0598s vs 1t 0.280s,
-0.062s in quiet-machine spot runs) and 3.6x at 4t. The remaining gap to the
-6P+2E hardware is bounded by what the runtime cannot steal: the hbag-resident
-high-priority work. Making the hbag stealable (atomic head/tail protocol) is
-the next structural step and needs its own correctness review; everything
-cheap has been taken. map300 stays spawn-bound (~3ms of thread setup against
-25ms of evaluation) and only gains from the fix incidentally.
+With the fix, nqueens9 reaches 4.7x at 8t (eval median 0.0598s vs the 1t
+floor 0.281s; quiet-machine spot runs measured 0.062s wall, max = median over
+6 runs) and 3.6x at 4t. The remaining gap to the 6P+2E hardware is bounded by
+what the runtime cannot steal: the hbag-resident high-priority work. Making
+the hbag stealable (atomic head/tail protocol) is the next structural step
+and needs its own correctness review; everything cheap has been taken.
+map300 stays spawn-bound (~3ms of thread setup against 25ms of evaluation)
+and only gains from the fix incidentally.
 
 ## Physical ceiling on this machine
 
