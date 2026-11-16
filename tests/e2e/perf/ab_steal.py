@@ -34,7 +34,7 @@ import perf_baseline as P
 INPUTS = ["tests/e2e/perf/inputs/nqueens9.core",
           "tests/fixtures/core/07_nqueens.core",
           "tests/e2e/perf/inputs/map300.core"]
-MODES = ["", "half", "scan", "halfscan", "boot"]
+MODES = ["", "half", "walk", "scan", "scanwalk", "scancap", "boot"]
 THREADS = [0, 1, 2, 3]  # TPC_L2 values => 1, 2, 4, 8 threads
 
 ITRS_RE = re.compile(r"- ITRS: (\d+)")
