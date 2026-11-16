@@ -192,6 +192,7 @@ data Value
   = VInt !Int
   | VBool !Bool
   | VClosure [(Var, Value)] Var CoreExpr
+  | VRecClosure [(Var, Value)] [(Var, CoreExpr)] Var CoreExpr
   | VConstr String [Value]
   deriving (Show, Eq)
 
@@ -242,6 +243,11 @@ eval env expr = case expr of
     in case eval env f of
       VClosure cEnv param body ->
         eval ((param, valArg) : cEnv) body
+      VRecClosure cEnv bs param body ->
+        let recBindings = map (\(k, e) -> case e of
+              CLam x b -> (k, VRecClosure cEnv bs x b)
+              _ -> (k, eval cEnv e)) bs
+        in eval ((param, valArg) : recBindings ++ cEnv) body
       VConstr cName args ->
         VConstr cName (args ++ [valArg])
       _ -> VInt 0
@@ -249,8 +255,10 @@ eval env expr = case expr of
     let val = eval env e
     in eval ((x, val) : env) body
   CLet (CRec bs) body ->
-    let recEnv = map (\(k, e) -> (k, eval recEnv e)) bs ++ env
-    in eval recEnv body
+    let recBindings = map (\(k, e) -> case e of
+          CLam x b -> (k, VRecClosure env bs x b)
+          _ -> (k, eval env e)) bs
+    in eval (recBindings ++ env) body
   CCase scrut b alts ->
     let val = eval env scrut
         env' = (b, val) : env

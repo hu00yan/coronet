@@ -5,6 +5,7 @@ struct CliArgs {
   input_files : Array[String]
   target : String
   output_file : String?
+  lto : Bool
 }
 
 ///|
@@ -41,6 +42,7 @@ fn parse_cli_args(args : Array[String]) -> CliArgs {
   let input_files : Array[String] = []
   let mut target : String? = None
   let mut output_file : String? = None
+  let mut lto = true
   let mut i = 1
   while i < args.length() {
     let arg = args[i]
@@ -55,6 +57,10 @@ fn parse_cli_args(args : Array[String]) -> CliArgs {
       target = Some("cuda")
     } else if arg == "--hip" {
       target = Some("hip")
+    } else if arg == "--lto" {
+      lto = true
+    } else if arg == "--no-lto" {
+      lto = false
     } else if arg == "--target" {
       i = i + 1
       if i >= args.length() {
@@ -109,7 +115,7 @@ fn parse_cli_args(args : Array[String]) -> CliArgs {
     }
   }
 
-  { input_files, target: tgt, output_file }
+  { input_files, target: tgt, output_file, lto }
 }
 
 ///|
@@ -237,7 +243,11 @@ async fn main {
     }
   }
 
-  let program = @syntax.link_programs(programs)
+  let program = if cli.lto {
+    @syntax.link_programs_lto(programs, ["main", "result"])
+  } else {
+    @syntax.link_programs(programs)
+  }
 
   if cli.target == "gpu" || cli.target == "cuda" || cli.target == "hip" {
     handle_gpu_target(program, cli.output_file)

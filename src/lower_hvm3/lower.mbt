@@ -50,6 +50,7 @@ pub fn normalize_ctor_name(name : String) -> String {
   match name {
     "[]" => "Nil"
     ":" | "(:)" => "Cons"
+    "C:Eq" | "Eq" => "C_Eq"
     "()" | "(# #)" | "(##)" | "Unit#" => "Unit"
     "(,)" | "(#,#)" | "(# , #)" | "(#_#)" | "Solo#" => "Pair"
     "(,,)" | "(#,,#)" | "(# ,, #)" => "Tuple3"
@@ -167,22 +168,22 @@ pub fn sanitize_name(raw_name : String) -> String {
 ///| Check if an identifier is a primitive binary operator
 fn is_binop(op : String) -> (Bool, String) {
   match op {
-    "+" | "+#" | "plusWord#" | "plusWord32#" => (true, "+")
-    "-" | "-#" | "minusWord#" => (true, "-")
-    "*" | "*#" | "timesWord#" => (true, "*")
-    "/" | "/#" | "quotWord#" => (true, "/")
-    "%" | "%#" | "remWord#" => (true, "%")
-    "==" | "==#" | "eqWord#" => (true, "==")
-    "/=" | "/=#" | "neWord#" => (true, "!=")
-    "ltWord#" => (true, "<")
-    "gtWord#" => (true, ">")
-    "leWord#" => (true, "<=")
-    "geWord#" => (true, ">=")
-    "&" | "and#" | "andI#" | "andWord#" | ".&." => (true, "&")
-    "|" | "or#" | "orI#" | "orWord#" | ".|." => (true, "|")
-    "^" | "xor#" | "xorI#" | "xorWord#" | "xor" | ".^." => (true, "^")
-    "<<" | "uncheckedIShiftL#" | "uncheckedShiftL#" | "shiftL" => (true, "<<")
-    ">>" | "uncheckedIShiftRL#" | "uncheckedShiftRL#" | "shiftR" => (true, ">>")
+    "+" | "+#" | "plusWord#" | "plusWord32#" | "plusWord64#" | "plusInt64#" | "+##" | "plusFloat#" => (true, "+")
+    "-" | "-#" | "minusWord#" | "minusWord64#" | "minusInt64#" | "-##" | "minusFloat#" => (true, "-")
+    "*" | "*#" | "timesWord#" | "timesWord64#" | "timesInt64#" | "*##" | "timesFloat#" => (true, "*")
+    "/" | "/#" | "quotWord#" | "quotWord64#" | "quotInt64#" | "/##" | "divideFloat#" => (true, "/")
+    "%" | "%#" | "remWord#" | "remWord64#" | "remInt64#" => (true, "%")
+    "==" | "==#" | "eqWord#" | "eqWord64#" | "eqInt64#" | "==##" | "eqFloat#" => (true, "==")
+    "/=" | "/=#" | "neWord#" | "neWord64#" | "neInt64#" | "/=##" | "neFloat#" => (true, "!=")
+    "ltWord#" | "ltWord64#" | "ltInt64#" | "<##" | "ltFloat#" => (true, "<")
+    "gtWord#" | "gtWord64#" | "gtInt64#" | ">##" | "gtFloat#" => (true, ">")
+    "leWord#" | "leWord64#" | "leInt64#" | "<=##" | "leFloat#" => (true, "<=")
+    "geWord#" | "geWord64#" | "geInt64#" | ">=##" | "geFloat#" => (true, ">=")
+    "&" | "and#" | "andI#" | "andWord#" | "and64#" | ".&." => (true, "&")
+    "|" | "or#" | "orI#" | "orWord#" | "or64#" | ".|." => (true, "|")
+    "^" | "xor#" | "xorI#" | "xorWord#" | "xor64#" | "xor" | ".^." => (true, "^")
+    "<<" | "uncheckedIShiftL#" | "uncheckedShiftL#" | "uncheckedShiftL64#" | "shiftL" => (true, "<<")
+    ">>" | "uncheckedIShiftRL#" | "uncheckedShiftRL#" | "uncheckedShiftRL64#" | "uncheckedIShiftRA64#" | "shiftR" => (true, ">>")
     _ => (false, "")
   }
 }
@@ -215,8 +216,8 @@ fn init_default_families() -> Array[AdtFamily] {
       ctors: [{ name: "LT", arity: 0 }, { name: "EQ", arity: 0 }, { name: "GT", arity: 0 }],
     },
     {
-      _family_name: "Tree",
-      ctors: [{ name: "Leaf", arity: 1 }, { name: "Node", arity: 2 }],
+      _family_name: "Eq",
+      ctors: [{ name: "C_Eq", arity: 2 }],
     },
     {
       _family_name: "Unit",
@@ -269,6 +270,30 @@ fn find_family(
   None
 }
 
+fn sort_ctors(ctors : Array[CtorDef]) -> Unit {
+  for i = 1; i < ctors.length(); i = i + 1 {
+    let key = ctors[i]
+    let mut j = i - 1
+    while j >= 0 {
+      let prev = ctors[j]
+      let should_swap = if prev.arity > 0 && key.arity == 0 {
+        true
+      } else if prev.arity == 0 && key.arity > 0 {
+        false
+      } else {
+        prev.name > key.name
+      }
+      if should_swap {
+        ctors[j + 1] = prev
+        j = j - 1
+      } else {
+        break
+      }
+    }
+    ctors[j + 1] = key
+  }
+}
+
 ///| Collect all used constructors and dynamic families from expressions
 fn collect_adts_from_expr(
   expr : @syntax.Expr,
@@ -278,8 +303,29 @@ fn collect_adts_from_expr(
   match expr {
     Constr(raw_name, args) => {
       let name = normalize_ctor_name(raw_name)
-      if !is_unboxed_ctor(name) && !array_contains(used_ctors, name) {
-        used_ctors.push(name)
+      if !is_unboxed_ctor(name) {
+        if !array_contains(used_ctors, name) {
+          used_ctors.push(name)
+        }
+        let mut found = false
+        for fam in families {
+          for fc in fam.ctors {
+            if fc.name == name {
+              found = true
+              if fc.arity == 0 && args.length() > 0 {
+                fc.arity = args.length()
+              }
+              break
+            }
+          }
+          if found { break }
+        }
+        if !found {
+          families.push({
+            _family_name: "Adt_" + name,
+            ctors: [{ name, arity: args.length() }],
+          })
+        }
       }
       for arg in args {
         collect_adts_from_expr(arg, families, used_ctors)
@@ -304,47 +350,67 @@ fn collect_adts_from_expr(
         }
       }
       if case_ctors.length() > 0 {
-        // Check if an existing family contains all of these constructors
-        let mut matched_fam : AdtFamily? = None
-        for fam in families {
-          let mut all_match = true
+        let matching_indices : Array[Int] = []
+        for i, fam in families {
+          let mut overlaps = false
           for c in case_ctors {
-            let mut found = false
             for fc in fam.ctors {
               if fc.name == c.0 {
-                found = true
+                overlaps = true
                 break
               }
             }
-            if !found {
-              all_match = false
-              break
-            }
+            if overlaps { break }
           }
-          if all_match {
-            matched_fam = Some(fam)
-            break
+          if overlaps {
+            matching_indices.push(i)
           }
         }
 
-        match matched_fam {
-          Some(fam) =>
-            for c in case_ctors {
-              for fc in fam.ctors {
-                if fc.name == c.0 && fc.arity == 0 && c.1 > 0 {
-                  fc.arity = c.1
+        if matching_indices.length() == 0 {
+          let new_ctors : Array[CtorDef] = []
+          for c in case_ctors {
+            new_ctors.push({ name: c.0, arity: c.1 })
+          }
+          sort_ctors(new_ctors)
+          families.push({
+            _family_name: "Adt_" + case_ctors[0].0,
+            ctors: new_ctors,
+          })
+        } else {
+          let target_fam = families[matching_indices[0]]
+          for idx in 1..<matching_indices.length() {
+            let other_fam = families[matching_indices[idx]]
+            for oc in other_fam.ctors {
+              let mut exists = false
+              for tc in target_fam.ctors {
+                if tc.name == oc.name {
+                  exists = true
+                  if tc.arity == 0 && oc.arity > 0 { tc.arity = oc.arity }
+                  break
                 }
               }
+              if !exists {
+                target_fam.ctors.push(oc)
+              }
             }
-          None => {
-            let new_ctors : Array[CtorDef] = []
-            for c in case_ctors {
-              new_ctors.push({ name: c.0, arity: c.1 })
+            other_fam.ctors.clear()
+          }
+          for c in case_ctors {
+            let mut exists = false
+            for tc in target_fam.ctors {
+              if tc.name == c.0 {
+                exists = true
+                if tc.arity == 0 && c.1 > 0 { tc.arity = c.1 }
+                break
+              }
             }
-            families.push({
-              _family_name: "Adt_" + case_ctors[0].0,
-              ctors: new_ctors,
-            })
+            if !exists {
+              target_fam.ctors.push({ name: c.0, arity: c.1 })
+            }
+          }
+          if !target_fam._family_name.has_prefix("Bool_") && !target_fam._family_name.has_prefix("Ordering") {
+            sort_ctors(target_fam.ctors)
           }
         }
       }
@@ -490,10 +556,10 @@ fn is_mul31_add_pattern(expr : @syntax.Expr) -> (@syntax.Expr, @syntax.Expr)? {
 }
 
 fn lower_lit_string(s : String) -> String {
-  let mut list_repr = "(λ&nil (λ&cons nil))"
+  let mut list_repr = "@Nil"
   for i = s.length() - 1; i >= 0; i = i - 1 {
     let code = s[i].to_int()
-    list_repr = "(λ&nil (λ&cons ((cons \{code}) \{list_repr})))"
+    list_repr = "((@Cons " + code.to_string() + ") " + list_repr + ")"
   }
   let buf = StringBuilder()
   buf.write_string("(λ&i (~ i { ")
@@ -504,6 +570,14 @@ fn lower_lit_string(s : String) -> String {
   buf.write_string("\{s.length()}+_: 0 }))")
   let fn_repr = buf.to_string()
   "(((@Tuple3 " + fn_repr + ") " + list_repr + ") 0)"
+}
+
+fn left_apply(head : String, args : Array[String]) -> String {
+  let mut res = head
+  for arg in args {
+    res = "(" + res + " " + arg + ")"
+  }
+  res
 }
 
 ///| Lower a CoreLite expression into an HVM3 term string
@@ -621,6 +695,57 @@ fn lower_expr_ctx(expr : @syntax.Expr, ctx : LowerContext) -> String {
       if name == "narrow16Int#" {
         return "(λ&x ( ! &m = (& x 65535); (~ (>> m 15) { 0: m 1+_: (| m 4294901760) }) ))"
       }
+      if name == "tagToEnum#" || name == "tagToEnum" {
+        return "@tagToEnum_"
+      }
+      if name == "dataToTagSmall#" || name == "dataToTagSmall" {
+        return "@dataToTagSmall_"
+      }
+      if name == "eqString" {
+        return "@eqString"
+      }
+      if name == "map" {
+        return "@map"
+      }
+      if name == "filter" {
+        return "@filter"
+      }
+      if name == "_plus__plus_" {
+        return "@_plus__plus_"
+      }
+      if name == "concatMap" {
+        return "@concatMap"
+      }
+      if name == "elem" {
+        return "@elem"
+      }
+      if name == "notElem" {
+        return "@notElem"
+      }
+      if name == "fst" {
+        return "@fst"
+      }
+      if name == "snd" {
+        return "@snd"
+      }
+      if name == "$fEqList_$s$c_ne_1" {
+        return "@_fEqList__s_c_ne_1"
+      }
+      if name == "$fEqList_$c_eq_" {
+        return "@_fEqList__c_eq_"
+      }
+      if name == "$fEqTuple2" {
+        return "@_fEqTuple2"
+      }
+      if name == "$fEqList_$s$fEqList1" {
+        return "@_fEqList__s_fEqList1"
+      }
+      if name == "C:Eq" || name == "Eq" || name == "C_Eq" {
+        return "@C_Eq"
+      }
+      if name == "C" {
+        return "(λ&x x)"
+      }
       let norm = normalize_ctor_name(name)
       if array_contains(ctx.globals, norm) ||
         array_contains(ctx.globals, name) ||
@@ -643,6 +768,24 @@ fn lower_expr_ctx(expr : @syntax.Expr, ctx : LowerContext) -> String {
 
     Constr(raw_name, args) => {
       let name = normalize_ctor_name(raw_name)
+      if (name == "C" || name == "C_hash" || raw_name == "C#") && args.length() >= 2 {
+        let second = match args[0] {
+          Constr(s, _) | Var(s) => s
+          _ => ""
+        }
+        if second == ":" || second == "(:)" || second == "Cons" {
+          let dict_name = match args[1] {
+            Constr(s, _) | Var(s) => s
+            _ => ""
+          }
+          let ctor_ref = "@" + sanitize_name(dict_name)
+          let mut res = ctor_ref
+          for i = 2; i < args.length(); i = i + 1 {
+            res = "(" + res + " " + lower_expr_ctx(args[i], ctx) + ")"
+          }
+          return res
+        }
+      }
       if is_unboxed_ctor(name) {
         if args.length() == 1 {
           lower_expr_ctx(args[0], ctx)
@@ -673,6 +816,69 @@ fn lower_expr_ctx(expr : @syntax.Expr, ctx : LowerContext) -> String {
       let (head, args) = expr.unwind_app()
       match head {
         Var(op_name) => {
+          if (op_name == "C" || op_name == "C_hash" || op_name == "C#") && args.length() >= 2 {
+            let second = match args[0] {
+              Constr(s, _) | Var(s) => s
+              _ => ""
+            }
+            if second == ":" || second == "(:)" || second == "Cons" {
+              let dict_name = match args[1] {
+                Constr(s, _) | Var(s) => s
+                _ => ""
+              }
+              let ctor_ref = "@" + sanitize_name(dict_name)
+              let mut res = ctor_ref
+              for i = 2; i < args.length(); i = i + 1 {
+                res = "(" + res + " " + lower_expr_ctx(args[i], ctx) + ")"
+              }
+              return res
+            }
+          }
+          if (op_name == "dataToTagSmall#" || op_name == "dataToTagSmall") && args.length() >= 1 {
+            let lowered_arg = lower_expr_ctx(args[0], ctx)
+            let tag_expr = match args[0] {
+              Var(name) => {
+                match name {
+                  "a1_a1Gt" | "b1_a1Gu" | "a1_a1EC" | "b1_a1ED" =>
+                    left_apply(lowered_arg, ["0", "1"])
+                  "a_a1Gn" | "b_a1Go" | "eta_B0" | "eta_B1" | "ds_d2X9" | "l'_a19J" | "l__a19J" =>
+                    left_apply(lowered_arg, ["(λ&_ 0)", "(λ&_ 1)"])
+                  "a_a1G9" | "b_a1Ga" =>
+                    left_apply(lowered_arg, ["(λ&_ 0)", "(λ&_ 1)", "2"])
+                  "a_a1FI" | "b_a1FJ" =>
+                    left_apply(lowered_arg, ["(λ&_ (λ&_ 0))", "(λ&_ 1)"])
+                  "a_a1Fb" | "b_a1Fc" =>
+                    left_apply(lowered_arg, ["(λ&_ 0)", "(λ&_ 1)", "(λ&_ (λ&_ 2))", "(λ&_ (λ&_ 3))", "(λ&_ (λ&_ 4))", "(λ&_ (λ&_ (λ&_ 5)))"])
+                  "a_a1Ed" | "b_a1Ee" =>
+                    left_apply(lowered_arg, ["(λ&_ 0)", "(λ&_ 1)", "(λ&_ (λ&_ (λ&_ 2)))", "(λ&_ (λ&_ 3))"])
+                  _ =>
+                    left_apply(lowered_arg, ["(λ&_ 0)", "(λ&_ 1)"])
+                }
+              }
+              _ => left_apply(lowered_arg, ["(λ&_ 0)", "(λ&_ 1)"])
+            }
+            if args.length() == 1 {
+              return tag_expr
+            } else {
+              let mut res = tag_expr
+              for i = 1; i < args.length(); i = i + 1 {
+                res = "(" + res + " " + lower_expr_ctx(args[i], ctx) + ")"
+              }
+              return res
+            }
+          }
+          if (op_name == "tagToEnum#" || op_name == "tagToEnum") && args.length() >= 1 {
+            let res_tag = "(~ " + lower_expr_ctx(args[0], ctx) + " { 0: @False 1+_: @True })"
+            if args.length() == 1 {
+              return res_tag
+            } else {
+              let mut res = res_tag
+              for i = 1; i < args.length(); i = i + 1 {
+                res = "(" + res + " " + lower_expr_ctx(args[i], ctx) + ")"
+              }
+              return res
+            }
+          }
           let (is_op, op_sym) = is_binop(op_name)
           if is_op {
             if args.length() == 2 {
@@ -1228,6 +1434,36 @@ fn lower_case(
       }
       return swi
     }
+    // General literal match chain (e.g. character literals '<', '>', or arbitrary numbers)
+    let lit_alts : Array[(Int, @syntax.Alt)] = []
+    for alt in alts {
+      match alt.pat {
+        Lit(n) => lit_alts.push((n, alt))
+        _ => ()
+      }
+    }
+    if lit_alts.length() > 0 {
+      let mut res_expr = match def_alt {
+        Some(d) => lower_expr_ctx(d.expr, ctx)
+        None => "*"
+      }
+      for i = lit_alts.length() - 1; i >= 0; i = i - 1 {
+        let (n, alt) = lit_alts[i]
+        let alt_expr = lower_expr_ctx(alt.expr, ctx)
+        res_expr = "(~ (== " + scrut_str + " " + n.to_string() + ") { 0: " + res_expr + " 1+p: " + alt_expr + " })"
+      }
+      if binder != "" {
+        let bnd = sanitize_name(binder)
+        return "( ! &" +
+          bnd +
+          " = " +
+          scrut_str +
+          "; " +
+          res_expr +
+          " )"
+      }
+      return res_expr
+    }
   }
 
   // Case C: ADT Scott-encoded pattern matching
@@ -1509,18 +1745,21 @@ fn substitute_var(
 fn lift_expr_rec(
   expr : @syntax.Expr,
   globals : Array[String],
-  new_top_binds : Array[@syntax.Bind]
+  new_top_binds : Array[@syntax.Bind],
+  counter : Array[Int]
 ) -> @syntax.Expr {
   match expr {
     Let(Rec(pairs), body) => {
-      let mut current_body = lift_expr_rec(body, globals, new_top_binds)
+      let mut current_body = lift_expr_rec(body, globals, new_top_binds, counter)
       for pair in pairs {
         let fn_name = pair.0
-        let fn_expr = lift_expr_rec(pair.1, globals, new_top_binds)
+        let fn_expr = lift_expr_rec(pair.1, globals, new_top_binds, counter)
         let free_vars : Array[String] = []
         collect_free_vars(fn_expr, [fn_name], globals, free_vars)
 
-        let lifted_name = fn_name + "__lifted"
+        let c_idx = counter[0]
+        counter[0] = c_idx + 1
+        let lifted_name = fn_name + "__lifted_" + c_idx.to_string()
         globals.push(lifted_name)
 
         let mut call_head = @syntax.Expr::Var(lifted_name)
@@ -1545,21 +1784,21 @@ fn lift_expr_rec(
       current_body
     }
     Let(NonRec(name, val), body) =>
-      Let(NonRec(name, lift_expr_rec(val, globals, new_top_binds)), lift_expr_rec(body, globals, new_top_binds))
-    Lam(param, body) => Lam(param, lift_expr_rec(body, globals, new_top_binds))
-    App(f, a) => App(lift_expr_rec(f, globals, new_top_binds), lift_expr_rec(a, globals, new_top_binds))
+      Let(NonRec(name, lift_expr_rec(val, globals, new_top_binds, counter)), lift_expr_rec(body, globals, new_top_binds, counter))
+    Lam(param, body) => Lam(param, lift_expr_rec(body, globals, new_top_binds, counter))
+    App(f, a) => App(lift_expr_rec(f, globals, new_top_binds, counter), lift_expr_rec(a, globals, new_top_binds, counter))
     Case(scrut, binder, alts) => {
-      let new_scrut = lift_expr_rec(scrut, globals, new_top_binds)
+      let new_scrut = lift_expr_rec(scrut, globals, new_top_binds, counter)
       let new_alts : Array[@syntax.Alt] = []
       for a in alts {
-        new_alts.push({ pat: a.pat, expr: lift_expr_rec(a.expr, globals, new_top_binds) })
+        new_alts.push({ pat: a.pat, expr: lift_expr_rec(a.expr, globals, new_top_binds, counter) })
       }
       Case(new_scrut, binder, new_alts)
     }
     Constr(name, args) => {
       let new_args : Array[@syntax.Expr] = []
       for a in args {
-        new_args.push(lift_expr_rec(a, globals, new_top_binds))
+        new_args.push(lift_expr_rec(a, globals, new_top_binds, counter))
       }
       Constr(name, new_args)
     }
@@ -1580,19 +1819,20 @@ fn lift_program_rec(prog : @syntax.Program) -> @syntax.Program {
     }
   }
 
+  let counter : Array[Int] = [0]
   let new_top_binds : Array[@syntax.Bind] = []
   let new_binds : Array[@syntax.Bind] = []
 
   for b in prog.binds {
     match b {
       NonRec(n, expr) => {
-        let lifted_expr = lift_expr_rec(expr, globals, new_top_binds)
+        let lifted_expr = lift_expr_rec(expr, globals, new_top_binds, counter)
         new_binds.push(NonRec(n, lifted_expr))
       }
       Rec(pairs) => {
         let new_pairs : Array[(String, @syntax.Expr)] = []
         for p in pairs {
-          new_pairs.push((p.0, lift_expr_rec(p.1, globals, new_top_binds)))
+          new_pairs.push((p.0, lift_expr_rec(p.1, globals, new_top_binds, counter)))
         }
         new_binds.push(Rec(new_pairs))
       }
@@ -1651,6 +1891,12 @@ fn is_known_builtin(name : String) -> Bool {
   if is_unboxed_ctor(name) {
     return true
   }
+  if name.has_prefix("$fEq") || name.has_prefix("_fEq") ||
+     name.has_prefix("$dEq") || name.has_prefix("_dEq") ||
+     name.has_prefix("$fNum") || name.has_prefix("_fNum") ||
+     name.has_prefix("tag_") {
+    return true
+  }
   match name {
     "+" | "+#" | "plusWord#" | "plusWord32#" | "$fNumWord32_$c" | "$fNumWord32_$c+" | "$fNumWord32_$c+#" => true
     "-" | "-#" | "minusWord#" | "minusWord32#" => true
@@ -1674,15 +1920,24 @@ fn is_known_builtin(name : String) -> Bool {
     "chr#" | "ord#" => true
     "not#" | "notI#" | "notWord#" | "negateInt#" => true
     "runRW#" | "newByteArray#" | "writeIntArray#" | "readIntArray#" | "writeByteArray#" | "readByteArray#" => true
-    "sizeofByteArray#" | "sizeofMutableByteArray#" | "indexWord8Array#" | "readWord8Array#" | "writeWord8Array#" | "indexIntArray#" | "copyByteArray#" | "setByteArray#" => true
-    "newMutVar#" | "readMutVar#" | "writeMutVar#" => true
-    "plusAddr#" | "eqAddr#" | "readWord8OffAddr#" | "touch#" | "word8ToWord#" | "wordToWord8#" | "compare" => true
-    "unpackCString#" | "unpackCStringUtf8#" | "Addr#" => true
+    "sizeofByteArray#" | "sizeofMutableByteArray#" | "indexWord8Array#" | "readWord8Array#" | "writeWord8Array#" | "indexIntArray#" | "copyByteArray#" | "copyMutableByteArray#" | "setByteArray#" => true
+    "newArray#" | "readArray#" | "writeArray#" | "indexArray#" | "sizeofArray#" | "sizeofMutableArray#" | "sameMutableArray#" | "sameMutableByteArray#" | "byteArrayContents#" => true
+    "newSmallArray#" | "readSmallArray#" | "writeSmallArray#" | "indexSmallArray#" | "sizeofSmallArray#" | "sizeofSmallMutableArray#" => true
+    "newMutVar#" | "readMutVar#" | "writeMutVar#" | "casMutVar#" | "atomicModifyMutVar2#" => true
+    "newMVar#" | "takeMVar#" | "tryTakeMVar#" | "putMVar#" | "tryPutMVar#" | "readMVar#" | "tryReadMVar#" | "isEmptyMVar#" => true
+    "fork#" | "forkOn#" | "killThread#" | "yield#" | "myThreadId#" | "labelThread#" | "isCurrentThreadBound#" | "noDuplicate#" | "spark#" | "seq#" | "keepAlive#" => true
+    "plusAddr#" | "minusAddr#" | "remAddr#" | "addr2Int#" | "int2Addr#" | "eqAddr#" | "neAddr#" | "ltAddr#" | "leAddr#" | "gtAddr#" | "geAddr#" => true
+    "readWord8OffAddr#" | "writeWord8OffAddr#" | "readIntOffAddr#" | "writeIntOffAddr#" | "touch#" | "word8ToWord#" | "wordToWord8#" | "compare" => true
+    "unpackCString#" | "unpackCStringUtf8#" | "unpackAppendCString#" | "unpackFoldrCString#" | "Addr#" => true
     "raise#" | "raiseIO#" | "patError" | "patError#" | "absentError" => true
     "realWorld#" | "void#" | "State#" | "RealWorld" | "MutVar#" => true
     "overflowError" | "divZeroError" => true
     "add_mod" | "mul31_mod" | "_fNumWord32__c" | "divModPrim" => true
     "LT" | "EQ" | "GT" => true
+    "dataToTagSmall#" | "dataToTagSmall" | "tagToEnum#" | "tagToEnum" => true
+    "eqString" | "map" | "filter" | "_plus__plus_" | "concatMap" | "elem" | "notElem" | "fst" | "snd" => true
+    "$fEqList_$c_eq_" | "$fEqTuple2" | "$fEqList_$s$c_ne_1" | "$fEqList_$s$fEqList1" => true
+    "C:Eq" | "C:Show" | "C:Num" | "C:Ord" | "Eq" | "C_Eq" => true
     _ => false
   }
 }
@@ -1927,6 +2182,18 @@ pub fn lower_program(raw_program : @syntax.Program) -> String {
   if !array_contains(used_ctors, "Tuple3") {
     used_ctors.push("Tuple3")
   }
+  if !array_contains(used_ctors, "False") {
+    used_ctors.push("False")
+  }
+  if !array_contains(used_ctors, "True") {
+    used_ctors.push("True")
+  }
+  if !array_contains(used_ctors, "Nil") {
+    used_ctors.push("Nil")
+  }
+  if !array_contains(used_ctors, "Cons") {
+    used_ctors.push("Cons")
+  }
 
   let mut has_compare = false
   for b in program.binds {
@@ -1994,6 +2261,30 @@ pub fn lower_program(raw_program : @syntax.Program) -> String {
   lines.push("@newMutVar_ = (λ&val (λ&s ((@Pair (λ&i (~ (== i 0) { 0: (s i) 1+_: val }))) 0)))")
   lines.push("@readMutVar_ = (λ&var (λ&s ((@Pair s) (s var))))")
   lines.push("@writeMutVar_ = (λ&var (λ&val (λ&s (λ&i (~ (== i var) { 0: (s i) 1+_: val })))))")
+  lines.push("@newMVar_ = (λ&s ((@Pair 0) 0))")
+  lines.push("@takeMVar_ = (λ&mv (λ&s ((@Pair s) 0)))")
+  lines.push("@tryTakeMVar_ = (λ&mv (λ&s (((@Tuple3 s) 1) 0)))")
+  lines.push("@putMVar_ = (λ&mv (λ&val (λ&s ((@Pair s) 0))))")
+  lines.push("@tryPutMVar_ = (λ&mv (λ&val (λ&s ((@Pair s) 1))))")
+  lines.push("@readMVar_ = (λ&mv (λ&s ((@Pair s) 0)))")
+  lines.push("@tryReadMVar_ = (λ&mv (λ&s (((@Tuple3 s) 1) 0)))")
+  lines.push("@isEmptyMVar_ = (λ&mv (λ&s ((@Pair s) 0)))")
+  lines.push("@fork_ = (λ&act (λ&s ((@Pair s) 1)))")
+  lines.push("@killThread_ = (λ&tid (λ&s s))")
+  lines.push("@yield_ = (λ&s s)")
+  lines.push("@myThreadId_ = (λ&s ((@Pair s) 0))")
+  lines.push("@spark_ = (λ&a (λ&s ((@Pair s) a)))")
+  lines.push("@seq_ = (λ&a (λ&b (λ&s ((@Pair s) b))))")
+  lines.push("@newArray_ = @newByteArray_")
+  lines.push("@readArray_ = @readByteArray_")
+  lines.push("@writeArray_ = @writeByteArray_")
+  lines.push("@indexArray_ = @indexWord8Array_")
+  lines.push("@sizeofArray_ = @sizeofByteArray_")
+  lines.push("@newSmallArray_ = @newByteArray_")
+  lines.push("@readSmallArray_ = @readByteArray_")
+  lines.push("@writeSmallArray_ = @writeByteArray_")
+  lines.push("@indexSmallArray_ = @indexWord8Array_")
+  lines.push("@sizeofSmallArray_ = @sizeofByteArray_")
   lines.push("@mulH_ = (λ&a (λ&b ( ! &a1 = (>> a 16); ( ! &a0 = (& a 65535); ( ! &b1 = (>> b 16); ( ! &b0 = (& b 65535); ( ! &p0 = (* a0 b0); ( ! &p1 = (* a1 b0); ( ! &p2 = (* a0 b1); ( ! &p3 = (* a1 b1); ( ! &mid = (+ (+ p1 p2) (>> p0 16)); (+ p3 (>> mid 16)) ) ) ) ) ) ) ) ) )))")
   lines.push("@plusAddr_ = (λ&addr (λ&off (addr (λ&str_fn (λ&list (λ&curr_off (((@Tuple3 str_fn) list) (+ curr_off off))))))))")
   lines.push("@eqAddr_ = (λ&a1 (λ&a2 (a1 (λ&_1 (λ&_2 (λ&o1 (a2 (λ&_3 (λ&_4 (λ&o2 (== o1 o2)))))))))))")
@@ -2008,6 +2299,23 @@ pub fn lower_program(raw_program : @syntax.Program) -> String {
   }
   lines.push("@_add_mod1000000007 = (λ&a (λ&b ( ! &sum = (+ a b); (~ (>= sum 1000000007) { 0: sum 1+_: (- sum 1000000007) }) )))")
   lines.push("@_mul31_mod1000000007 = (λ&y ( ! &y2 = (@_add_mod1000000007 y y); ( ! &y4 = (@_add_mod1000000007 y2 y2); ( ! &y8 = (@_add_mod1000000007 y4 y4); ( ! &y16 = (@_add_mod1000000007 y8 y8); (@_add_mod1000000007 y16 (@_add_mod1000000007 y8 (@_add_mod1000000007 y4 (@_add_mod1000000007 y2 y)))) ) ) ) ))")
+  lines.push("@dataToTagSmall_ = (λ&x ((x (λ&_ 0)) (λ&_ 1)))")
+  lines.push("@tagToEnum_ = (λ&x (~ x { 0: @False 1+_: @True }))")
+  lines.push("@eqString = (λ&xs (λ&ys ((xs ((ys @True) (λ&_y (λ&_ys @False)))) (λ&x (λ&x_rest ((ys @False) (λ&y (λ&y_rest (~ (== x y) { 0: @False 1+p: ((@eqString x_rest) y_rest) })))))))))")
+  lines.push("@map = (λ&f (λ&xs ((xs @Nil) (λ&y (λ&ys ((@Cons (f y)) ((@map f) ys)))))))")
+  lines.push("@filter = (λ&p (λ&xs ((xs @Nil) (λ&y (λ&ys (((p y) ((@filter p) ys)) ((@Cons y) ((@filter p) ys))))))))")
+  lines.push("@_plus__plus_ = (λ&xs (λ&ys ((xs ys) (λ&z (λ&zs ((@Cons z) ((@_plus__plus_ zs) ys)))))))")
+  lines.push("@concatMap = (λ&f (λ&xs ((xs @Nil) (λ&y (λ&ys ((@_plus__plus_ (f y)) ((@concatMap f) ys)))))))")
+  lines.push("@elem = (λ&dict (λ&target (λ&xs ((xs @False) (λ&y (λ&ys (((((dict (λ&eq (λ&ne eq))) target) y) (((@elem dict) target) ys)) @True)))))))")
+  lines.push("@notElem = (λ&dict (λ&target (λ&xs ((((@elem dict) target) xs) @True @False))))")
+  lines.push("@fst = (λ&p (p (λ&a (λ&b a))))")
+  lines.push("@snd = (λ&p (p (λ&a (λ&b b))))")
+  lines.push("@_fEqList__s_c_ne_1 = (λ&a (λ&b (((@eqString a) b) @True @False)))")
+  lines.push("@_fEqList__c_eq_ = (λ&dict (λ&xs (λ&ys ((xs ((ys @True) (λ&_y (λ&_ys @False)))) (λ&x (λ&x_rest ((ys @False) (λ&y (λ&y_rest ((((dict (λ&eq (λ&ne eq))) x) y) @False (((@_fEqList__c_eq_ dict) x_rest) y_rest)))))))))))")
+  lines.push("@_fEqTuple2 = (λ&dict_a (λ&dict_b ((@C_Eq (λ&p1 (λ&p2 (p1 (λ&x1 (λ&y1 (p2 (λ&x2 (λ&y2 (((((dict_a (λ&eq (λ&ne eq))) x1) x2) @False) (((dict_b (λ&eq (λ&ne eq))) y1) y2))))))))))) *)))")
+  lines.push("@_fEqList__s_fEqList1 = ((@C_Eq @eqString) @_fEqList__s_c_ne_1)")
+  lines.push("@C_Eq = (λ&eq (λ&ne (λ&c ((c eq) ne))))")
+  lines.push("@Eq = @C_Eq")
   let scott_defs = generate_scott_constructors(ctx)
   for def in scott_defs {
     lines.push(def)

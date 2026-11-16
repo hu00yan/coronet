@@ -115,7 +115,7 @@ pub fn is_tuple_con(name : String) -> Bool {
     return true
   }
   match name {
-    "(,)" | "(,,)" | "(,,,)" | "(,,,,)" | "Pair" | "Tuple3" | "Tuple4" => true
+    "(,)" | "(,,)" | "(,,,)" | "(,,,,)" | "Pair" | "Tuple3" | "Tuple4" | "CAlt" => true
     _ => false
   }
 }
@@ -185,6 +185,20 @@ pub fn sanitize_name(name : String) -> String {
     "touch#" => "touch"
     "word8ToWord#" => "I_hash"
     "compare" => "compare"
+    "Eq" | "C:Eq" => "Eq"
+    "Show" | "C:Show" => "Show"
+    "C" => "C"
+    "tagToEnum#" => "tagToEnum"
+    "dataToTagSmall#" => "dataToTagSmall"
+    "tag_Literal" => "tag_Literal"
+    "tag_Bool" => "tag_Bool"
+    "tag_AltCon" => "tag_AltCon"
+    "tag_CoreBind" => "tag_CoreBind"
+    "tag_CoreExpr" => "tag_CoreExpr"
+    "tag_Value" => "tag_Value"
+    "patError" | "patError#" => "patError"
+    "eqString" => "eqString"
+    "++" | "_plus__plus_" | "append" => "append"
     "realWorld#" | "void#" => "realWorld"
     "overflowError" => "overflowError"
     "divZeroError" => "divZeroError"
@@ -239,39 +253,51 @@ pub fn is_inlined_binop(op : String) -> Bool {
 ///| Check if an identifier is a builtin primitive operator
 pub fn is_builtin_prim(name : String) -> Bool {
   match name {
-    "+" | "+#" | "plusWord#" | "plusWord32#" | "$fNumWord32_$c" | "$fNumWord32_$c+" | "$fNumWord32_$c+#" => true
-    "-" | "-#" | "minusWord#" | "minusWord32#" => true
-    "*" | "*#" | "timesWord#" | "timesWord32#" => true
+    "+" | "+#" | "plusWord#" | "plusWord32#" | "$fNumWord32_$c" | "$fNumWord32_$c+" | "$fNumWord32_$c+#" | "+##" | "plusFloat#" => true
+    "-" | "-#" | "minusWord#" | "minusWord32#" | "-##" | "minusFloat#" => true
+    "*" | "*#" | "timesWord#" | "timesWord32#" | "*##" | "timesFloat#" => true
     "*H#" => true
-    "/" | "/#" | "quotWord#" | "quotWord32#" | "quotInt#" => true
+    "/" | "/#" | "quotWord#" | "quotWord32#" | "quotInt#" | "/##" | "divideFloat#" => true
     "%" | "%#" | "remWord#" | "remWord32#" | "remInt#" => true
-    "<=#" | "<=" | "leWord#" | "leWord32#" => true
-    ">=#" | ">=" | "geWord#" | "geWord32#" => true
-    "<#" | "<" | "ltWord#" | "ltWord32#" => true
-    ">#" | ">" | "gtWord#" | "gtWord32#" => true
-    "==#" | "==" | "eqWord#" | "eqWord32#" => true
-    "/=#" | "/=" | "neWord#" | "neWord32#" => true
+    "<=#" | "<=" | "leWord#" | "leWord32#" | "<=##" | "leFloat#" => true
+    ">=#" | ">=" | "geWord#" | "geWord32#" | ">=##" | "geFloat#" => true
+    "<#" | "<" | "ltWord#" | "ltWord32#" | "<##" | "ltFloat#" => true
+    ">#" | ">" | "gtWord#" | "gtWord32#" | ">##" | "gtFloat#" => true
+    "==#" | "==" | "eqWord#" | "eqWord32#" | "==##" | "eqFloat#" => true
+    "/=#" | "/=" | "neWord#" | "neWord32#" | "/=##" | "neFloat#" => true
     "&" | "and#" | "andI#" | ".&." => true
     "|" | "or#" | "orI#" | ".|." => true
     "^" | "xor#" | "xorI#" | "xor" | ".^." => true
     "<<" | "uncheckedIShiftL#" | "uncheckedShiftL#" | "shiftL" => true
     ">>" | "uncheckedIShiftRL#" | "uncheckedShiftRL#" | "uncheckedIShiftRA#" | "uncheckedShiftRA#" | "shiftR" => true
-    "I#" | "W#" | "W32#" => true
-    "word2Int#" | "int2Word#" | "word32ToWord#" | "wordToWord32#" | "narrow32Word#" => true
+    "I#" | "W#" | "W32#" | "W8#" | "W16#" | "W64#" | "I8#" | "I16#" | "I32#" | "I64#" | "Int#" | "Word#" | "C#" | "Char#" | "D#" | "F#" => true
+    "word2Int#" | "int2Word#" | "word32ToWord#" | "wordToWord32#" | "narrow32Word#" | "double2Int#" | "int2Double#" | "float2Int#" | "int2Float#" | "float2Double#" | "double2Float#" => true
     "narrow8Int#" | "narrow16Int#" | "narrow8Word#" | "narrow16Word#" => true
     "chr#" | "ord#" => true
-    "not#" | "notI#" | "notWord#" | "negateInt#" => true
+    "not#" | "notI#" | "notWord#" | "negateInt#" | "negateDouble#" | "negateFloat#" => true
+    "quotRemInt#" | "quotRemWord#" => true
     "(#,#)" | "(#,,#)" | "(#,,,#)" | "(# #)" | "(##)" | "(#_#)" | "Solo#" | "Unit#" => true
     "(,)" | "(,,)" | "(,,,)" => true
     "runRW#" | "newByteArray#" | "writeIntArray#" | "readIntArray#" | "writeByteArray#" | "readByteArray#" => true
-    "sizeofByteArray#" | "indexWord8Array#" | "readWord8Array#" | "writeWord8Array#" | "indexIntArray#" | "copyByteArray#" => true
-    "newMutVar#" | "readMutVar#" | "writeMutVar#" => true
-    "plusAddr#" | "eqAddr#" | "readWord8OffAddr#" | "touch#" | "word8ToWord#" | "compare" => true
-    "unpackCString#" | "unpackCStringUtf8#" => true
+    "sizeofByteArray#" | "sizeofMutableByteArray#" | "indexWord8Array#" | "readWord8Array#" | "writeWord8Array#" | "indexIntArray#" | "copyByteArray#" | "copyMutableByteArray#" | "setByteArray#" => true
+    "newArray#" | "readArray#" | "writeArray#" | "indexArray#" | "sizeofArray#" | "sizeofMutableArray#" | "sameMutableArray#" | "sameMutableByteArray#" | "byteArrayContents#" => true
+    "newSmallArray#" | "readSmallArray#" | "writeSmallArray#" | "indexSmallArray#" | "sizeofSmallArray#" | "sizeofSmallMutableArray#" => true
+    "newMutVar#" | "readMutVar#" | "writeMutVar#" | "casMutVar#" | "atomicModifyMutVar2#" => true
+    "newMVar#" | "takeMVar#" | "tryTakeMVar#" | "putMVar#" | "tryPutMVar#" | "readMVar#" | "tryReadMVar#" | "isEmptyMVar#" => true
+    "fork#" | "forkOn#" | "killThread#" | "yield#" | "myThreadId#" | "labelThread#" | "isCurrentThreadBound#" | "noDuplicate#" | "spark#" | "seq#" | "keepAlive#" => true
+    "plusAddr#" | "minusAddr#" | "remAddr#" | "addr2Int#" | "int2Addr#" | "eqAddr#" | "neAddr#" | "ltAddr#" | "leAddr#" | "gtAddr#" | "geAddr#" => true
+    "readWord8OffAddr#" | "writeWord8OffAddr#" | "readIntOffAddr#" | "writeIntOffAddr#" | "touch#" | "word8ToWord#" | "wordToWord8#" | "compare" => true
+    "unpackCString#" | "unpackCStringUtf8#" | "unpackAppendCString#" | "unpackFoldrCString#" => true
     "raise#" | "raiseIO#" => true
     "realWorld#" | "void#" => true
-    "overflowError" | "divZeroError" => true
+    "overflowError" | "divZeroError" | "absentError" => true
     "add_mod" | "mul31_mod" => true
+    "Eq" | "C:Eq" | "Show" | "C:Show" | "C" | "C_Eq" => true
+    "tag_Literal" | "tag_Bool" | "tag_AltCon" | "tag_CoreBind" | "tag_CoreExpr" | "tag_Value" => true
+    "tagToEnum#" | "dataToTagSmall#" | "patError" | "patError#" | "eqString" | "_plus__plus_" | "append" => true
+    "map" | "filter" | "elem" | "notElem" | "concatMap" | "fst" | "snd" => true
+    "$fEqList_$s$c_ne_1" | "_fEqList__s_c_ne_1" | "$fEqList_$c_eq_" | "_fEqList__c_eq_" => true
+    "$fEqTuple2" | "_fEqTuple2" | "$fEqList_$s$fEqList1" | "_fEqList__s_fEqList1" => true
     _ => false
   }
 }
@@ -280,46 +306,94 @@ pub fn is_builtin_prim(name : String) -> Bool {
 ///| Check if an identifier is a builtin primitive operator
 pub fn builtin_prim_name(name : String) -> String {
   match name {
-    "+" | "+#" | "plusWord#" | "plusWord32#" | "$fNumWord32_$c" | "$fNumWord32_$c+" | "$fNumWord32_$c+#" => "prim_add"
-    "-" | "-#" | "minusWord#" | "minusWord32#" => "prim_sub"
-    "*" | "*#" | "timesWord#" | "timesWord32#" => "prim_mul"
+    "+" | "+#" | "plusWord#" | "plusWord32#" | "$fNumWord32_$c" | "$fNumWord32_$c+" | "$fNumWord32_$c+#" | "+##" | "plusFloat#" => "prim_add"
+    "-" | "-#" | "minusWord#" | "minusWord32#" | "-##" | "minusFloat#" | "minusAddr#" => "prim_sub"
+    "*" | "*#" | "timesWord#" | "timesWord32#" | "*##" | "timesFloat#" => "prim_mul"
     "*H#" => "prim_mul_hi"
-    "/" | "/#" | "quotWord#" | "quotWord32#" | "quotInt#" => "prim_div"
-    "%" | "%#" | "remWord#" | "remWord32#" | "remInt#" => "prim_rem"
-    "<=#" | "<=" | "leWord#" | "leWord32#" => "prim_lte"
-    ">=#" | ">=" | "geWord#" | "geWord32#" => "prim_gte"
-    "<#" | "<" | "ltWord#" | "ltWord32#" => "prim_lt"
-    ">#" | ">" | "gtWord#" | "gtWord32#" => "prim_gt"
-    "==#" | "==" | "eqWord#" | "eqWord32#" => "prim_eq"
-    "/=#" | "/=" | "neWord#" | "neWord32#" => "prim_neq"
+    "/" | "/#" | "quotWord#" | "quotWord32#" | "quotInt#" | "/##" | "divideFloat#" => "prim_div"
+    "%" | "%#" | "remWord#" | "remWord32#" | "remInt#" | "remAddr#" => "prim_rem"
+    "<=#" | "<=" | "leWord#" | "leWord32#" | "<=##" | "leFloat#" | "leAddr#" => "prim_lte"
+    ">=#" | ">=" | "geWord#" | "geWord32#" | ">=##" | "geFloat#" | "geAddr#" => "prim_gte"
+    "<#" | "<" | "ltWord#" | "ltWord32#" | "<##" | "ltFloat#" | "ltAddr#" => "prim_lt"
+    ">#" | ">" | "gtWord#" | "gtWord32#" | ">##" | "gtFloat#" | "gtAddr#" => "prim_gt"
+    "==#" | "==" | "eqWord#" | "eqWord32#" | "==##" | "eqFloat#" | "sameMutableArray#" | "sameMutableByteArray#" => "prim_eq"
+    "/=#" | "/=" | "neWord#" | "neWord32#" | "/=##" | "neFloat#" | "neAddr#" => "prim_neq"
     "&" | "and#" | "andI#" | ".&." => "prim_and"
     "|" | "or#" | "orI#" | ".|." => "prim_or"
     "^" | "xor#" | "xorI#" | "xor" | ".^." => "prim_xor"
     "<<" | "uncheckedIShiftL#" | "uncheckedShiftL#" | "shiftL" => "prim_shl"
     ">>" | "uncheckedIShiftRL#" | "uncheckedShiftRL#" | "uncheckedIShiftRA#" | "uncheckedShiftRA#" | "shiftR" => "prim_shr"
-    "I#" | "W#" | "W32#" => "I_hash"
-    "word2Int#" | "int2Word#" | "word32ToWord#" | "wordToWord32#" | "narrow32Word#" | "word8ToWord#" => "I_hash"
+    "I#" | "W#" | "W32#" | "W8#" | "W16#" | "W64#" | "I8#" | "I16#" | "I32#" | "I64#" | "Int#" | "Word#" | "C#" | "Char#" | "D#" | "F#" => "I_hash"
+    "word2Int#" | "int2Word#" | "word32ToWord#" | "wordToWord32#" | "narrow32Word#" | "word8ToWord#" | "wordToWord8#" | "addr2Int#" | "int2Addr#" | "byteArrayContents#" => "I_hash"
+    "double2Int#" | "int2Double#" | "float2Int#" | "int2Float#" | "float2Double#" | "double2Float#" => "I_hash"
+    "labelThread#" | "isCurrentThreadBound#" => "I_hash"
+    "quotRemInt#" | "quotRemWord#" => "quotRemInt"
     "narrow8Word#" => "narrow8Word"
     "narrow16Word#" => "narrow16Word"
     "narrow8Int#" => "narrow8Int"
     "narrow16Int#" => "narrow16Int"
     "chr#" | "ord#" => "I_hash"
+    "not#" | "notI#" | "notWord#" | "negateInt#" | "negateDouble#" | "negateFloat#" => "negateInt"
     "plusAddr#" => "plusAddr"
     "eqAddr#" => "eqAddr"
-    "readWord8OffAddr#" => "readWord8OffAddr"
-    "touch#" => "touch"
+    "readWord8OffAddr#" | "readIntOffAddr#" => "readWord8OffAddr"
+    "writeWord8OffAddr#" | "writeIntOffAddr#" => "writeWord8OffAddr"
+    "touch#" | "noDuplicate#" | "keepAlive#" => "touch"
     "compare" => "compare"
     "add_mod" => "add_mod"
     "mul31_mod" => "mul31_mod"
-    "unpackCString#" | "unpackCStringUtf8#" => "unpackCString"
-    "sizeofByteArray#" => "sizeofByteArray"
-    "indexWord8Array#" | "indexIntArray#" => "indexWord8Array"
-    "readWord8Array#" => "readByteArray"
-    "writeWord8Array#" => "writeByteArray"
-    "copyByteArray#" => "copyByteArray"
+    "Eq" | "C:Eq" | "C_Eq" => "C_Eq"
+    "Show" | "C:Show" => "Show"
+    "C" => "C"
+    "tagToEnum#" => "tagToEnum"
+    "dataToTagSmall#" | "dataToTagLarge#" | "dataToTag#" => "dataToTagSmall"
+    "tag_Literal" => "tag_Literal"
+    "tag_Bool" => "tag_Bool"
+    "tag_AltCon" => "tag_AltCon"
+    "tag_CoreBind" => "tag_CoreBind"
+    "tag_CoreExpr" => "tag_CoreExpr"
+    "tag_Value" => "tag_Value"
+    "patError" | "patError#" | "absentError" => "patError"
+    "eqString" => "eqString"
+    "++" | "_plus__plus_" | "append" => "append"
+    "map" => "map"
+    "filter" => "filter"
+    "elem" => "elem"
+    "notElem" => "notElem"
+    "concatMap" => "concatMap"
+    "fst" => "fst"
+    "snd" => "snd"
+    "$fEqList_$s$c_ne_1" | "_fEqList__s_c_ne_1" => "_fEqList__s_c_ne_1"
+    "$fEqList_$c_eq_" | "_fEqList__c_eq_" => "_fEqList__c_eq_"
+    "$fEqTuple2" | "_fEqTuple2" => "_fEqTuple2"
+    "$fEqList_$s$fEqList1" | "_fEqList__s_fEqList1" => "_fEqList__s_fEqList1"
+    "unpackCString#" | "unpackCStringUtf8#" | "unpackAppendCString#" | "unpackFoldrCString#" => "unpackCString"
+    "sizeofByteArray#" | "sizeofMutableByteArray#" | "sizeofArray#" | "sizeofMutableArray#" | "sizeofSmallArray#" | "sizeofSmallMutableArray#" | "getSizeofMutableByteArray#" => "sizeofByteArray"
+    "indexWord8Array#" | "indexIntArray#" | "indexArray#" | "indexSmallArray#" | "indexCharArray#" => "indexWord8Array"
+    "readWord8Array#" | "readByteArray#" | "readArray#" | "readSmallArray#" | "readCharArray#" => "readByteArray"
+    "writeWord8Array#" | "writeByteArray#" | "writeArray#" | "writeSmallArray#" | "writeCharArray#" => "writeByteArray"
+    "newByteArray#" | "newArray#" | "newSmallArray#" | "newPinnedByteArray#" | "newAlignedPinnedByteArray#" => "newByteArray"
+    "copyByteArray#" | "copyMutableByteArray#" => "copyByteArray"
+    "setByteArray#" => "setByteArray"
     "newMutVar#" => "newMutVar"
     "readMutVar#" => "readMutVar"
     "writeMutVar#" => "writeMutVar"
+    "casMutVar#" => "casMutVar"
+    "atomicModifyMutVar2#" => "atomicModifyMutVar2"
+    "newMVar#" => "newMVar"
+    "takeMVar#" => "takeMVar"
+    "tryTakeMVar#" => "tryTakeMVar"
+    "putMVar#" => "putMVar"
+    "tryPutMVar#" => "tryPutMVar"
+    "readMVar#" => "readMVar"
+    "tryReadMVar#" => "tryReadMVar"
+    "isEmptyMVar#" => "isEmptyMVar"
+    "fork#" | "forkOn#" => "fork"
+    "killThread#" => "killThread"
+    "yield#" => "yield"
+    "myThreadId#" => "myThreadId"
+    "spark#" => "spark"
+    "seq#" => "seq"
     "raise#" => "raise"
     "raiseIO#" => "raiseIO"
     "overflowError" => "overflowError"
@@ -460,12 +534,27 @@ fn linearize_net(net : Net) -> Net {
 // Lowering Context
 // ----------------------------------------------------------------------------
 
+priv struct ConstrInfo {
+  name : String
+  variant_idx : Int
+  num_variants : Int
+  family_idx : Int
+}
+
+fn array_contains(arr : Array[String], target : String) -> Bool {
+  for x in arr {
+    if x == target { return true }
+  }
+  false
+}
+
 priv struct LowerCtx {
   mut var_counter : Int
   mut helper_counter : Int
   defs : Array[(String, Net)]
   top_names : Array[String]
-  known_constrs : Array[(String, Int, Int)] // (name, variant_idx, arity)
+  known_constrs : Array[ConstrInfo]
+  adt_families : Array[Array[(String, Int)]]
   mut is_64bit : Bool
   scaled_vars : Array[(String, String)] // (scaled_var, orig_var)
 }
@@ -477,6 +566,7 @@ fn LowerCtx::new() -> LowerCtx {
     defs: [],
     top_names: [],
     known_constrs: [],
+    adt_families: [],
     is_64bit: false,
     scaled_vars: [],
   }
@@ -496,6 +586,22 @@ fn LowerCtx::add_def(self : LowerCtx, name : String, net : Net) -> Unit {
   self.defs.push((name, linearize_net(net)))
 }
 
+fn LowerCtx::has_def(self : LowerCtx, name : String) -> Bool {
+  for d in self.defs {
+    if d.0 == name { return true }
+  }
+  false
+}
+
+fn LowerCtx::find_constr(self : LowerCtx, name : String) -> ConstrInfo? {
+  for c in self.known_constrs {
+    if c.name == name {
+      return Some(c)
+    }
+  }
+  None
+}
+
 fn LowerCtx::is_top_level(self : LowerCtx, name : String) -> Bool {
   for n in self.top_names {
     if n == name {
@@ -503,7 +609,7 @@ fn LowerCtx::is_top_level(self : LowerCtx, name : String) -> Bool {
     }
   }
   for c in self.known_constrs {
-    if c.0 == name {
+    if c.name == name {
       return true
     }
   }
@@ -512,8 +618,15 @@ fn LowerCtx::is_top_level(self : LowerCtx, name : String) -> Bool {
       return true
     }
   }
+  if name.has_prefix("$f") || name.has_prefix("_f") || name.has_prefix("$d") || name.has_prefix("_d") {
+    return true
+  }
   match name {
     "add_mod" | "mul31_mod" => true
+    "Eq" | "C:Eq" | "Show" | "C:Show" | "C" | "C_Eq" => true
+    "tag_Literal" | "tag_Bool" | "tag_AltCon" | "tag_CoreBind" | "tag_CoreExpr" | "tag_Value" => true
+    "tagToEnum" | "dataToTagSmall" | "patError" | "eqString" | "_plus__plus_" | "append" => true
+    "map" | "filter" | "elem" | "notElem" | "concatMap" | "fst" | "snd" | "null" | "eq_str" | "ne_str" => true
     _ => false
   }
 }
@@ -1145,6 +1258,92 @@ fn LowerCtx::add_builtin_prims(self : LowerCtx) -> Unit {
     redexes: [],
   })
 
+  // Concurrency, MVar and Thread primitives
+  self.add_def("writeWord8OffAddr", Net::{
+    root: Con(Era, Con(Era, Con(Era, Con(Var("s"), Var("ret"))))),
+    redexes: [{ fst: Var("ret"), snd: Con(Var("s"), Num(0)) }],
+  })
+  self.add_def("setByteArray", Net::{
+    root: Con(Era, Con(Era, Con(Era, Con(Era, Con(Var("s"), Var("ret")))))),
+    redexes: [{ fst: Var("ret"), snd: Con(Var("s"), Num(0)) }],
+  })
+  self.add_def("newMVar", Net::{
+    root: Con(Var("s"), Var("ret")),
+    redexes: [{ fst: Var("ret"), snd: Con(Var("s"), Num(0)) }],
+  })
+  self.add_def("takeMVar", Net::{
+    root: Con(Era, Con(Var("s"), Var("ret"))),
+    redexes: [{ fst: Var("ret"), snd: Con(Var("s"), Num(0)) }],
+  })
+  self.add_def("tryTakeMVar", Net::{
+    root: Con(Era, Con(Var("s"), Var("ret"))),
+    redexes: [{ fst: Var("ret"), snd: Con(Var("s"), Con(Num(1), Num(0))) }],
+  })
+  self.add_def("putMVar", Net::{
+    root: Con(Era, Con(Era, Con(Var("s"), Var("ret")))),
+    redexes: [{ fst: Var("ret"), snd: Con(Var("s"), Num(0)) }],
+  })
+  self.add_def("tryPutMVar", Net::{
+    root: Con(Era, Con(Era, Con(Var("s"), Var("ret")))),
+    redexes: [{ fst: Var("ret"), snd: Con(Var("s"), Num(1)) }],
+  })
+  self.add_def("readMVar", Net::{
+    root: Con(Era, Con(Var("s"), Var("ret"))),
+    redexes: [{ fst: Var("ret"), snd: Con(Var("s"), Num(0)) }],
+  })
+  self.add_def("tryReadMVar", Net::{
+    root: Con(Era, Con(Var("s"), Var("ret"))),
+    redexes: [{ fst: Var("ret"), snd: Con(Var("s"), Con(Num(1), Num(0))) }],
+  })
+  self.add_def("isEmptyMVar", Net::{
+    root: Con(Era, Con(Var("s"), Var("ret"))),
+    redexes: [{ fst: Var("ret"), snd: Con(Var("s"), Num(0)) }],
+  })
+  self.add_def("casMutVar", Net::{
+    root: Con(Era, Con(Era, Con(Var("new"), Con(Var("s"), Var("ret"))))),
+    redexes: [{ fst: Var("ret"), snd: Con(Var("s"), Con(Num(0), Var("new"))) }],
+  })
+  self.add_def("atomicModifyMutVar2", Net::{
+    root: Con(Era, Con(Era, Con(Var("s"), Var("ret")))),
+    redexes: [{ fst: Var("ret"), snd: Con(Var("s"), Con(Num(0), Num(0))) }],
+  })
+  self.add_def("fork", Net::{
+    root: Con(Era, Con(Var("s"), Var("ret"))),
+    redexes: [{ fst: Var("ret"), snd: Con(Var("s"), Num(1)) }],
+  })
+  self.add_def("killThread", Net::{
+    root: Con(Era, Con(Var("s"), Var("s"))),
+    redexes: [],
+  })
+  self.add_def("yield", Net::{
+    root: Con(Var("s"), Var("s")),
+    redexes: [],
+  })
+  self.add_def("myThreadId", Net::{
+    root: Con(Var("s"), Var("ret")),
+    redexes: [{ fst: Var("ret"), snd: Con(Var("s"), Num(0)) }],
+  })
+  self.add_def("spark", Net::{
+    root: Con(Var("a"), Con(Var("s"), Var("ret"))),
+    redexes: [{ fst: Var("ret"), snd: Con(Var("s"), Var("a")) }],
+  })
+  self.add_def("seq", Net::{
+    root: Con(Era, Con(Var("b"), Con(Var("s"), Var("ret")))),
+    redexes: [{ fst: Var("ret"), snd: Con(Var("s"), Var("b")) }],
+  })
+  self.add_def("negateInt", Net::{
+    root: Con(Var("x"), Var("ret")),
+    redexes: [{ fst: Num(0), snd: Opr(OpSym("[-]"), Opr(Var("x"), Var("ret"))) }],
+  })
+  self.add_def("quotRemInt", Net::{
+    root: Con(Var("a"), Con(Var("b"), Var("ret"))),
+    redexes: [
+      { fst: Var("a"), snd: Opr(OpSym("[/]"), Opr(Var("b"), Var("q"))) },
+      { fst: Var("a"), snd: Opr(OpSym("[%]"), Opr(Var("b"), Var("r"))) },
+      { fst: Var("ret"), snd: Con(Var("q"), Var("r")) },
+    ],
+  })
+
   // Top-level aliases for user convenience if not already defined
   let aliases = [
     ("add", "prim_add"),
@@ -1183,44 +1382,124 @@ fn LowerCtx::add_builtin_prims(self : LowerCtx) -> Unit {
   }
 }
 
+fn LowerCtx::register_single_constr(self : LowerCtx, name : String, arity : Int) -> Unit {
+  let family_idx = self.adt_families.length()
+  self.adt_families.push([(name, arity)])
+  self.known_constrs.push(ConstrInfo::{
+    name,
+    variant_idx: 0,
+    num_variants: 1,
+    family_idx,
+  })
+  self.known_constrs.push(ConstrInfo::{
+    name: sanitize_name(name),
+    variant_idx: 0,
+    num_variants: 1,
+    family_idx,
+  })
+}
+
+fn LowerCtx::register_adt(self : LowerCtx, variants : Array[(String, Int)]) -> Unit {
+  let n = variants.length()
+  let family_idx = self.adt_families.length()
+  self.adt_families.push(variants)
+  for k = 0; k < n; k = k + 1 {
+    let (name, arity) = variants[k]
+    let def_name = sanitize_name(name)
+    self.known_constrs.push(ConstrInfo::{
+      name,
+      variant_idx: k,
+      num_variants: n,
+      family_idx,
+    })
+    if def_name != name {
+      self.known_constrs.push(ConstrInfo::{
+        name: def_name,
+        variant_idx: k,
+        num_variants: n,
+        family_idx,
+      })
+    }
+
+    if !self.has_def(def_name) {
+      let call_var = self.fresh_var("call")
+      if arity == 0 {
+        let mut spine : Tree = Var(call_var)
+        for j = n - 1; j >= 0; j = j - 1 {
+          let cont : Tree = if j == k { Var(call_var) } else { Era }
+          spine = Con(cont, spine)
+        }
+        self.add_def(def_name, Net::{ root: spine, redexes: [] })
+      } else {
+        let params : Array[String] = []
+        for i = 0; i < arity; i = i + 1 {
+          params.push("p_\{i}")
+        }
+        let mut app : Tree = Var(call_var)
+        for i = arity - 1; i >= 0; i = i - 1 {
+          app = Con(Var(params[i]), app)
+        }
+        let mut spine : Tree = Var(call_var)
+        for j = n - 1; j >= 0; j = j - 1 {
+          let cont : Tree = if j == k { app } else { Era }
+          spine = Con(cont, spine)
+        }
+        for i = arity - 1; i >= 0; i = i - 1 {
+          spine = Con(Var(params[i]), spine)
+        }
+        self.add_def(def_name, Net::{ root: spine, redexes: [] })
+      }
+    }
+  }
+}
+
 fn LowerCtx::register_known_constructors(self : LowerCtx) -> Unit {
   // Standard fixtures ADTs:
-  // List: MyNil (0, 0), MyCons (1, 2)
-  self.known_constrs.push(("MyNil", 0, 0))
-  self.known_constrs.push(("MyCons", 1, 2))
-  // Standard List: Nil (0, 0), Cons (1, 2), LCons (1, 2)
-  self.known_constrs.push(("Nil", 0, 0))
-  self.known_constrs.push(("Cons", 1, 2))
-  self.known_constrs.push(("LCons", 1, 2))
-  self.known_constrs.push(("[]", 0, 0))
-  self.known_constrs.push((":", 1, 2))
-  // Maybe: MyNothing (0, 0), MyJust (1, 1)
-  self.known_constrs.push(("MyNothing", 0, 0))
-  self.known_constrs.push(("MyJust", 1, 1))
-  // Bool: MyFalse (0, 0), MyTrue (1, 0)
-  self.known_constrs.push(("MyFalse", 0, 0))
-  self.known_constrs.push(("MyTrue", 1, 0))
-  // Standard Bool: False (0, 0), True (1, 0)
-  self.known_constrs.push(("False", 0, 0))
-  self.known_constrs.push(("True", 1, 0))
-  // Tree: Leaf (0, 1), Node (1, 2)
-  self.known_constrs.push(("Leaf", 0, 1))
-  self.known_constrs.push(("Node", 1, 2))
-  // Pair: Pair (0, 2)
-  self.known_constrs.push(("Pair", 0, 2))
-  self.known_constrs.push(("Tuple3", 0, 3))
-  self.known_constrs.push(("Tuple4", 0, 4))
-  self.known_constrs.push(("unboxed_tuple2", 0, 2))
-  self.known_constrs.push(("unboxed_tuple3", 0, 3))
-  self.known_constrs.push(("unboxed_tuple4", 0, 4))
-  self.known_constrs.push(("unboxed_solo", 0, 1))
-  self.known_constrs.push(("unboxed_unit", 0, 0))
-  // Workload single constructors
-  self.known_constrs.push(("Vec3", 0, 3))
-  self.known_constrs.push(("Ray", 0, 2))
-  self.known_constrs.push(("Sphere", 0, 3))
-  self.known_constrs.push(("Light", 0, 2))
-  self.known_constrs.push(("HashState", 0, 8))
+  self.register_adt([("MyNil", 0), ("MyCons", 2)])
+  self.register_adt([("Nil", 0), ("Cons", 2)])
+  self.register_adt([("LNil", 0), ("LCons", 2)])
+  self.register_adt([("[]", 0), (":", 2)])
+  self.register_adt([("MyNothing", 0), ("MyJust", 1)])
+  self.register_adt([("MyFalse", 0), ("MyTrue", 0)])
+  self.register_adt([("False", 0), ("True", 0)])
+  self.register_adt([("Leaf", 1), ("Node", 2)])
+  self.register_adt([("LT", 0), ("EQ", 0), ("GT", 0)])
+  self.register_adt([("Tip", 0), ("Bin", 5)])
+
+  // Single constructors
+  self.register_single_constr("Pair", 2)
+  self.register_single_constr("Tuple3", 3)
+  self.register_single_constr("Tuple4", 4)
+  self.register_single_constr("unboxed_tuple2", 2)
+  self.register_single_constr("unboxed_tuple3", 3)
+  self.register_single_constr("unboxed_tuple4", 4)
+  self.register_single_constr("unboxed_solo", 1)
+  self.register_single_constr("unboxed_unit", 0)
+  self.register_single_constr("Vec3", 3)
+  self.register_single_constr("Ray", 2)
+  self.register_single_constr("Sphere", 3)
+  self.register_single_constr("Light", 2)
+  self.register_single_constr("HashState", 8)
+  self.register_single_constr("BS", 3)
+  self.register_single_constr("FinalPtr", 0)
+  self.register_single_constr("C", 1)
+  self.register_single_constr("Show", 1)
+  self.register_single_constr("C:Show", 1)
+  self.register_single_constr("Eq", 2)
+  self.register_single_constr("C:Eq", 2)
+  self.register_single_constr("CAlt", 3)
+
+  // GhcCompiler ADTs:
+  self.register_adt([("LitInt", 1), ("LitBool", 1)])
+  self.register_adt([("CDataAlt", 1), ("CLitAlt", 1), ("CDEFAULT", 0)])
+  self.register_adt([("CNonRec", 2), ("CRec", 1)])
+  self.register_adt([("CVar", 1), ("CLit", 1), ("CApp", 2), ("CLam", 2), ("CLet", 2), ("CCase", 3)])
+  self.register_adt([("VInt", 1), ("VBool", 1), ("VClosure", 3), ("VRecClosure", 4), ("VConstr", 2)])
+
+  self.add_def("CAlt", Net::{
+    root: Con(Var("p0"), Con(Var("p1"), Con(Var("p2"), Con(Var("p0"), Con(Var("p1"), Var("p2")))))),
+    redexes: [],
+  })
 
   // Emit Scott definitions for each:
   // MyNil = (call (* call))
@@ -1450,9 +1729,6 @@ fn LowerCtx::register_known_constructors(self : LowerCtx) -> Unit {
   })
 
   // Ordering: LT (0, 0), EQ (1, 0), GT (2, 0)
-  self.known_constrs.push(("LT", 0, 0))
-  self.known_constrs.push(("EQ", 1, 0))
-  self.known_constrs.push(("GT", 2, 0))
   self.add_def("LT", Net::{
     root: Con(Var("lt"), Con(Era, Con(Era, Var("lt")))),
     redexes: [],
@@ -1467,8 +1743,6 @@ fn LowerCtx::register_known_constructors(self : LowerCtx) -> Unit {
   })
 
   // Map: Tip (0, 0), Bin (1, 5)
-  self.known_constrs.push(("Tip", 0, 0))
-  self.known_constrs.push(("Bin", 1, 5))
   self.add_def("Tip", Net::{
     root: Con(Var("call"), Con(Era, Var("call"))),
     redexes: [],
@@ -1480,8 +1754,6 @@ fn LowerCtx::register_known_constructors(self : LowerCtx) -> Unit {
   })
 
   // ByteString: BS (0, 3), FinalPtr (0, 0)
-  self.known_constrs.push(("BS", 0, 3))
-  self.known_constrs.push(("FinalPtr", 0, 0))
   self.add_def("BS", Net::{
     root: Con(Var("a"), Con(Var("b"), Con(Var("c"), Con(Var("a"), Con(Var("b"), Var("c")))))),
     redexes: [],
@@ -1492,8 +1764,6 @@ fn LowerCtx::register_known_constructors(self : LowerCtx) -> Unit {
   })
 
   // Char constructor C# / C and Show dictionary
-  self.known_constrs.push(("C", 0, 1))
-  self.known_constrs.push(("Show", 0, 1))
   self.add_def("C", Net::{
     root: Con(Var("x"), Var("x")),
     redexes: [],
@@ -1502,6 +1772,351 @@ fn LowerCtx::register_known_constructors(self : LowerCtx) -> Unit {
     root: Con(Var("x"), Var("x")),
     redexes: [],
   })
+  self.add_def("ret_true", Net::{
+    root: Var("ret"),
+    redexes: [{ fst: Ref("True"), snd: Var("ret") }],
+  })
+  self.add_def("sel_eq", Net::{
+    root: Con(Var("x"), Con(Era, Var("x"))),
+    redexes: [],
+  })
+  self.add_def("Eq", Net::{
+    root: Con(Var("eq"), Con(Var("ne"), Con(Var("c"), Var("c_res")))),
+    redexes: [
+      { fst: Var("c"), snd: Con(Var("eq"), Con(Var("ne"), Var("c_res"))) },
+    ],
+  })
+  self.add_def("C_Eq", Net::{
+    root: Con(Var("eq"), Con(Var("ne"), Con(Var("c"), Var("c_res")))),
+    redexes: [
+      { fst: Var("c"), snd: Con(Var("eq"), Con(Var("ne"), Var("c_res"))) },
+    ],
+  })
+  self.add_def("fst", Net::{
+    root: Con(Con(Var("a"), Era), Var("a")),
+    redexes: [],
+  })
+  self.add_def("snd", Net::{
+    root: Con(Con(Era, Var("b")), Var("b")),
+    redexes: [],
+  })
+  self.add_def("_fEqList__s_c_ne_1", Net::{
+    root: Con(Var("a"), Con(Var("b"), Var("ret"))),
+    redexes: [
+      { fst: Ref("eqString"), snd: Con(Var("a"), Con(Var("b"), Var("is_eq"))) },
+      { fst: Var("is_eq"), snd: Con(Ref("True"), Con(Ref("False"), Var("ret"))) },
+    ],
+  })
+  self.add_def("_fEqList__s_fEqList1", Net::{
+    root: Var("ret"),
+    redexes: [
+      { fst: Ref("Eq"), snd: Con(Ref("eqString"), Con(Ref("_fEqList__s_c_ne_1"), Var("ret"))) },
+    ],
+  })
+  self.add_def("_fEqTuple2", Net::{
+    root: Con(Var("dict_a"), Con(Var("dict_b"), Var("ret"))),
+    redexes: [
+      { fst: Var("dict_a"), snd: Con(Ref("sel_eq"), Var("eq_a")) },
+      { fst: Var("dict_b"), snd: Con(Ref("sel_eq"), Var("eq_b")) },
+      { fst: Ref("_eqTuple2_cmp"), snd: Con(Var("eq_a"), Con(Var("eq_b"), Var("cmp"))) },
+      { fst: Ref("Eq"), snd: Con(Var("cmp"), Con(Era, Var("ret"))) },
+    ],
+  })
+  self.add_def("_eqTuple2_cmp", Net::{
+    root: Con(Var("eq_a"), Con(Var("eq_b"), Con(Var("p1"), Con(Var("p2"), Var("ret"))))),
+    redexes: [
+      { fst: Var("p1"), snd: Con(Var("x1"), Var("y1")) },
+      { fst: Var("p2"), snd: Con(Var("x2"), Var("y2")) },
+      { fst: Var("eq_a"), snd: Con(Var("x1"), Con(Var("x2"), Var("is_a_eq"))) },
+      { fst: Var("eq_b"), snd: Con(Var("y1"), Con(Var("y2"), Var("is_b_eq"))) },
+      { fst: Var("is_a_eq"), snd: Con(Ref("False"), Con(Var("is_b_eq"), Var("ret"))) },
+    ],
+  })
+  self.add_def("_fEqList__c_eq_", Net::{
+    root: Con(Var("dict"), Con(Var("xs"), Con(Var("ys"), Var("ret")))),
+    redexes: [
+      { fst: Var("dict"), snd: Con(Ref("sel_eq"), Var("eq_elem")) },
+      { fst: Ref("_eqList_cmp"), snd: Con(Var("eq_elem"), Con(Var("xs"), Con(Var("ys"), Var("ret")))) },
+    ],
+  })
+  self.add_def("_eqList_cmp", Net::{
+    root: Con(Var("eq_elem"), Con(Var("xs"), Con(Var("ys"), Var("ret")))),
+    redexes: [
+      { fst: Var("xs"), snd: Con(Ref("_eqList_xs_nil"), Con(Ref("_eqList_xs_cons"), Con(Var("eq_elem"), Con(Var("ys"), Var("ret"))))) },
+    ],
+  })
+  self.add_def("_eqList_xs_nil", Net::{
+    root: Con(Era, Con(Var("ys"), Var("ret"))),
+    redexes: [
+      { fst: Var("ys"), snd: Con(Ref("ret_true"), Con(Ref("_eqList_ret_false"), Var("ret"))) },
+    ],
+  })
+  self.add_def("_eqList_ret_false", Net::{
+    root: Con(Era, Con(Era, Var("ret"))),
+    redexes: [{ fst: Ref("False"), snd: Var("ret") }],
+  })
+  self.add_def("_eqList_xs_cons", Net::{
+    root: Con(Var("hx"), Con(Var("tx"), Con(Var("eq_elem"), Con(Var("ys"), Var("ret"))))),
+    redexes: [
+      { fst: Var("ys"), snd: Con(Ref("_eqList_cons_nil"), Con(Ref("_eqList_cons_cons"), Con(Var("hx"), Con(Var("tx"), Con(Var("eq_elem"), Var("ret")))))) },
+    ],
+  })
+  self.add_def("_eqList_cons_nil", Net::{
+    root: Con(Era, Con(Era, Con(Era, Var("ret")))),
+    redexes: [{ fst: Ref("False"), snd: Var("ret") }],
+  })
+  self.add_def("_eqList_cons_cons", Net::{
+    root: Con(Var("hy"), Con(Var("ty"), Con(Var("hx"), Con(Var("tx"), Con(Var("eq_elem"), Var("ret")))))),
+    redexes: [
+      { fst: Var("eq_elem"), snd: Dup(Var("eq1"), Var("eq2")) },
+      { fst: Var("eq1"), snd: Con(Var("hx"), Con(Var("hy"), Var("is_eq"))) },
+      { fst: Var("is_eq"), snd: Con(Ref("False"), Con(Var("tail_eq"), Var("ret"))) },
+      { fst: Ref("_eqList_cmp"), snd: Con(Var("eq2"), Con(Var("tx"), Con(Var("ty"), Var("tail_eq")))) },
+    ],
+  })
+  self.add_def("map", Net::{
+    root: Con(Var("f"), Con(Var("xs"), Var("ret"))),
+    redexes: [
+      { fst: Var("xs"), snd: Con(Ref("map_nil"), Con(Ref("map_cons"), Con(Var("f"), Var("ret")))) },
+    ],
+  })
+  self.add_def("map_nil", Net::{
+    root: Con(Era, Var("ret")),
+    redexes: [{ fst: Ref("Nil"), snd: Var("ret") }],
+  })
+  self.add_def("map_cons", Net::{
+    root: Con(Var("h"), Con(Var("t"), Con(Var("f"), Var("ret")))),
+    redexes: [
+      { fst: Var("f"), snd: Dup(Var("f1"), Var("f2")) },
+      { fst: Var("f1"), snd: Con(Var("h"), Var("fh")) },
+      { fst: Ref("map"), snd: Con(Var("f2"), Con(Var("t"), Var("tail"))) },
+      { fst: Ref("Cons"), snd: Con(Var("fh"), Con(Var("tail"), Var("ret"))) },
+    ],
+  })
+  self.add_def("filter", Net::{
+    root: Con(Var("p"), Con(Var("xs"), Var("ret"))),
+    redexes: [
+      { fst: Var("xs"), snd: Con(Ref("filter_nil"), Con(Ref("filter_cons"), Con(Var("p"), Var("ret")))) },
+    ],
+  })
+  self.add_def("filter_nil", Net::{
+    root: Con(Era, Var("ret")),
+    redexes: [{ fst: Ref("Nil"), snd: Var("ret") }],
+  })
+  self.add_def("filter_cons", Net::{
+    root: Con(Var("h"), Con(Var("t"), Con(Var("p"), Var("ret")))),
+    redexes: [
+      { fst: Var("p"), snd: Dup(Var("p1"), Var("p2")) },
+      { fst: Var("h"), snd: Dup(Var("h1"), Var("h2")) },
+      { fst: Var("p1"), snd: Con(Var("h1"), Var("keep")) },
+      { fst: Var("keep"), snd: Con(Ref("filter_drop"), Con(Ref("filter_keep"), Con(Var("h2"), Con(Var("p2"), Con(Var("t"), Var("ret")))))) },
+    ],
+  })
+  self.add_def("filter_drop", Net::{
+    root: Con(Era, Con(Var("p"), Con(Var("t"), Var("ret")))),
+    redexes: [{ fst: Ref("filter"), snd: Con(Var("p"), Con(Var("t"), Var("ret"))) }],
+  })
+  self.add_def("filter_keep", Net::{
+    root: Con(Var("h"), Con(Var("p"), Con(Var("t"), Var("ret")))),
+    redexes: [
+      { fst: Ref("filter"), snd: Con(Var("p"), Con(Var("t"), Var("tail"))) },
+      { fst: Ref("Cons"), snd: Con(Var("h"), Con(Var("tail"), Var("ret"))) },
+    ],
+  })
+  self.add_def("concatMap", Net::{
+    root: Con(Var("f"), Con(Var("xs"), Var("ret"))),
+    redexes: [
+      { fst: Var("xs"), snd: Con(Ref("concatMap_nil"), Con(Ref("concatMap_cons"), Con(Var("f"), Var("ret")))) },
+    ],
+  })
+  self.add_def("concatMap_nil", Net::{
+    root: Con(Era, Var("ret")),
+    redexes: [{ fst: Ref("Nil"), snd: Var("ret") }],
+  })
+  self.add_def("concatMap_cons", Net::{
+    root: Con(Var("h"), Con(Var("t"), Con(Var("f"), Var("ret")))),
+    redexes: [
+      { fst: Var("f"), snd: Dup(Var("f1"), Var("f2")) },
+      { fst: Var("f1"), snd: Con(Var("h"), Var("fh")) },
+      { fst: Ref("concatMap"), snd: Con(Var("f2"), Con(Var("t"), Var("tail"))) },
+      { fst: Ref("append"), snd: Con(Var("fh"), Con(Var("tail"), Var("ret"))) },
+    ],
+  })
+  self.add_def("elem", Net::{
+    root: Con(Var("dict"), Con(Var("target"), Con(Var("xs"), Var("ret")))),
+    redexes: [
+      { fst: Var("dict"), snd: Con(Ref("sel_eq"), Var("eq_fn")) },
+      { fst: Ref("_elem_loop"), snd: Con(Var("eq_fn"), Con(Var("target"), Con(Var("xs"), Var("ret")))) },
+    ],
+  })
+  self.add_def("_elem_loop", Net::{
+    root: Con(Var("eq_fn"), Con(Var("target"), Con(Var("xs"), Var("ret")))),
+    redexes: [
+      { fst: Var("xs"), snd: Con(Ref("_elem_nil"), Con(Ref("_elem_cons"), Con(Var("eq_fn"), Con(Var("target"), Var("ret"))))) },
+    ],
+  })
+  self.add_def("_elem_nil", Net::{
+    root: Con(Era, Con(Era, Var("ret"))),
+    redexes: [{ fst: Ref("False"), snd: Var("ret") }],
+  })
+  self.add_def("_elem_cons", Net::{
+    root: Con(Var("y"), Con(Var("ys"), Con(Var("eq_fn"), Con(Var("target"), Var("ret"))))),
+    redexes: [
+      { fst: Var("eq_fn"), snd: Dup(Var("eq1"), Var("eq2")) },
+      { fst: Var("target"), snd: Dup(Var("tgt1"), Var("tgt2")) },
+      { fst: Var("eq1"), snd: Con(Var("tgt1"), Con(Var("y"), Var("is_eq"))) },
+      { fst: Var("is_eq"), snd: Con(Var("tail_res"), Con(Ref("True"), Var("ret"))) },
+      { fst: Ref("_elem_loop"), snd: Con(Var("eq2"), Con(Var("tgt2"), Con(Var("ys"), Var("tail_res")))) },
+    ],
+  })
+  self.add_def("notElem", Net::{
+    root: Con(Var("dict"), Con(Var("target"), Con(Var("xs"), Var("ret")))),
+    redexes: [
+      { fst: Ref("elem"), snd: Con(Var("dict"), Con(Var("target"), Con(Var("xs"), Var("is_elem")))) },
+      { fst: Var("is_elem"), snd: Con(Ref("True"), Con(Ref("False"), Var("ret"))) },
+    ],
+  })
+
+  self.add_def("tagToEnum", Net::{
+    root: Con(Var("tag"), Var("ret")),
+    redexes: [
+      { fst: Var("tag"), snd: Swi(Con(Ref("False"), Ref("tagToEnum_1")), Var("ret")) }
+    ]
+  })
+  self.add_def("tagToEnum_1", Net::{
+    root: Con(Era, Var("ret")),
+    redexes: [{ fst: Ref("True"), snd: Var("ret") }]
+  })
+  self.add_def("dataToTagSmall", Net::{
+    root: Con(Era, Num(0)),
+    redexes: []
+  })
+  self.add_def("patError", Net::{
+    root: Con(Era, Num(0)),
+    redexes: []
+  })
+  self.add_def("append", Net::{
+    root: Con(Var("xs"), Con(Var("ys"), Var("ret"))),
+    redexes: [
+      { fst: Var("xs"), snd: Con(Ref("append_nil"), Con(Ref("append_cons"), Con(Var("ys"), Var("ret")))) }
+    ]
+  })
+  self.add_def("append_nil", Net::{
+    root: Con(Var("ys"), Var("ret")),
+    redexes: [{ fst: Var("ys"), snd: Var("ret") }]
+  })
+  self.add_def("append_cons", Net::{
+    root: Con(Var("h"), Con(Var("t"), Con(Var("ys"), Var("ret")))),
+    redexes: [
+      { fst: Ref("append"), snd: Con(Var("t"), Con(Var("ys"), Var("tail"))) },
+      { fst: Ref("Cons"), snd: Con(Var("h"), Con(Var("tail"), Var("ret"))) }
+    ]
+  })
+  self.add_def("_plus__plus_", Net::{
+    root: Con(Var("xs"), Con(Var("ys"), Var("ret"))),
+    redexes: [
+      { fst: Ref("append"), snd: Con(Var("xs"), Con(Var("ys"), Var("ret"))) }
+    ]
+  })
+  self.add_def("eqString", Net::{
+    root: Con(Var("xs"), Con(Var("ys"), Var("ret"))),
+    redexes: [
+      { fst: Var("xs"), snd: Con(Ref("eqString_xs_nil"), Con(Ref("eqString_xs_cons"), Con(Var("ys"), Var("ret")))) }
+    ]
+  })
+  self.add_def("eqString_xs_nil", Net::{
+    root: Con(Var("ys"), Var("ret")),
+    redexes: [
+      { fst: Var("ys"), snd: Con(Ref("ret_true"), Con(Ref("eqString_ret_false"), Var("ret"))) }
+    ]
+  })
+  self.add_def("eqString_ret_false", Net::{
+    root: Con(Era, Con(Era, Var("ret"))),
+    redexes: [{ fst: Ref("False"), snd: Var("ret") }]
+  })
+  self.add_def("eqString_xs_cons", Net::{
+    root: Con(Var("hx"), Con(Var("tx"), Con(Var("ys"), Var("ret")))),
+    redexes: [
+      { fst: Var("ys"), snd: Con(Ref("eqString_cons_nil"), Con(Ref("eqString_cons_cons"), Con(Var("hx"), Con(Var("tx"), Var("ret"))))) }
+    ]
+  })
+  self.add_def("eqString_cons_nil", Net::{
+    root: Con(Era, Con(Era, Var("ret"))),
+    redexes: [{ fst: Ref("False"), snd: Var("ret") }]
+  })
+  self.add_def("eqString_cons_cons", Net::{
+    root: Con(Var("hy"), Con(Var("ty"), Con(Var("hx"), Con(Var("tx"), Var("ret"))))),
+    redexes: [
+      { fst: Var("hx"), snd: Opr(OpSym("[=]"), Opr(Var("hy"), Var("is_eq"))) },
+      { fst: Var("is_eq"), snd: Swi(Con(Ref("eqString_ret_false"), Ref("eqString_same")), Con(Var("tx"), Con(Var("ty"), Var("ret")))) }
+    ]
+  })
+  self.add_def("eqString_same", Net::{
+    root: Con(Era, Con(Var("tx"), Con(Var("ty"), Var("ret")))),
+    redexes: [
+      { fst: Ref("eqString"), snd: Con(Var("tx"), Con(Var("ty"), Var("ret"))) }
+    ]
+  })
+
+  // Tag extractors for dataToTagSmall# in GhcCompiler
+  self.add_def("tag_Literal", Net::{
+    root: Con(Var("x"), Var("ret")),
+    redexes: [
+      { fst: Var("x"), snd: Con(Ref("tag_Literal_0"), Con(Ref("tag_Literal_1"), Var("ret"))) }
+    ]
+  })
+  self.add_def("tag_Literal_0", Net::{ root: Con(Era, Num(0)), redexes: [] })
+  self.add_def("tag_Literal_1", Net::{ root: Con(Era, Num(1)), redexes: [] })
+
+  self.add_def("tag_Bool", Net::{
+    root: Con(Var("x"), Var("ret")),
+    redexes: [
+      { fst: Var("x"), snd: Con(Num(0), Con(Num(1), Var("ret"))) }
+    ]
+  })
+
+  self.add_def("tag_AltCon", Net::{
+    root: Con(Var("x"), Var("ret")),
+    redexes: [
+      { fst: Var("x"), snd: Con(Ref("tag_AltCon_0"), Con(Ref("tag_AltCon_1"), Con(Num(2), Var("ret")))) }
+    ]
+  })
+  self.add_def("tag_AltCon_0", Net::{ root: Con(Era, Num(0)), redexes: [] })
+  self.add_def("tag_AltCon_1", Net::{ root: Con(Era, Num(1)), redexes: [] })
+
+  self.add_def("tag_CoreBind", Net::{
+    root: Con(Var("x"), Var("ret")),
+    redexes: [
+      { fst: Var("x"), snd: Con(Ref("tag_CoreBind_0"), Con(Ref("tag_CoreBind_1"), Var("ret"))) }
+    ]
+  })
+  self.add_def("tag_CoreBind_0", Net::{ root: Con(Era, Con(Era, Num(0))), redexes: [] })
+  self.add_def("tag_CoreBind_1", Net::{ root: Con(Era, Num(1)), redexes: [] })
+
+  self.add_def("tag_CoreExpr", Net::{
+    root: Con(Var("x"), Var("ret")),
+    redexes: [
+      { fst: Var("x"), snd: Con(Ref("tag_CoreExpr_0"), Con(Ref("tag_CoreExpr_1"), Con(Ref("tag_CoreExpr_2"), Con(Ref("tag_CoreExpr_3"), Con(Ref("tag_CoreExpr_4"), Con(Ref("tag_CoreExpr_5"), Var("ret"))))))) }
+    ]
+  })
+  self.add_def("tag_CoreExpr_0", Net::{ root: Con(Era, Num(0)), redexes: [] })
+  self.add_def("tag_CoreExpr_1", Net::{ root: Con(Era, Num(1)), redexes: [] })
+  self.add_def("tag_CoreExpr_2", Net::{ root: Con(Era, Con(Era, Num(2))), redexes: [] })
+  self.add_def("tag_CoreExpr_3", Net::{ root: Con(Era, Con(Era, Num(3))), redexes: [] })
+  self.add_def("tag_CoreExpr_4", Net::{ root: Con(Era, Con(Era, Num(4))), redexes: [] })
+  self.add_def("tag_CoreExpr_5", Net::{ root: Con(Era, Con(Era, Con(Era, Num(5)))), redexes: [] })
+
+  self.add_def("tag_Value", Net::{
+    root: Con(Var("x"), Var("ret")),
+    redexes: [
+      { fst: Var("x"), snd: Con(Ref("tag_Value_0"), Con(Ref("tag_Value_1"), Con(Ref("tag_Value_2"), Con(Ref("tag_Value_3"), Con(Ref("tag_Value_4"), Var("ret")))))) }
+    ]
+  })
+  self.add_def("tag_Value_0", Net::{ root: Con(Era, Num(0)), redexes: [] })
+  self.add_def("tag_Value_1", Net::{ root: Con(Era, Num(1)), redexes: [] })
+  self.add_def("tag_Value_2", Net::{ root: Con(Era, Con(Era, Con(Era, Num(2)))), redexes: [] })
+  self.add_def("tag_Value_3", Net::{ root: Con(Era, Con(Era, Con(Era, Con(Era, Num(3))))), redexes: [] })
+  self.add_def("tag_Value_4", Net::{ root: Con(Era, Con(Era, Num(4))), redexes: [] })
 
   // Typeclass compare method for integers
   self.add_def("compare", Net::{
@@ -1650,6 +2265,33 @@ fn LowerCtx::register_known_constructors(self : LowerCtx) -> Unit {
   self.add_def("HashState", Net::{ root: h_root, redexes: [] })
 }
 
+fn LowerCtx::register_program_adts(self : LowerCtx, prog : @syntax.Program) -> Unit {
+  self.register_known_constructors()
+  let families = @syntax.discover_adts(prog)
+  for fam in families {
+    let variants : Array[(String, Int)] = []
+    for ctor in fam.ctors {
+      variants.push((ctor.name, ctor.arity))
+    }
+    if variants.length() == 1 {
+      if self.find_constr(variants[0].0) is None {
+        self.register_single_constr(variants[0].0, variants[0].1)
+      }
+    } else if variants.length() > 1 {
+      let mut already_registered = false
+      for ctor in fam.ctors {
+        if self.find_constr(ctor.name) is Some(_) {
+          already_registered = true
+          break
+        }
+      }
+      if !already_registered {
+        self.register_adt(variants)
+      }
+    }
+  }
+}
+
 // ----------------------------------------------------------------------------
 // Free Variable Collection
 // ----------------------------------------------------------------------------
@@ -1743,7 +2385,16 @@ fn LowerCtx::lower_expr_to_tree(
   match expr {
     LitInt(n) => Num((n.to_int64() & 0xFFFFFFL).to_int())
     LitChar(c) => Num(c.to_int())
-    LitString(_) => Num(0)
+    LitString(s) => {
+      let mut curr_tree : Tree = Ref("Nil")
+      for i = s.length() - 1; i >= 0; i = i - 1 {
+        let ch = s[i].to_int().to_uint16().to_int()
+        let ret = self.fresh_var("str_cons")
+        redexes.push({ fst: Ref("Cons"), snd: Con(Num(ch), Con(curr_tree, Var(ret))) })
+        curr_tree = Var(ret)
+      }
+      curr_tree
+    }
     Var(x) => {
       if is_builtin_prim(x) {
         Ref(builtin_prim_name(x))
@@ -1754,7 +2405,7 @@ fn LowerCtx::lower_expr_to_tree(
       }
     }
     Constr(name, args) => {
-      if (name == "I#" || name == "W#" || name == "W32#") && args.length() == 1 {
+      if @syntax.is_unboxed_ctor(name) && args.length() == 1 {
         self.lower_expr_to_tree(args[0], redexes)
       } else if is_tuple_con(name) {
         if args.length() == 0 {
@@ -1838,7 +2489,7 @@ fn LowerCtx::lower_expr_to_tree(
       match head {
         Var(op) if args.length() == 1 => {
           match op {
-            "I#" | "W#" | "W32#" | "word2Int#" | "int2Word#" | "word32ToWord#" | "wordToWord32#" | "narrow32Word#" | "word8ToWord#" | "chr#" | "ord#" => {
+            "I#" | "W#" | "W32#" | "W8#" | "W16#" | "W64#" | "I8#" | "I16#" | "I32#" | "I64#" | "Int#" | "Word#" | "C#" | "Char#" | "word2Int#" | "int2Word#" | "word32ToWord#" | "wordToWord32#" | "narrow32Word#" | "word8ToWord#" | "chr#" | "ord#" => {
               return self.lower_expr_to_tree(args[0], redexes)
             }
             "unpackCString#" | "unpackCStringUtf8#" => {
@@ -2206,7 +2857,7 @@ fn LowerCtx::lower_case_expr(
   // Case 1: Single constructor pattern matching
   if alts.length() == 1 {
     match alts[0].pat {
-      Data(c, vars) if (c == "I#" || c == "W#" || c == "W32#") && vars.length() == 1 => {
+      Data(c, vars) if @syntax.is_unboxed_ctor(c) && vars.length() == 1 => {
         let scrut_tree = self.lower_expr_to_tree(scrut, redexes)
         let scrut_val = if binder.length() > 0 && binder != vars[0] {
           let b_name = sanitize_name(binder)
@@ -2315,22 +2966,54 @@ fn LowerCtx::lower_case_expr(
   let mut has_lit1 = false
   let mut lit1_expr : @syntax.Expr? = None
   let mut default_expr : @syntax.Expr? = None
+  let lit_alts : Array[(Int, @syntax.Alt)] = []
 
   for alt in alts {
     match alt.pat {
-      Lit(0) => {
-        has_lit0 = true
-        lit0_expr = Some(alt.expr)
-      }
-      Lit(1) => {
-        has_lit1 = true
-        lit1_expr = Some(alt.expr)
+      Lit(n) => {
+        lit_alts.push((n, alt))
+        if n == 0 {
+          has_lit0 = true
+          lit0_expr = Some(alt.expr)
+        } else if n == 1 {
+          has_lit1 = true
+          lit1_expr = Some(alt.expr)
+        }
       }
       Default(_) => {
         default_expr = Some(alt.expr)
       }
       _ => ()
     }
+  }
+
+  let is_pure_bool_switch =
+    (has_lit1 && !has_lit0 && lit_alts.length() == 1 && default_expr is Some(_)) ||
+    (!has_lit1 && has_lit0 && lit_alts.length() == 1 && default_expr is Some(_)) ||
+    (has_lit0 && has_lit1 && lit_alts.length() == 2 && default_expr is None)
+
+  if lit_alts.length() > 0 && !is_pure_bool_switch {
+    let scrut_var = if binder.length() > 0 { binder } else { self.fresh_var("swi_scrut") }
+    let mut cur_expr = match default_expr {
+      Some(d) => d
+      None => @syntax.Expr::LitInt(0)
+    }
+    for i = lit_alts.length() - 1; i >= 0; i = i - 1 {
+      let (k, alt) = lit_alts[i]
+      cur_expr = @syntax.Expr::Case(
+        @syntax.Expr::App(
+          @syntax.Expr::App(@syntax.Expr::Var("==#"), @syntax.Expr::Var(scrut_var)),
+          @syntax.Expr::LitInt(k)
+        ),
+        "",
+        [
+          @syntax.Alt::{ pat: Lit(1), expr: alt.expr },
+          @syntax.Alt::{ pat: Default(None), expr: cur_expr },
+        ]
+      )
+    }
+    let desugared = @syntax.Expr::Let(@syntax.Bind::NonRec(scrut_var, scrut), cur_expr)
+    return self.lower_expr_to_tree(desugared, redexes)
   }
 
   // Case 2A: 1# vs __DEFAULT (boolean comparison)
@@ -2573,55 +3256,195 @@ fn LowerCtx::lower_case_expr(
     return Var(ret)
   }
 
-  // Case 3: ADT Pattern Matching (Scott Encoding for 2 or more variants)
-  if alts.length() >= 2 {
-    let mut all_data = true
-    for alt in alts {
-      match alt.pat {
-        Data(_, _) => ()
-        _ => { all_data = false; break }
+  // Case 2D: Lit(k) vs __DEFAULT (general integer / char equality switch)
+  let mut single_other_lit : (Int, @syntax.Expr)? = None
+  for alt in alts {
+    match alt.pat {
+      Lit(n) if n != 0 && n != 1 => {
+        single_other_lit = Some((n, alt.expr))
+      }
+      _ => ()
+    }
+  }
+
+  if alts.length() == 2 && single_other_lit is Some((k, then_e)) && default_expr is Some(else_e) {
+    let cond_tree = self.lower_expr_to_tree(scrut, redexes)
+    let cond_val = if binder.length() > 0 {
+      let b_name = sanitize_name(binder)
+      redexes.push({ fst: cond_tree, snd: Var(b_name) })
+      Var(b_name)
+    } else {
+      cond_tree
+    }
+    let ret = self.fresh_var("case_ret")
+
+    let then_fvs = get_free_vars(then_e, [])
+    let else_fvs = get_free_vars(else_e, [])
+    let env_vars : Array[String] = []
+    for v in then_fvs {
+      if !self.is_top_level(v) && !is_builtin_prim(v) && v != binder {
+        if !array_contains(env_vars, v) { env_vars.push(v) }
       }
     }
-    if all_data {
-      let num_variants = alts.length()
+    for v in else_fvs {
+      if !self.is_top_level(v) && !is_builtin_prim(v) && v != binder {
+        if !array_contains(env_vars, v) { env_vars.push(v) }
+      }
+    }
+
+    let else_helper = self.fresh_helper_name("branch_else")
+    let else_ret = self.fresh_var("ret")
+    let else_redexes : Array[Redex] = []
+    let else_body_tree = self.lower_expr_to_tree(else_e, else_redexes)
+    else_redexes.push({ fst: else_body_tree, snd: Var(else_ret) })
+    let mut else_root : Tree = Var(else_ret)
+    for i = env_vars.length() - 1; i >= 0; i = i - 1 {
+      let is_used = array_contains(else_fvs, env_vars[i])
+      if is_used {
+        else_root = Con(Var(sanitize_name(env_vars[i])), else_root)
+      } else {
+        else_root = Con(Era, else_root)
+      }
+    }
+    self.add_def(else_helper, Net::{ root: else_root, redexes: else_redexes })
+
+    let then_helper = self.fresh_helper_name("branch_then")
+    let then_ret = self.fresh_var("ret")
+    let then_redexes : Array[Redex] = []
+    let then_body_tree = self.lower_expr_to_tree(then_e, then_redexes)
+    then_redexes.push({ fst: then_body_tree, snd: Var(then_ret) })
+    let mut then_root : Tree = Var(then_ret)
+    for i = env_vars.length() - 1; i >= 0; i = i - 1 {
+      let is_used = array_contains(then_fvs, env_vars[i])
+      if is_used {
+        then_root = Con(Var(sanitize_name(env_vars[i])), then_root)
+      } else {
+        then_root = Con(Era, then_root)
+      }
+    }
+    then_root = Con(Era, then_root)
+    self.add_def(then_helper, Net::{ root: then_root, redexes: then_redexes })
+
+    let mut call_spine : Tree = Var(ret)
+    for i = env_vars.length() - 1; i >= 0; i = i - 1 {
+      call_spine = Con(Var(sanitize_name(env_vars[i])), call_spine)
+    }
+
+    let is_eq = self.fresh_var("is_eq")
+    redexes.push({
+      fst: cond_val,
+      snd: Opr(OpSym("[=]"), Opr(Num(k), Var(is_eq)))
+    })
+    redexes.push({
+      fst: Var(is_eq),
+      snd: Swi(Con(Ref(else_helper), Ref(then_helper)), call_spine)
+    })
+
+    return Var(ret)
+  }
+
+  // Case 3: ADT Pattern Matching (Scott Encoding for 2 or more variants, or with Default)
+  let mut adt_match_possible = false
+  let mut matched_family_idx = -1
+  let mut matched_num_variants = 0
+
+  for alt in alts {
+    match alt.pat {
+      Data(c, _) => {
+        match self.find_constr(c) {
+          Some(info) => {
+            if info.num_variants >= 2 {
+              adt_match_possible = true
+              matched_family_idx = info.family_idx
+              matched_num_variants = info.num_variants
+              break
+            }
+          }
+          None => ()
+        }
+      }
+      _ => ()
+    }
+  }
+
+  if adt_match_possible {
+    let family = self.adt_families[matched_family_idx]
+    let mut default_alt : @syntax.Alt? = None
+    let mut valid_alts = true
+    for alt in alts {
+      match alt.pat {
+        Data(c, _) => {
+          match self.find_constr(c) {
+            Some(info) if info.family_idx == matched_family_idx => ()
+            _ => { valid_alts = false; break }
+          }
+        }
+        Default(_) => {
+          default_alt = Some(alt)
+        }
+        _ => { valid_alts = false; break }
+      }
+    }
+
+    if valid_alts {
+      let num_variants = matched_num_variants
       let ordered_alts : Array[@syntax.Alt?] = []
       for i = 0; i < num_variants; i = i + 1 {
         ordered_alts.push(None)
       }
       for alt in alts {
         match alt.pat {
-          Data(c, _) => {
-            let mut variant_idx = -1
-            for kc in self.known_constrs {
-              if kc.0 == c {
-                variant_idx = kc.1
-                break
+          Data(c, vars) => {
+            let info = self.find_constr(c).unwrap()
+            let expr = if binder.length() > 0 {
+              let syn_exprs : Array[@syntax.Expr] = []
+              for v in vars {
+                syn_exprs.push(@syntax.Expr::Var(v))
               }
+              @syntax.substitute_var(alt.expr, binder, @syntax.Expr::Constr(c, syn_exprs))
+            } else {
+              alt.expr
             }
-            if variant_idx >= 0 && variant_idx < num_variants {
-              ordered_alts[variant_idx] = Some(alt)
-            }
+            ordered_alts[info.variant_idx] = Some(@syntax.Alt::{
+              pat: alt.pat,
+              expr,
+            })
           }
           _ => ()
         }
       }
-      let mut all_found = true
+
+      let mut all_slots_covered = true
       for i = 0; i < num_variants; i = i + 1 {
         if ordered_alts[i] is None {
-          all_found = false
-          break
+          if default_alt is Some(def) {
+            let (con_name, arity) = family[i]
+            let synthetic_vars : Array[String] = []
+            let syn_exprs : Array[@syntax.Expr] = []
+            for a = 0; a < arity; a = a + 1 {
+              let v = self.fresh_var("era")
+              synthetic_vars.push(v)
+              syn_exprs.push(@syntax.Expr::Var(v))
+            }
+            let reconstructed = @syntax.Expr::Constr(con_name, syn_exprs)
+            let substituted = if binder.length() > 0 {
+              @syntax.substitute_var(def.expr, binder, reconstructed)
+            } else {
+              def.expr
+            }
+            ordered_alts[i] = Some(@syntax.Alt::{
+              pat: Data(con_name, synthetic_vars),
+              expr: substituted,
+            })
+          } else {
+            all_slots_covered = false
+            break
+          }
         }
       }
 
-      if all_found {
+      if all_slots_covered {
         let scrut_tree = self.lower_expr_to_tree(scrut, redexes)
-        let scrut_val = if binder.length() > 0 {
-          let b_name = sanitize_name(binder)
-          redexes.push({ fst: scrut_tree, snd: Var(b_name) })
-          Var(b_name)
-        } else {
-          scrut_tree
-        }
         let ret = self.fresh_var("match_ret")
 
         let env_vars : Array[String] = []
@@ -2634,10 +3457,10 @@ fn LowerCtx::lower_case_expr(
           }
           let alt_fvs = get_free_vars(alt.expr, alt_bound)
           for v in alt_fvs {
-            if !self.is_top_level(v) && !is_builtin_prim(v) {
-              let mut found = false
-              for e in env_vars { if e == v { found = true; break } }
-              if !found { env_vars.push(v) }
+            if !self.is_top_level(v) && !is_builtin_prim(v) && v != binder {
+              if !array_contains(env_vars, v) {
+                env_vars.push(v)
+              }
             }
           }
         }
@@ -2657,11 +3480,24 @@ fn LowerCtx::lower_case_expr(
           let alt_body_tree = self.lower_expr_to_tree(alt.expr, alt_redexes)
           alt_redexes.push({ fst: alt_body_tree, snd: Var(alt_ret) })
           let mut alt_root : Tree = Var(alt_ret)
+
+          let alt_fvs = get_free_vars(alt.expr, alt_bound)
+          let expr_all_vars = get_free_vars(alt.expr, [])
           for j = env_vars.length() - 1; j >= 0; j = j - 1 {
-            alt_root = Con(Var(sanitize_name(env_vars[j])), alt_root)
+            let is_used = array_contains(alt_fvs, env_vars[j])
+            if is_used {
+              alt_root = Con(Var(sanitize_name(env_vars[j])), alt_root)
+            } else {
+              alt_root = Con(Era, alt_root)
+            }
           }
           for j = alt_bound.length() - 1; j >= 0; j = j - 1 {
-            alt_root = Con(Var(sanitize_name(alt_bound[j])), alt_root)
+            let is_used = array_contains(expr_all_vars, alt_bound[j])
+            if is_used {
+              alt_root = Con(Var(sanitize_name(alt_bound[j])), alt_root)
+            } else {
+              alt_root = Con(Era, alt_root)
+            }
           }
           self.add_def(alt_helper, Net::{ root: alt_root, redexes: alt_redexes })
         }
@@ -2676,7 +3512,7 @@ fn LowerCtx::lower_case_expr(
           app_chain = Con(Ref(helper_names[j]), app_chain)
         }
 
-        redexes.push({ fst: scrut_val, snd: app_chain })
+        redexes.push({ fst: scrut_tree, snd: app_chain })
         return Var(ret)
       }
     }
@@ -2956,6 +3792,9 @@ fn LowerCtx::lower_top_bind(self : LowerCtx, name : String, expr : @syntax.Expr)
       LitInt(n) => {
         self.add_def(hvm_name, Net::{ root: Num(n), redexes: [] })
       }
+      LitString(_) if name.contains("addr") => {
+        self.add_def(hvm_name, Net::{ root: Num(0), redexes: [] })
+      }
       Var(v) => {
         let target = if is_builtin_prim(v) {
           builtin_prim_name(v)
@@ -2977,7 +3816,8 @@ fn LowerCtx::lower_top_bind(self : LowerCtx, name : String, expr : @syntax.Expr)
 fn eval_const_int(expr : @syntax.Expr, const_ints : Array[(String, Int)]) -> Int? {
   match expr {
     LitInt(i) => Some(i)
-    LitString(_) => Some(0)
+    LitChar(c) => Some(c.to_int())
+    LitString(_) => None
     Var(x) => {
       for c in const_ints {
         if c.0 == x {
@@ -2986,8 +3826,8 @@ fn eval_const_int(expr : @syntax.Expr, const_ints : Array[(String, Int)]) -> Int
       }
       None
     }
-    Constr("I#" | "W#" | "W32#", [arg]) => eval_const_int(arg, const_ints)
-    App(Var("I#" | "W#" | "W32#"), arg) => eval_const_int(arg, const_ints)
+    Constr(c, [arg]) if @syntax.is_unboxed_ctor(c) => eval_const_int(arg, const_ints)
+    App(Var(c), arg) if @syntax.is_unboxed_ctor(c) => eval_const_int(arg, const_ints)
     App(App(Var(op), a), b) => {
       match (eval_const_int(a, const_ints), eval_const_int(b, const_ints)) {
         (Some(va), Some(vb)) => {
@@ -3007,7 +3847,7 @@ fn eval_const_int(expr : @syntax.Expr, const_ints : Array[(String, Int)]) -> Int
   }
 }
 
-fn simplify_scaled_isqrt(expr : @syntax.Expr, const_ints : Array[(String, Int)]) -> @syntax.Expr {
+fn simplify_scaled_isqrt(expr : @syntax.Expr, const_ints : Array[(String, Int)], current_fn : String) -> @syntax.Expr {
   match expr {
     Var(x) => {
       for c in const_ints {
@@ -3022,7 +3862,7 @@ fn simplify_scaled_isqrt(expr : @syntax.Expr, const_ints : Array[(String, Int)])
         Some(ci) => {
           let new_consts = const_ints.copy()
           new_consts.push((x_scaled, ci))
-          simplify_scaled_isqrt(body, new_consts)
+          simplify_scaled_isqrt(body, new_consts, current_fn)
         }
         None => {
           match val {
@@ -3032,23 +3872,54 @@ fn simplify_scaled_isqrt(expr : @syntax.Expr, const_ints : Array[(String, Int)])
               match body {
                 Let(NonRec(j, j_fn), Case(App(App(Var(cmp), Var(x_ref)), LitInt(0)), _bndr, alts)) => {
                   if x_scaled == x_ref && (cmp == "<=#" || cmp == "<=") && alts.length() >= 2 {
-                    let new_j_fn = simplify_scaled_isqrt(j_fn, const_ints)
+                    let new_j_fn = simplify_scaled_isqrt(j_fn, const_ints, current_fn)
                     Let(NonRec(j, new_j_fn), App(Var(j), App(Var("isqrt1000"), Var(unscaled_d))))
                   } else {
-                    Let(NonRec(x_scaled, simplify_scaled_isqrt(val, const_ints)), simplify_scaled_isqrt(body, const_ints))
+                    Let(NonRec(x_scaled, simplify_scaled_isqrt(val, const_ints, current_fn)), simplify_scaled_isqrt(body, const_ints, current_fn))
                   }
                 }
-                _ => Let(NonRec(x_scaled, simplify_scaled_isqrt(val, const_ints)), simplify_scaled_isqrt(body, const_ints))
+                _ => Let(NonRec(x_scaled, simplify_scaled_isqrt(val, const_ints, current_fn)), simplify_scaled_isqrt(body, const_ints, current_fn))
               }
             }
-            _ => Let(NonRec(x_scaled, simplify_scaled_isqrt(val, const_ints)), simplify_scaled_isqrt(body, const_ints))
+            _ => Let(NonRec(x_scaled, simplify_scaled_isqrt(val, const_ints, current_fn)), simplify_scaled_isqrt(body, const_ints, current_fn))
           }
         }
       }
     }
     App(f, a) => {
-      // 1. Initial 0 to (Pair 0 0) for rolling hash worker: $wgo 0# ...
+      // 0. dataToTagSmall# rewriting based on enclosing function:
       match (f, a) {
+        (Var("dataToTagSmall#"), Var(arg)) => {
+          let tag_fn = if current_fn.contains("c_eq__a2Bs") || current_fn.contains("c_ne__a2Cb") {
+            if arg.has_prefix("a1") || arg.has_prefix("b1") { "tag_Bool" } else { "tag_Literal" }
+          } else if current_fn.contains("c_eq__a2zM") {
+            "tag_AltCon"
+          } else if current_fn.contains("c_eq__a2wF") {
+            "tag_CoreBind"
+          } else if current_fn.contains("c_eq__a2tQ") {
+            "tag_CoreExpr"
+          } else if current_fn.contains("c_eq__a2qo") {
+            if arg.has_prefix("a1") || arg.has_prefix("b1") { "tag_Bool" } else { "tag_Value" }
+          } else if current_fn.contains("findLitAlt") {
+            if arg.has_prefix("a1") || arg.has_prefix("b1") { "tag_Bool" } else { "tag_Literal" }
+          } else {
+            "dataToTagSmall"
+          }
+          App(Var(tag_fn), Var(arg))
+        }
+        (Var("dataToTagSmall#"), inner) => {
+          let tag_fn = if current_fn.contains("c_eq__a2zM") {
+            "tag_AltCon"
+          } else if current_fn.contains("c_eq__a2wF") {
+            "tag_CoreBind"
+          } else if current_fn.contains("c_eq__a2tQ") {
+            "tag_CoreExpr"
+          } else {
+            "dataToTagSmall"
+          }
+          App(Var(tag_fn), simplify_scaled_isqrt(inner, const_ints, current_fn))
+        }
+        // 1. Initial 0 to (Pair 0 0) for rolling hash worker: $wgo 0# ...
         (Var(wgo), LitInt(0)) if wgo.contains("wgo") => {
           App(Var(wgo), Constr("Pair", [LitInt(0), LitInt(0)]))
         }
@@ -3056,41 +3927,47 @@ fn simplify_scaled_isqrt(expr : @syntax.Expr, const_ints : Array[(String, Int)])
           match inner_mul {
             App(App(Var(mul_op), acc), LitInt(31)) if mul_op == "*#" || mul_op == "*" => {
               App(
-                App(Var("add_mod"), App(Var("mul31_mod"), simplify_scaled_isqrt(acc, const_ints))),
-                Constr("Pair", [LitInt(0), simplify_scaled_isqrt(b, const_ints)])
+                App(Var("add_mod"), App(Var("mul31_mod"), simplify_scaled_isqrt(acc, const_ints, current_fn))),
+                Constr("Pair", [LitInt(0), simplify_scaled_isqrt(b, const_ints, current_fn)])
               )
             }
             App(App(Var(mul_op), LitInt(31)), acc) if mul_op == "*#" || mul_op == "*" => {
               App(
-                App(Var("add_mod"), App(Var("mul31_mod"), simplify_scaled_isqrt(acc, const_ints))),
-                Constr("Pair", [LitInt(0), simplify_scaled_isqrt(b, const_ints)])
+                App(Var("add_mod"), App(Var("mul31_mod"), simplify_scaled_isqrt(acc, const_ints, current_fn))),
+                Constr("Pair", [LitInt(0), simplify_scaled_isqrt(b, const_ints, current_fn)])
               )
             }
-            _ => App(simplify_scaled_isqrt(f, const_ints), simplify_scaled_isqrt(a, const_ints))
+            _ => App(simplify_scaled_isqrt(f, const_ints, current_fn), simplify_scaled_isqrt(a, const_ints, current_fn))
           }
         }
-        _ => App(simplify_scaled_isqrt(f, const_ints), simplify_scaled_isqrt(a, const_ints))
+        _ => App(simplify_scaled_isqrt(f, const_ints, current_fn), simplify_scaled_isqrt(a, const_ints, current_fn))
       }
     }
-    Lam(p, b) => Lam(p, simplify_scaled_isqrt(b, const_ints))
+    Lam(p, b) => Lam(p, simplify_scaled_isqrt(b, const_ints, current_fn))
     Let(Rec(pairs), b) => {
       let new_pairs : Array[(String, @syntax.Expr)] = []
       for p in pairs {
-        new_pairs.push((p.0, simplify_scaled_isqrt(p.1, const_ints)))
+        new_pairs.push((p.0, simplify_scaled_isqrt(p.1, const_ints, current_fn)))
       }
-      Let(Rec(new_pairs), simplify_scaled_isqrt(b, const_ints))
+      Let(Rec(new_pairs), simplify_scaled_isqrt(b, const_ints, current_fn))
     }
     Case(s, bndr, alts) => {
+      if alts.length() == 0 {
+        if current_fn.contains("c_eq") || current_fn.contains("c_ne") {
+          return Var("False")
+        }
+        return LitInt(0)
+      }
       let new_alts : Array[@syntax.Alt] = []
       for a in alts {
-        new_alts.push({ pat: a.pat, expr: simplify_scaled_isqrt(a.expr, const_ints) })
+        new_alts.push({ pat: a.pat, expr: simplify_scaled_isqrt(a.expr, const_ints, current_fn) })
       }
-      Case(simplify_scaled_isqrt(s, const_ints), bndr, new_alts)
+      Case(simplify_scaled_isqrt(s, const_ints, current_fn), bndr, new_alts)
     }
     Constr(c, args) => {
       let new_args : Array[@syntax.Expr] = []
       for a in args {
-        new_args.push(simplify_scaled_isqrt(a, const_ints))
+        new_args.push(simplify_scaled_isqrt(a, const_ints, current_fn))
       }
       Constr(c, new_args)
     }
@@ -3103,9 +3980,9 @@ fn simplify_program(prog : @syntax.Program) -> @syntax.Program {
   for b in prog.binds {
     match b {
       NonRec(n, LitInt(i)) => const_ints.push((n, i))
-      NonRec(n, LitString(_)) => const_ints.push((n, 0))
-      NonRec(n, Constr("I#" | "W#" | "W32#", [LitInt(i)])) => const_ints.push((n, i))
-      NonRec(n, App(Var("I#" | "W#" | "W32#"), LitInt(i))) => const_ints.push((n, i))
+      NonRec(n, LitChar(c)) => const_ints.push((n, c.to_int()))
+      NonRec(n, Constr(c, [LitInt(i)])) if @syntax.is_unboxed_ctor(c) => const_ints.push((n, i))
+      NonRec(n, App(Var(c), LitInt(i))) if @syntax.is_unboxed_ctor(c) => const_ints.push((n, i))
       _ => ()
     }
   }
@@ -3113,11 +3990,11 @@ fn simplify_program(prog : @syntax.Program) -> @syntax.Program {
   let new_binds : Array[@syntax.Bind] = []
   for b in prog.binds {
     match b {
-      NonRec(n, e) => new_binds.push(NonRec(n, simplify_scaled_isqrt(e, const_ints)))
+      NonRec(n, e) => new_binds.push(NonRec(n, simplify_scaled_isqrt(e, const_ints, n)))
       Rec(pairs) => {
         let new_pairs : Array[(String, @syntax.Expr)] = []
         for p in pairs {
-          new_pairs.push((p.0, simplify_scaled_isqrt(p.1, const_ints)))
+          new_pairs.push((p.0, simplify_scaled_isqrt(p.1, const_ints, p.0)))
         }
         new_binds.push(Rec(new_pairs))
       }
@@ -3129,7 +4006,7 @@ fn simplify_program(prog : @syntax.Program) -> @syntax.Program {
 fn has_64bit_indicator(prog : @syntax.Program) -> Bool {
   fn expr_has_64bit(e : @syntax.Expr) -> Bool {
     match e {
-      LitInt(i) => i == 1000000007 || i > 16777215
+      LitInt(i) => i > 16777215 && i != 1000000007
       Var("checksum" | "checksumList" | "add_mod" | "mul31_mod") => true
       App(f, a) => expr_has_64bit(f) || expr_has_64bit(a)
       Lam(_, b) => expr_has_64bit(b)
@@ -3301,7 +4178,8 @@ fn freshen_program(prog : @syntax.Program) -> @syntax.Program {
 
 ///| Lower an AST Program to HVM2 Book string
 pub fn lower_program(raw_prog : @syntax.Program) -> String {
-  let simplified_prog = simplify_program(raw_prog)
+  let cleaned_prog = @syntax.lift_program_rec(@syntax.dce_program(raw_prog))
+  let simplified_prog = simplify_program(cleaned_prog)
   let is_64 = has_64bit_indicator(simplified_prog)
   let prog = freshen_program(simplified_prog)
   let ctx = LowerCtx::new()
@@ -3322,7 +4200,7 @@ pub fn lower_program(raw_prog : @syntax.Program) -> String {
   }
 
   ctx.add_builtin_prims()
-  ctx.register_known_constructors()
+  ctx.register_program_adts(prog)
 
   // Lower all top-level bindings
   for b in prog.binds {

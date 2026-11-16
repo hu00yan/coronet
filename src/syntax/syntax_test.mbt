@@ -839,6 +839,51 @@ test "parse and link multimodule fixtures (Math_Fib, Data_ListOps, Main)" {
   assert_true(linked_from_sources.lookup("Data_ListOps_myMap") is Some(_))
 }
 
+test "multi-module linker whole-program tree shaking LTO" {
+  let s_lib =
+    #|usedHelper = \ x -> + x 1#
+    #|unusedHelper1 = \ y -> * y 2#
+    #|unusedHelper2 = \ z -> - z 3#
+    #|libFunc = \ a -> usedHelper a
+  let p_lib = @syntax.parse_program(s_lib).unwrap()
+
+  let s_app =
+    #|result = libFunc 10#
+    #|main = result
+    #|unusedAppFunc = 42#
+  let p_app = @syntax.parse_program(s_app).unwrap()
+
+  // With link_programs (no LTO), all 7 bindings remain
+  let unpruned = @syntax.link_programs([p_lib, p_app])
+  assert_eq(unpruned.binds.length(), 7)
+  assert_true(unpruned.lookup("unusedHelper1") is Some(_))
+  assert_true(unpruned.lookup("unusedAppFunc") is Some(_))
+
+  // With link_programs_lto, dead bindings are pruned, keeping only transitively reachable ones
+  let pruned = @syntax.link_programs_lto([p_lib, p_app], ["main"])
+  assert_true(pruned.lookup("main") is Some(_))
+  assert_true(pruned.lookup("result") is Some(_))
+  assert_true(pruned.lookup("libFunc") is Some(_))
+  assert_true(pruned.lookup("usedHelper") is Some(_))
+
+  // Unreferenced bindings must be pruned
+  assert_true(pruned.lookup("unusedHelper1") is None)
+  assert_true(pruned.lookup("unusedHelper2") is None)
+  assert_true(pruned.lookup("unusedAppFunc") is None)
+  assert_eq(pruned.binds.length(), 4)
+}
+
+test "prune_unreachable on library without roots preserves all" {
+  let s_lib =
+    #|f1 = \ x -> x
+    #|f2 = \ y -> y
+  let p_lib = @syntax.parse_program(s_lib).unwrap()
+  let pruned = @syntax.prune_unreachable(p_lib, [])
+  assert_eq(pruned.binds.length(), 2)
+  assert_true(pruned.lookup("f1") is Some(_))
+  assert_true(pruned.lookup("f2") is Some(_))
+}
+
 test "parse 32-bit bitwise primitives and operators" {
   let e1 = @syntax.parse_expr("and# a b").unwrap()
   assert_eq(e1, @syntax.Expr::App(@syntax.Expr::App(@syntax.Expr::Var("and#"), @syntax.Expr::Var("a")), @syntax.Expr::Var("b")))
@@ -1279,6 +1324,96 @@ test "parse tests/packages/bytestring_core.core" {
   assert_true(prog.lookup("result") is Some(_))
   assert_true(prog.lookup("main") is Some(_))
 }
+
+test "parse char pattern in case" {
+  let src =
+    #|f = \ c -> case c of {
+    #|  __DEFAULT -> 0#;
+    #|  '*' -> 1#;
+    #|  '+' -> 2#;
+    #|  '-' -> 3#
+    #|}
+  let prog = @syntax.parse_core(src).unwrap()
+  println("prog: \{prog}")
+}
+
+test "parse Level 4 GhcCompiler Core AST patterns and optimizer pipelines" {
+  let src =
+    #|lvl_s4z8
+    #|  = "tests/packages/ghc/GhcCompiler.hs:13:19-20|case"#
+    #|
+    #|lvl_s49a
+    #|  = patError lvl_s4z8
+    #|
+    #|$c_eq__a2Bs
+    #|  = \ a_a1Gn b_a1Go ->
+    #|      case dataToTagSmall# a_a1Gn of a#_a1Gp {
+    #|        __DEFAULT -> case dataToTagSmall# b_a1Go of b#_a1Gq {
+    #|        __DEFAULT -> case /=# a#_a1Gp b#_a1Gq of ds_d322 {
+    #|        __DEFAULT -> case a_a1Gn of wild_X1 {
+    #|        LitInt bx_d33r -> case b_a1Go of wild_X2 {
+    #|        LitInt bx_d33t -> tagToEnum# (==# bx_d33r bx_d33t);
+    #|        LitBool ipv_s3a1 -> case lvl_s49a of wild_48_0 {
+    #|
+    #|      }
+    #|      };
+    #|        LitBool a1_a1Gt -> case b_a1Go of wild_X2 {
+    #|        LitInt ipv_s3a3 -> case lvl_s49a of wild_48_0 {
+    #|
+    #|      };
+    #|        LitBool b1_a1Gu -> case dataToTagSmall# a1_a1Gt of a#_a3a7 {
+    #|        __DEFAULT -> case dataToTagSmall# b1_a1Gu of b#_a3a8 {
+    #|        __DEFAULT -> tagToEnum# (==# a#_a3a7 b#_a3a8)
+    #|      }
+    #|      }
+    #|      }
+    #|      };
+    #|        1# -> False
+    #|      }
+    #|      }
+    #|      }
+    #|
+    #|Rec {
+    #|$c_ne__a2vD
+    #|  = \ eta_B0 eta_B1 ->
+    #|      case $c_eq__a2Bs eta_B0 eta_B1 of wild_a33m {
+    #|        False -> True;
+    #|        True -> False
+    #|      };
+    #|$c_eq__a2yp
+    #|  = \ ds_d31I ds_d31J ->
+    #|      case ds_d31I of wild_X1E {
+    #|        CAlt a1_a1FX a2_a1FY a3_a1FZ -> case ds_d31J of wild_X1 {
+    #|        CAlt b1_a1G0 b2_a1G1 b3_a1G2 -> True
+    #|      }
+    #|      }
+    #|end Rec }
+    #|
+    #|runBenchmark
+    #|  = \ expr_s4yK ->
+    #|      case expr_s4yK of opt_a1fw {
+    #|        __DEFAULT -> 1528835#
+    #|      }
+    #|
+    #|result
+    #|  = I# 1528835#
+    #|
+    #|main = result
+  let prog = @syntax.parse_program(src).unwrap()
+  assert_true(prog.lookup("lvl_s4z8") is Some(_))
+  assert_true(prog.lookup("lvl_s49a") is Some(_))
+  assert_true(prog.lookup("$c_eq__a2Bs") is Some(_))
+  assert_true(prog.lookup("$c_ne__a2vD") is Some(_))
+  assert_true(prog.lookup("$c_eq__a2yp") is Some(_))
+  assert_true(prog.lookup("runBenchmark") is Some(_))
+  assert_true(prog.lookup("result") is Some(_))
+  assert_true(prog.lookup("main") is Some(_))
+
+  // Linker verification
+  let linked = @syntax.link_programs([prog])
+  assert_true(linked.lookup("main") is Some(_))
+}
+
 
 
 

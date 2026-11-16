@@ -6,13 +6,37 @@ import {
 }
 
 // Values
+pub fn collect_adts_from_expr(Expr, Array[AdtFamily], Array[String]) -> Unit
+
+pub fn dce_program(Program) -> Program
+
+pub fn discover_adts(Program) -> Array[AdtFamily]
+
+pub fn find_family(Array[AdtFamily], String) -> AdtFamily?
+
 pub fn get_unqualified_name(String) -> String
 
+pub fn init_default_families() -> Array[AdtFamily]
+
+pub fn is_binop(String) -> (Bool, String)
+
 pub fn is_constructor_name(String) -> Bool
+
+pub fn is_known_builtin(String) -> Bool
+
+pub fn is_known_symbol(String, Array[String], Array[AdtFamily]) -> Bool
+
+pub fn is_unboxed_ctor(String) -> Bool
+
+pub fn lift_program_rec(Program) -> Program
 
 pub fn link_core_sources(Array[String]) -> Result[Program, String]
 
 pub fn link_programs(Array[Program]) -> Program
+
+pub fn link_programs_lto(Array[Program], Array[String]) -> Program
+
+pub fn normalize_ctor_name(String) -> String
 
 pub fn parse_core(String) -> Result[Program, String]
 
@@ -20,9 +44,24 @@ pub fn parse_expr(String) -> Result[Expr, String]
 
 pub fn parse_program(String) -> Result[Program, String]
 
+pub fn prune_unreachable(Program, Array[String]) -> Program
+
+pub fn sort_ctors(Array[CtorDef]) -> Unit
+
+pub fn substitute_var(Expr, String, Expr) -> Expr
+
 // Errors
 
 // Types and methods
+#derive(Eq, @debug.Debug)
+pub(all) struct AdtFamily {
+  family_name : String
+  ctors : Array[CtorDef]
+}
+pub fn AdtFamily::equal(Self, Self) -> Bool
+pub fn AdtFamily::not_equal(Self, Self) -> Bool
+pub fn AdtFamily::to_repr(Self) -> @debug.Repr
+
 #derive(Eq, @debug.Debug)
 pub(all) struct Alt {
   pat : Pat
@@ -53,6 +92,15 @@ pub fn Bind::rec(Array[(String, Expr)]) -> Self
 pub fn Bind::to_repr(Self) -> @debug.Repr
 pub fn Bind::to_string(Self) -> String
 pub impl Show for Bind
+
+#derive(Eq, @debug.Debug)
+pub(all) struct CtorDef {
+  name : String
+  mut arity : Int32
+}
+pub fn CtorDef::equal(Self, Self) -> Bool
+pub fn CtorDef::not_equal(Self, Self) -> Bool
+pub fn CtorDef::to_repr(Self) -> @debug.Repr
 
 #derive(Eq, @debug.Debug)
 pub(all) enum Expr {

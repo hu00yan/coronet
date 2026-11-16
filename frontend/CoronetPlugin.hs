@@ -4,7 +4,9 @@ module CoronetPlugin (plugin) where
 import GHC.Plugins
 import GHC.Core
 import GHC.Core.Utils
-import Data.List (isPrefixOf, isSuffixOf, intercalate, nub)
+import GHC.Types.ForeignCall (ForeignCall(..), CCallSpec(..), CCallTarget(..))
+import GHC.Types.Id.Info (IdDetails(..))
+import Data.List (isPrefixOf, isSuffixOf, isInfixOf, intercalate, nub)
 import System.IO
 import System.Directory (doesFileExist, createDirectoryIfMissing)
 import Control.Monad.IO.Class (liftIO)
@@ -154,14 +156,35 @@ sanitizeIdent raw
           rep (c:xs)       = c : rep xs
       in rep raw
 
+extractFfiName :: CoreBndr -> Maybe String
+extractFfiName b =
+  case idDetails b of
+    FCallId (CCall (CCallSpec (StaticTarget _ fs _ _) _ _)) ->
+      Just ("ccall_" ++ unpackFS fs)
+    FCallId (CCall (CCallSpec DynamicTarget _ _)) ->
+      Just "ccall_dynamic"
+    _ ->
+      let raw = showSDocUnsafe (ppr b)
+      in if "__ffi_" `isInfixOf` raw
+         then
+           let clean = takeWhile (\c -> c /= ' ' && c /= ':' && c /= '}' && c /= '\n')
+                         (dropWhile (== ' ')
+                           (dropWhile (/= ' ')
+                             (dropWhile (/= '_') raw)))
+           in if null clean then Just "ccall_unknown" else Just ("ccall_" ++ clean)
+         else Nothing
+
 bndrName :: CoreBndr -> String
 bndrName b =
-  let name = varName b
-      occ = occNameString (getOccName b)
-      raw = if isExternalName name || occ == "main" || occ == "result"
-            then occ
-            else showSDocUnsafe (ppr b)
-  in sanitizeIdent raw
+  case extractFfiName b of
+    Just ffiName -> ffiName
+    Nothing ->
+      let name = varName b
+          occ = occNameString (getOccName b)
+          raw = if isExternalName name || occ == "main" || occ == "result"
+                then occ
+                else showSDocUnsafe (ppr b)
+      in sanitizeIdent raw
 
 qualifyTopBinder :: Module -> CoreBndr -> String
 qualifyTopBinder currentMod b =
@@ -233,6 +256,7 @@ isPrimitiveName occ =
     ]
     || isUnboxedTupleOcc occ
     || isUnboxedSumOcc occ
+    || ("ccall_" `isPrefixOf` occ)
     || ("#" `isSuffixOf` occ && not ("$" `isPrefixOf` occ))
 
 renderBind :: Module -> CoreBind -> String

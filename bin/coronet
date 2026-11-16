@@ -3,21 +3,23 @@ set -euo pipefail
 
 # Coronet: Haskell / Core to Interaction Nets (HVM2 / HVM3 / GPU / Metal / CUDA / HIP) Compiler CLI
 # Usage:
-#   coronet build [--make] <input.hs|input.core> [--target hvm2|hvm3|gpu|metal|cuda|hip] [-o <output_file>]
-#   coronet run [--make] <input.hs|input.core> [--target hvm2|hvm3|gpu|metal|cuda|hip] [--gpu|--metal|--cuda|--hip]
+#   coronet build [--make] <input.hs|input.core> [--target hvm2|hvm3|gpu|metal|cuda|hip] [-o <output_file>] [-j <threads>|--threads <threads>]
+#   coronet run [--make] <input.hs|input.core> [--target hvm2|hvm3|gpu|metal|cuda|hip] [--gpu|--metal|--cuda|--hip] [-j <threads>|--threads <threads>]
 #   coronet compile [--make] <input.hs|input.core> [--target hvm2|hvm3|gpu|metal|cuda|hip] [-o <output_file>]
 #   coronet <input.hs|input.core> [--target hvm2|hvm3|gpu|metal|cuda|hip] [-o <output_file>]
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
+DEFAULT_THREADS="$(sysctl -n hw.ncpu 2>/dev/null || nproc 2>/dev/null || echo 4)"
+
 print_usage() {
-    cat << 'EOF'
+    cat << EOF
 Coronet: Unified Haskell Core -> Interaction Nets / GPU Compiler CLI
 
 Usage:
-  coronet build [--make] <file.hs|file.core> [--target <backend>] [-o <output_file>]
-  coronet run [--make] <file.hs|file.core> [--target <backend>] [--gpu|--metal|--cuda|--hip]
+  coronet build [--make] <file.hs|file.core> [--target <backend>] [-o <output_file>] [-j <threads>]
+  coronet run [--make] <file.hs|file.core> [--target <backend>] [--gpu|--metal|--cuda|--hip] [-j <threads>]
   coronet compile [--make] <file.hs|file.core> [--target <backend>] [-o <output_file>]
   coronet <file.hs|file.core> [--target <backend>] [-o <output_file>]
 
@@ -29,6 +31,7 @@ Commands:
 
 Options:
   --make                Enable GHC-compatible multi-module dependency compilation
+  -j, --threads <N>     Execution threads / CPU cores (default: auto-detected, currently: $DEFAULT_THREADS)
   --target <backend>    Target backend:
                           hvm2  (Interaction Nets CPU, default)
                           hvm3  (Interaction Calculus CPU)
@@ -40,6 +43,8 @@ Options:
   --metal               Shortcut for --target metal
   --cuda                Shortcut for --target cuda
   --hip                 Shortcut for --target hip
+  --linker <name>       Select native binary linker: mold, lld, gold, system (default: auto)
+  --lto / --no-lto      Enable/disable whole-program tree shaking LTO (default: enabled)
   -o, --output <file>   Output file for compilation
 EOF
 }
@@ -77,11 +82,26 @@ INPUT_FILE=""
 TARGET="hvm2"
 OUTPUT_FILE=""
 MAKE_MODE=false
+USER_LINKER=""
+LTO_MODE=true
+THREADS="$DEFAULT_THREADS"
 
 while [ $# -gt 0 ]; do
     case "$1" in
         --make)
             MAKE_MODE=true
+            shift
+            ;;
+        -j|--threads)
+            THREADS="$2"
+            shift 2
+            ;;
+        -j=*|--threads=*)
+            THREADS="${1#*=}"
+            shift
+            ;;
+        -j[0-9]*)
+            THREADS="${1#-j}"
             shift
             ;;
         --target)
@@ -106,6 +126,22 @@ while [ $# -gt 0 ]; do
             ;;
         --hip)
             TARGET="hip"
+            shift
+            ;;
+        --linker)
+            USER_LINKER="$2"
+            shift 2
+            ;;
+        --linker=*)
+            USER_LINKER="${1#--linker=}"
+            shift
+            ;;
+        --lto)
+            LTO_MODE=true
+            shift
+            ;;
+        --no-lto)
+            LTO_MODE=false
             shift
             ;;
         -o|--output)
@@ -310,14 +346,63 @@ if [ "$MODE" = "compile" ] && [ -n "$OUTPUT_FILE" ]; then
 fi
 
 # Step 3: Run MoonBit compiler driver (link & lower Core to target representation)
+LTO_FLAG="--lto"
+if [ "$LTO_MODE" = false ]; then
+    LTO_FLAG="--no-lto"
+fi
+
 (
     cd "$REPO_ROOT"
-    moon run cmd/main -- "${CORE_FILES[@]}" --target "$TARGET" -o "$COMPILED_OUT" >/dev/null
+    moon run cmd/main -- "${CORE_FILES[@]}" --target "$TARGET" "$LTO_FLAG" -o "$COMPILED_OUT" >/dev/null
 )
+
+# Linker auto-discovery and resolution
+# Hierarchy: mold (fastest in the world) > lld (LLVM) > Apple ld-prime / system ld
+LINKER_FLAGS=()
+LINKER_NAME=""
+REQ_LINKER="${USER_LINKER:-${CORONET_LINKER:-auto}}"
+
+if [ "$REQ_LINKER" = "mold" ] || { [ "$REQ_LINKER" = "auto" ] && command -v mold >/dev/null 2>&1; }; then
+    LINKER_FLAGS+=("-fuse-ld=mold")
+    LINKER_NAME="mold (fastest ELF linker)"
+elif [ "$REQ_LINKER" = "lld" ] || { [ "$REQ_LINKER" = "auto" ] && command -v lld >/dev/null 2>&1; }; then
+    LINKER_FLAGS+=("-fuse-ld=lld")
+    LINKER_NAME="lld (LLVM high-performance linker)"
+elif [ "$REQ_LINKER" = "gold" ] || { [ "$REQ_LINKER" = "auto" ] && command -v ld.gold >/dev/null 2>&1; }; then
+    LINKER_FLAGS+=("-fuse-ld=gold")
+    LINKER_NAME="gold (GNU ELF linker)"
+elif [[ "$OSTYPE" == "darwin"* ]]; then
+    LINKER_NAME="Apple ld-prime (Mach-O multithreaded linker)"
+else
+    LINKER_NAME="system ld"
+fi
+
+# Link-time dead code stripping
+if [[ "$OSTYPE" == "darwin"* ]]; then
+    LINKER_FLAGS+=("-Wl,-dead_strip")
+else
+    LINKER_FLAGS+=("-Wl,--gc-sections")
+fi
+
+# Multi-core thread configuration
+calc_tpc_l2() {
+    local t="$1"
+    if [ "$t" -ge 64 ]; then echo 6
+    elif [ "$t" -ge 32 ]; then echo 5
+    elif [ "$t" -ge 16 ]; then echo 4
+    elif [ "$t" -ge 8 ]; then echo 3
+    elif [ "$t" -ge 4 ]; then echo 2
+    elif [ "$t" -ge 2 ]; then echo 1
+    else echo 0
+    fi
+}
+TPC_L2="$(calc_tpc_l2 "$THREADS")"
 
 # Step 4: Native Build or Execution
 if [ "$MODE" = "build" ]; then
     FINAL_BIN="${OUTPUT_FILE:-a.out}"
+    echo "--> Linker: using $LINKER_NAME (flags: ${LINKER_FLAGS[*]})"
+    echo "--> Concurrency: $THREADS CPU threads (TPC_L2=$TPC_L2)"
     case "$TARGET" in
         metal)
             echo "--> Compiling standalone native Metal GPU executable: $FINAL_BIN"
@@ -331,16 +416,80 @@ if [ "$MODE" = "build" ]; then
                 -framework Metal \
                 -framework Foundation \
                 -DDEFAULT_WORKLOAD="\"$WORKLOAD\"" \
+                ${LINKER_FLAGS[@]+"${LINKER_FLAGS[@]}"} \
                 "$REPO_ROOT/runtime/metal/coronet_metal.m" \
                 -o "$FINAL_BIN"
             echo "Successfully built '$FINAL_BIN' (Metal GPU native binary)"
             ;;
         hvm2)
             if [ -x "$HVM2_BIN" ]; then
-                echo "--> Compiling standalone native C executable: $FINAL_BIN"
-                "$HVM2_BIN" gen-c "$COMPILED_OUT" > "$TMP_DIR/gen.c"
-                clang -O3 -pthread "$TMP_DIR/gen.c" -o "$FINAL_BIN"
-                echo "Successfully built '$FINAL_BIN' (HVM2 native C binary)"
+                echo "--> Compiling standalone native HVM2 executable: $FINAL_BIN ($THREADS threads, TPC_L2=$TPC_L2)"
+                GEN_C_SUCCESS=false
+                if "$HVM2_BIN" gen-c "$COMPILED_OUT" > "$TMP_DIR/gen.c" 2>/dev/null && [ -s "$TMP_DIR/gen.c" ]; then
+                    if clang -O3 -pthread -DTPC_L2="$TPC_L2" "$TMP_DIR/gen.c" ${LINKER_FLAGS[@]+"${LINKER_FLAGS[@]}"} -o "$FINAL_BIN" >/dev/null 2>&1; then
+                        GEN_C_SUCCESS=true
+                        echo "Successfully built '$FINAL_BIN' (HVM2 native C binary with $THREADS threads, TPC_L2=$TPC_L2)"
+                    fi
+                fi
+                if [ "$GEN_C_SUCCESS" = false ]; then
+                    HVM2_STUB="$TMP_DIR/hvm2_stub.c"
+                    python3 -c "
+import sys
+content = open('$COMPILED_OUT', 'rb').read()
+with open('$HVM2_STUB', 'w') as f:
+    f.write('''#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <sys/wait.h>
+''')
+    f.write('static const unsigned char hvm_data[] = {' + ','.join(str(b) for b in content) + ',0};\n')
+    f.write('''int main(int argc, char* argv[]) {
+    char tmppath[] = \"/tmp/coronet_hvm2_XXXXXX\";
+    int fd = mkstemp(tmppath);
+    if (fd < 0) return 1;
+    write(fd, hvm_data, sizeof(hvm_data) - 1);
+    close(fd);
+    int pfd[2];
+    if (pipe(pfd) < 0) return 1;
+    pid_t pid = fork();
+    if (pid == 0) {
+        close(pfd[0]);
+        dup2(pfd[1], STDOUT_FILENO);
+        close(pfd[1]);
+        char* args[32];
+        int idx = 0;
+        args[idx++] = (char*)\"''' + '$HVM2_BIN' + '''\";
+        args[idx++] = \"run\";
+        args[idx++] = tmppath;
+        for (int i = 1; i < argc && idx < 30; i++) {
+            args[idx++] = argv[i];
+        }
+        args[idx] = NULL;
+        execv(\"''' + '$HVM2_BIN' + '''\", args);
+        _exit(1);
+    }
+    close(pfd[1]);
+    FILE* stream = fdopen(pfd[0], \"r\");
+    char line[1024];
+    while (fgets(line, sizeof(line), stream)) {
+        unsigned long long hi, lo;
+        if (sscanf(line, \"Result: (%llu %llu)\", &hi, &lo) == 2) {
+            printf(\"Result: %llu\\\\n\", (hi << 24) + lo);
+        } else {
+            fputs(line, stdout);
+        }
+    }
+    fclose(stream);
+    int status;
+    waitpid(pid, &status, 0);
+    unlink(tmppath);
+    return WEXITSTATUS(status);
+}
+''')
+"
+                    clang -O3 "$HVM2_STUB" ${LINKER_FLAGS[@]+"${LINKER_FLAGS[@]}"} -o "$FINAL_BIN"
+                    echo "Successfully built '$FINAL_BIN' (HVM2 native binary)"
+                fi
             else
                 cp "$COMPILED_OUT" "$FINAL_BIN"
                 echo "Compiled HVM2 net to '$FINAL_BIN'"
@@ -348,7 +497,7 @@ if [ "$MODE" = "build" ]; then
             ;;
         hvm3)
             if [ -x "$HVM3_BIN" ]; then
-                echo "--> Compiling standalone native HVM3 executable: $FINAL_BIN"
+                echo "--> Compiling standalone native HVM3 executable: $FINAL_BIN ($THREADS RTS threads)"
                 HVM3_STUB="$TMP_DIR/hvm3_stub.c"
                 python3 -c "
 import sys
@@ -365,6 +514,9 @@ with open('$HVM3_STUB', 'w') as f:
     char* args[32];
     int idx = 0;
     args[idx++] = (char*)\"''' + '$HVM3_BIN' + '''\";
+    args[idx++] = \"+RTS\";
+    args[idx++] = \"-N''' + '$THREADS' + '''\";
+    args[idx++] = \"-RTS\";
     args[idx++] = \"run\";
     args[idx++] = tmppath;
     args[idx++] = \"-c\";
@@ -379,8 +531,8 @@ with open('$HVM3_STUB', 'w') as f:
 }
 ''')
 "
-                clang -O3 "$HVM3_STUB" -o "$FINAL_BIN"
-                echo "Successfully built '$FINAL_BIN' (HVM3 native binary)"
+                clang -O3 "$HVM3_STUB" ${LINKER_FLAGS[@]+"${LINKER_FLAGS[@]}"} -o "$FINAL_BIN"
+                echo "Successfully built '$FINAL_BIN' (HVM3 native binary with $THREADS RTS threads)"
             else
                 cp "$COMPILED_OUT" "$FINAL_BIN"
                 echo "Compiled HVM3 net to '$FINAL_BIN'"
@@ -425,13 +577,19 @@ elif [ "$SHOULD_RUN" = true ]; then
                 -framework Metal \
                 -framework Foundation \
                 -DDEFAULT_WORKLOAD="\"$WORKLOAD\"" \
+                ${LINKER_FLAGS[@]+"${LINKER_FLAGS[@]}"} \
                 "$REPO_ROOT/runtime/metal/coronet_metal.m" \
                 -o "$STANDALONE_METAL"
             exec "$STANDALONE_METAL" --workload "$WORKLOAD" "$@"
             ;;
         hvm2)
             if [ -x "$HVM2_BIN" ]; then
-                "$HVM2_BIN" run "$COMPILED_OUT" "$@" | python3 -c '
+                RUN_C_SUCCESS=false
+                if "$HVM2_BIN" gen-c "$COMPILED_OUT" > "$TMP_DIR/gen.c" 2>/dev/null && [ -s "$TMP_DIR/gen.c" ]; then
+                    FAST_RUNNER="$TMP_DIR/hvm2_fast_runner"
+                    if clang -O3 -pthread -DTPC_L2="$TPC_L2" "$TMP_DIR/gen.c" ${LINKER_FLAGS[@]+"${LINKER_FLAGS[@]}"} -o "$FAST_RUNNER" >/dev/null 2>&1; then
+                        RUN_C_SUCCESS=true
+                        "$FAST_RUNNER" "$@" | python3 -c '
 import sys, re
 for line in sys.stdin:
     m = re.match(r"^Result: \((\d+) (\d+)\)$", line)
@@ -441,6 +599,20 @@ for line in sys.stdin:
     else:
         print(line, end="")
 '
+                    fi
+                fi
+                if [ "$RUN_C_SUCCESS" = false ]; then
+                    "$HVM2_BIN" run "$COMPILED_OUT" "$@" | python3 -c '
+import sys, re
+for line in sys.stdin:
+    m = re.match(r"^Result: \((\d+) (\d+)\)$", line)
+    if m:
+        hi, lo = int(m.group(1)), int(m.group(2))
+        print(f"Result: {(hi << 24) + lo}")
+    else:
+        print(line, end="")
+'
+                fi
             else
                 echo "Error: HVM2 executable not found." >&2
                 exit 1
@@ -448,7 +620,7 @@ for line in sys.stdin:
             ;;
         hvm3)
             if [ -x "$HVM3_BIN" ]; then
-                "$HVM3_BIN" run "$COMPILED_OUT" -c -C "$@"
+                "$HVM3_BIN" +RTS -N"$THREADS" -RTS run "$COMPILED_OUT" -c -C "$@"
             else
                 echo "Error: HVM3 executable not found." >&2
                 exit 1

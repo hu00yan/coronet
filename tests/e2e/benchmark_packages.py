@@ -35,6 +35,20 @@ BENCHMARKS = [
         "expected": "10570",
         "description": "Hackage Data.Map Size-Balanced BST with rotations, balanceL/R, and key lookups",
     },
+    {
+        "name": "vector_core",
+        "hs": PACKAGES_DIR / "vector_core.hs",
+        "core": PACKAGES_DIR / "vector_core.hs",
+        "expected": "5381447",
+        "description": "Hackage Data.Vector Unboxed Stream Fusion, loop unrolling & dot product",
+    },
+    {
+        "name": "ffi_core",
+        "hs": PACKAGES_DIR / "ffi_core.hs",
+        "core": PACKAGES_DIR / "ffi_core.hs",
+        "expected": "30427",
+        "description": "C-FFI & Foreign Function Interface (strlen, memcpy, memcmp)",
+    },
 ]
 
 

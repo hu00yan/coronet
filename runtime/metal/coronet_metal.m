@@ -1,6 +1,6 @@
 // runtime/metal/coronet_metal.m
-// Native Apple Silicon Metal GPU Runtime for Interaction Calculus (Coronet)
-// Zero-script standalone executable: embeds MSL shaders and executes with Zero-Copy Unified Memory.
+// Native Apple Silicon Metal GPU Runtime for Interaction Calculus & Vector Reductions
+// Zero-Script Standalone Executable: SIMD-group aggregated UMA engine supporting Raytracer & Vector dot products.
 
 #import <Foundation/Foundation.h>
 #import <Metal/Metal.h>
@@ -70,12 +70,13 @@ typedef struct {
     Term snd;
 } RedexPair;
 
-#define DEFAULT_HEAP_WORDS (16 * 1024 * 1024) // 16M words = 64 MB VRAM
-#define DEFAULT_RBAG_CAP   (1 * 1024 * 1024)  // 1M redex pairs = 8 MB
+#define DEFAULT_HEAP_WORDS (32 * 1024 * 1024) // 32M words = 128 MB VRAM
+#define DEFAULT_RBAG_CAP   (2 * 1024 * 1024)  // 2M redex pairs = 16 MB
 
 // Embedded MSL Compute Shader Source for 100% standalone binary generation
 static NSString* const EMBEDDED_MSL_SHADER = @""
 "#include <metal_stdlib>\n"
+"#include <metal_simdgroup>\n"
 "using namespace metal;\n"
 "\n"
 "#define TAG_MASK   (0x7FU)\n"
@@ -151,120 +152,161 @@ static NSString* const EMBEDDED_MSL_SHADER = @""
 "    uint                      lid         [[thread_position_in_threadgroup]],\n"
 "    uint                      simd_lane   [[thread_index_in_simdgroup]]\n"
 ") {\n"
-"    if (gid >= in_count) return;\n"
-"    RedexPair pair = rbag_in[gid];\n"
-"    Term a = pair.fst;\n"
-"    Term b = pair.snd;\n"
-"    Tag tag_a = metal_tag(a);\n"
-"    Tag tag_b = metal_tag(b);\n"
-"    if (tag_a > tag_b) {\n"
-"        Term tmp_t = a; a = b; b = tmp_t;\n"
-"        Tag tmp_g = tag_a; tag_a = tag_b; tag_b = tmp_g;\n"
-"    }\n"
+"    bool has_work = (gid < in_count);\n"
+"    RedexPair out_pair = {0, 0};\n"
+"    uint has_out = 0;\n"
 "    uint local_itrs = 0;\n"
-"    if (tag_a == TAG_APP && tag_b == TAG_LAM) {\n"
-"        Loc app_loc = metal_loc(a);\n"
-"        Loc lam_loc = metal_loc(b);\n"
-"        Term bod = atomic_load_explicit(&heap[lam_loc + 0], memory_order_relaxed);\n"
-"        Term arg = atomic_load_explicit(&heap[app_loc + 1], memory_order_relaxed);\n"
-"        atomic_store_explicit(&heap[lam_loc + 0], metal_set_sub(arg), memory_order_relaxed);\n"
-"        local_itrs++;\n"
-"        uint slot = atomic_fetch_add_explicit(out_count, 1, memory_order_relaxed);\n"
-"        rbag_out[slot] = RedexPair{ bod, metal_term_new(TAG_VAR, 0, lam_loc + 0) };\n"
-"    }\n"
-"    else if (tag_a == TAG_OPX && tag_b == TAG_W32) {\n"
-"        Loc opx_loc = metal_loc(a);\n"
-"        Lab op = metal_lab(a);\n"
-"        atomic_store_explicit(&heap[opx_loc + 1], b, memory_order_relaxed);\n"
-"        local_itrs++;\n"
-"        uint slot = atomic_fetch_add_explicit(out_count, 1, memory_order_relaxed);\n"
-"        rbag_out[slot] = RedexPair{ metal_term_new(TAG_OPY, op, opx_loc), atomic_load_explicit(&heap[opx_loc + 0], memory_order_relaxed) };\n"
-"    }\n"
-"    else if (tag_a == TAG_OPY && tag_b == TAG_W32) {\n"
-"        Loc opy_loc = metal_loc(a);\n"
-"        Lab op = metal_lab(a);\n"
-"        Term x_term = atomic_load_explicit(&heap[opy_loc + 1], memory_order_relaxed);\n"
-"        uint x = (uint)metal_loc(x_term);\n"
-"        uint y = (uint)metal_loc(b);\n"
-"        uint res = 0;\n"
-"        switch (op) {\n"
-"            case OP_ADD: res = x + y; break;\n"
-"            case OP_SUB: res = x - y; break;\n"
-"            case OP_MUL: res = x * y; break;\n"
-"            case OP_DIV: res = (y != 0) ? (x / y) : 0; break;\n"
-"            case OP_MOD: res = (y != 0) ? (x % y) : 0; break;\n"
-"            case OP_EQ:  res = (x == y) ? 1 : 0; break;\n"
-"            case OP_NE:  res = (x != y) ? 1 : 0; break;\n"
-"            case OP_LT:  res = (x < y) ? 1 : 0; break;\n"
-"            case OP_GT:  res = (x > y) ? 1 : 0; break;\n"
-"            case OP_AND: res = x & y; break;\n"
-"            case OP_OR:  res = x | y; break;\n"
-"            case OP_XOR: res = x ^ y; break;\n"
-"            case OP_SHL: res = x << (y & 15); break;\n"
-"            case OP_SHR: res = x >> (y & 15); break;\n"
-"            default: res = 0; break;\n"
+"    if (has_work) {\n"
+"        RedexPair pair = rbag_in[gid];\n"
+"        Term a = pair.fst;\n"
+"        Term b = pair.snd;\n"
+"        Tag tag_a = metal_tag(a);\n"
+"        Tag tag_b = metal_tag(b);\n"
+"        if (tag_a > tag_b) {\n"
+"            Term tmp_t = a; a = b; b = tmp_t;\n"
+"            Tag tmp_g = tag_a; tag_a = tag_b; tag_b = tmp_g;\n"
 "        }\n"
-"        atomic_store_explicit(&heap[opy_loc], metal_set_sub(metal_term_new(TAG_W32, 0, (Loc)(res & 0xFFFF))), memory_order_relaxed);\n"
-"        local_itrs++;\n"
-"    }\n"
-"    else if ((tag_a == TAG_DP0 || tag_a == TAG_DP1) && tag_b == TAG_SUP) {\n"
-"        Lab dup_lab = metal_lab(a);\n"
-"        Lab sup_lab = metal_lab(b);\n"
-"        Loc dup_loc = metal_loc(a);\n"
-"        Loc sup_loc = metal_loc(b);\n"
-"        if (dup_lab == sup_lab) {\n"
-"            Term tm0 = atomic_load_explicit(&heap[sup_loc + 0], memory_order_relaxed);\n"
-"            Term tm1 = atomic_load_explicit(&heap[sup_loc + 1], memory_order_relaxed);\n"
-"            if (tag_a == TAG_DP0) {\n"
-"                atomic_store_explicit(&heap[dup_loc], metal_set_sub(tm1), memory_order_relaxed);\n"
-"                uint slot = atomic_fetch_add_explicit(out_count, 1, memory_order_relaxed);\n"
-"                rbag_out[slot] = RedexPair{ tm0, metal_term_new(TAG_VAR, 0, dup_loc) };\n"
-"            } else {\n"
-"                atomic_store_explicit(&heap[dup_loc], metal_set_sub(tm0), memory_order_relaxed);\n"
-"                uint slot = atomic_fetch_add_explicit(out_count, 1, memory_order_relaxed);\n"
-"                rbag_out[slot] = RedexPair{ tm1, metal_term_new(TAG_VAR, 0, dup_loc) };\n"
+"        if (tag_a == TAG_APP && tag_b == TAG_LAM) {\n"
+"            Loc app_loc = metal_loc(a);\n"
+"            Loc lam_loc = metal_loc(b);\n"
+"            Term bod = atomic_load_explicit(&heap[lam_loc + 0], memory_order_relaxed);\n"
+"            Term arg = atomic_load_explicit(&heap[app_loc + 1], memory_order_relaxed);\n"
+"            atomic_store_explicit(&heap[lam_loc + 0], metal_set_sub(arg), memory_order_relaxed);\n"
+"            local_itrs++;\n"
+"            out_pair = RedexPair{ bod, metal_term_new(TAG_VAR, 0, lam_loc + 0) };\n"
+"            has_out = 1;\n"
+"        }\n"
+"        else if (tag_a == TAG_OPX && tag_b == TAG_W32) {\n"
+"            Loc opx_loc = metal_loc(a);\n"
+"            Lab op = metal_lab(a);\n"
+"            atomic_store_explicit(&heap[opx_loc + 1], b, memory_order_relaxed);\n"
+"            local_itrs++;\n"
+"            out_pair = RedexPair{ metal_term_new(TAG_OPY, op, opx_loc), atomic_load_explicit(&heap[opx_loc + 0], memory_order_relaxed) };\n"
+"            has_out = 1;\n"
+"        }\n"
+"        else if (tag_a == TAG_OPY && tag_b == TAG_W32) {\n"
+"            Loc opy_loc = metal_loc(a);\n"
+"            Lab op = metal_lab(a);\n"
+"            Term x_term = atomic_load_explicit(&heap[opy_loc + 1], memory_order_relaxed);\n"
+"            uint x = (uint)metal_loc(x_term);\n"
+"            uint y = (uint)metal_loc(b);\n"
+"            uint res = 0;\n"
+"            switch (op) {\n"
+"                case OP_ADD: res = x + y; break;\n"
+"                case OP_SUB: res = x - y; break;\n"
+"                case OP_MUL: res = x * y; break;\n"
+"                case OP_DIV: res = (y != 0) ? (x / y) : 0; break;\n"
+"                case OP_MOD: res = (y != 0) ? (x % y) : 0; break;\n"
+"                case OP_EQ:  res = (x == y) ? 1 : 0; break;\n"
+"                case OP_NE:  res = (x != y) ? 1 : 0; break;\n"
+"                case OP_LT:  res = (x < y) ? 1 : 0; break;\n"
+"                case OP_GT:  res = (x > y) ? 1 : 0; break;\n"
+"                case OP_AND: res = x & y; break;\n"
+"                case OP_OR:  res = x | y; break;\n"
+"                case OP_XOR: res = x ^ y; break;\n"
+"                case OP_SHL: res = x << (y & 15); break;\n"
+"                case OP_SHR: res = x >> (y & 15); break;\n"
+"                default: res = 0; break;\n"
 "            }\n"
+"            atomic_store_explicit(&heap[opy_loc], metal_set_sub(metal_term_new(TAG_W32, 0, (Loc)(res & 0xFFFF))), memory_order_relaxed);\n"
 "            local_itrs++;\n"
 "        }\n"
-"    }\n"
-"    else if (tag_a == TAG_SWI && tag_b == TAG_W32) {\n"
-"        Loc swi_loc = metal_loc(a);\n"
-"        uint cond = (uint)metal_loc(b);\n"
-"        Term zero_br = atomic_load_explicit(&heap[swi_loc + 0], memory_order_relaxed);\n"
-"        Term succ_br = atomic_load_explicit(&heap[swi_loc + 1], memory_order_relaxed);\n"
-"        local_itrs++;\n"
-"        if (cond == 0) {\n"
-"            uint slot = atomic_fetch_add_explicit(out_count, 1, memory_order_relaxed);\n"
-"            rbag_out[slot] = RedexPair{ zero_br, metal_term_new(TAG_VAR, 0, swi_loc) };\n"
-"        } else {\n"
-"            uint new_nodes = atomic_fetch_add_explicit(alloc_head, 2, memory_order_relaxed);\n"
-"            atomic_store_explicit(&heap[new_nodes + 0], succ_br, memory_order_relaxed);\n"
-"            atomic_store_explicit(&heap[new_nodes + 1], metal_term_new(TAG_W32, 0, (Loc)(cond - 1)), memory_order_relaxed);\n"
-"            uint slot = atomic_fetch_add_explicit(out_count, 1, memory_order_relaxed);\n"
-"            rbag_out[slot] = RedexPair{ metal_term_new(TAG_APP, 0, (Loc)new_nodes), metal_term_new(TAG_VAR, 0, swi_loc) };\n"
+"        else if ((tag_a == TAG_DP0 || tag_a == TAG_DP1) && tag_b == TAG_SUP) {\n"
+"            Lab dup_lab = metal_lab(a);\n"
+"            Lab sup_lab = metal_lab(b);\n"
+"            Loc dup_loc = metal_loc(a);\n"
+"            Loc sup_loc = metal_loc(b);\n"
+"            if (dup_lab == sup_lab) {\n"
+"                Term tm0 = atomic_load_explicit(&heap[sup_loc + 0], memory_order_relaxed);\n"
+"                Term tm1 = atomic_load_explicit(&heap[sup_loc + 1], memory_order_relaxed);\n"
+"                if (tag_a == TAG_DP0) {\n"
+"                    atomic_store_explicit(&heap[dup_loc], metal_set_sub(tm1), memory_order_relaxed);\n"
+"                    out_pair = RedexPair{ tm0, metal_term_new(TAG_VAR, 0, dup_loc) };\n"
+"                } else {\n"
+"                    atomic_store_explicit(&heap[dup_loc], metal_set_sub(tm0), memory_order_relaxed);\n"
+"                    out_pair = RedexPair{ tm1, metal_term_new(TAG_VAR, 0, dup_loc) };\n"
+"                }\n"
+"                local_itrs++;\n"
+"                has_out = 1;\n"
+"            }\n"
 "        }\n"
-"    }\n"
-"    else if (tag_a == TAG_VAR) {\n"
-"        Loc var_loc = metal_loc(a);\n"
-"        Term subst = atomic_load_explicit(&heap[var_loc], memory_order_relaxed);\n"
-"        if (metal_sub(subst)) {\n"
+"        else if (tag_a == TAG_SWI && tag_b == TAG_W32) {\n"
+"            Loc swi_loc = metal_loc(a);\n"
+"            uint cond = (uint)metal_loc(b);\n"
+"            Term zero_br = atomic_load_explicit(&heap[swi_loc + 0], memory_order_relaxed);\n"
+"            Term succ_br = atomic_load_explicit(&heap[swi_loc + 1], memory_order_relaxed);\n"
 "            local_itrs++;\n"
-"            uint slot = atomic_fetch_add_explicit(out_count, 1, memory_order_relaxed);\n"
-"            rbag_out[slot] = RedexPair{ metal_rem_sub(subst), b };\n"
-"        } else {\n"
-"            uint slot = atomic_fetch_add_explicit(out_count, 1, memory_order_relaxed);\n"
-"            rbag_out[slot] = RedexPair{ a, b };\n"
+"            if (cond == 0) {\n"
+"                out_pair = RedexPair{ zero_br, metal_term_new(TAG_VAR, 0, swi_loc) };\n"
+"                has_out = 1;\n"
+"            } else {\n"
+"                uint new_nodes = atomic_fetch_add_explicit(alloc_head, 2, memory_order_relaxed);\n"
+"                atomic_store_explicit(&heap[new_nodes + 0], succ_br, memory_order_relaxed);\n"
+"                atomic_store_explicit(&heap[new_nodes + 1], metal_term_new(TAG_W32, 0, (Loc)(cond - 1)), memory_order_relaxed);\n"
+"                out_pair = RedexPair{ metal_term_new(TAG_APP, 0, (Loc)new_nodes), metal_term_new(TAG_VAR, 0, swi_loc) };\n"
+"                has_out = 1;\n"
+"            }\n"
+"        }\n"
+"        else if (tag_a == TAG_VAR) {\n"
+"            Loc var_loc = metal_loc(a);\n"
+"            Term subst = atomic_load_explicit(&heap[var_loc], memory_order_relaxed);\n"
+"            if (metal_sub(subst)) {\n"
+"                local_itrs++;\n"
+"                out_pair = RedexPair{ metal_rem_sub(subst), b };\n"
+"                has_out = 1;\n"
+"            } else {\n"
+"                out_pair = RedexPair{ a, b };\n"
+"                has_out = 1;\n"
+"            }\n"
 "        }\n"
 "    }\n"
-"    if (local_itrs > 0) {\n"
-"        atomic_fetch_add_explicit(itrs, local_itrs, memory_order_relaxed);\n"
+"    uint lane_offset = simd_prefix_exclusive_sum(has_out);\n"
+"    uint warp_total_out = simd_sum(has_out);\n"
+"    uint warp_base_slot = 0;\n"
+"    if (simd_lane == 0 && warp_total_out > 0) {\n"
+"        warp_base_slot = atomic_fetch_add_explicit(out_count, warp_total_out, memory_order_relaxed);\n"
+"    }\n"
+"    warp_base_slot = simd_broadcast(warp_base_slot, 0);\n"
+"    if (has_out) {\n"
+"        rbag_out[warp_base_slot + lane_offset] = out_pair;\n"
+"    }\n"
+"    uint warp_itrs = simd_sum(local_itrs);\n"
+"    if (simd_lane == 0 && warp_itrs > 0) {\n"
+"        atomic_fetch_add_explicit(itrs, warp_itrs, memory_order_relaxed);\n"
+"    }\n"
+"}\n"
+"\n"
+"kernel void coronet_metal_vector_dot(\n"
+"    device const uint*        vec_u       [[buffer(0)]],\n"
+"    device const uint*        vec_v       [[buffer(1)]],\n"
+"    device atomic_uint*       acc_result  [[buffer(2)]],\n"
+"    device atomic_uint*       total_itrs  [[buffer(3)]],\n"
+"    constant uint&            length      [[buffer(4)]],\n"
+"    uint                      gid         [[thread_position_in_grid]],\n"
+"    uint                      lid         [[thread_position_in_threadgroup]],\n"
+"    uint                      simd_lane   [[thread_index_in_simdgroup]]\n"
+") {\n"
+"    uint prod = 0;\n"
+"    if (gid < length) {\n"
+"        prod = vec_u[gid] * vec_v[gid];\n"
+"    }\n"
+"    uint warp_sum = simd_sum(prod);\n"
+"    uint warp_ops = simd_sum(gid < length ? 2 : 0);\n"
+"    if (simd_lane == 0) {\n"
+"        if (warp_sum > 0) {\n"
+"            atomic_fetch_add_explicit(acc_result, warp_sum, memory_order_relaxed);\n"
+"        }\n"
+"        if (warp_ops > 0) {\n"
+"            atomic_fetch_add_explicit(total_itrs, warp_ops, memory_order_relaxed);\n"
+"        }\n"
 "    }\n"
 "}\n";
 
 typedef struct {
     id<MTLDevice> device;
     id<MTLCommandQueue> queue;
-    id<MTLComputePipelineState> pipeline;
+    id<MTLComputePipelineState> reducePipeline;
+    id<MTLComputePipelineState> vectorPipeline;
     id<MTLBuffer> heapBuf;
     id<MTLBuffer> rbagA;
     id<MTLBuffer> rbagB;
@@ -298,7 +340,6 @@ static MetalRuntime* init_metal_runtime(const char* metal_source_path) {
         sourceStr = [NSString stringWithContentsOfFile:path encoding:NSUTF8StringEncoding error:&error];
     }
 
-    // Default to embedded MSL shader if no external shader file provided
     if (!sourceStr) {
         sourceStr = EMBEDDED_MSL_SHADER;
     }
@@ -310,18 +351,15 @@ static MetalRuntime* init_metal_runtime(const char* metal_source_path) {
         exit(1);
     }
 
-    id<MTLFunction> kernelFunc = [library newFunctionWithName:@"coronet_metal_reduce_step"];
-    if (!kernelFunc) {
-        fprintf(stderr, "Error: Kernel 'coronet_metal_reduce_step' not found in library.\n");
+    id<MTLFunction> reduceFunc = [library newFunctionWithName:@"coronet_metal_reduce_step"];
+    id<MTLFunction> vectorFunc = [library newFunctionWithName:@"coronet_metal_vector_dot"];
+    if (!reduceFunc || !vectorFunc) {
+        fprintf(stderr, "Error: Metal kernel functions not found.\n");
         exit(1);
     }
 
-    rt->pipeline = [rt->device newComputePipelineStateWithFunction:kernelFunc error:&error];
-    if (!rt->pipeline) {
-        fprintf(stderr, "Error: Failed to create compute pipeline state: %s\n",
-                [[error localizedDescription] UTF8String]);
-        exit(1);
-    }
+    rt->reducePipeline = [rt->device newComputePipelineStateWithFunction:reduceFunc error:&error];
+    rt->vectorPipeline = [rt->device newComputePipelineStateWithFunction:vectorFunc error:&error];
 
     // Allocate Zero-Copy Unified Memory buffers (MTLResourceStorageModeShared)
     rt->heapBuf = [rt->device newBufferWithLength:(DEFAULT_HEAP_WORDS * sizeof(uint32_t))
@@ -409,6 +447,76 @@ static void setup_raytracer_scale_benchmark(MetalRuntime* rt, uint32_t resolutio
     *(uint32_t*)[rt->allocHeadBuf contents] = head;
 }
 
+static void run_vector_benchmark(MetalRuntime* rt, uint32_t length, bool json_out) {
+    // Zero-Copy UMA Vector inner product
+    id<MTLBuffer> bufU = [rt->device newBufferWithLength:(length * sizeof(uint32_t)) options:MTLResourceStorageModeShared];
+    id<MTLBuffer> bufV = [rt->device newBufferWithLength:(length * sizeof(uint32_t)) options:MTLResourceStorageModeShared];
+    id<MTLBuffer> bufRes = [rt->device newBufferWithLength:sizeof(uint32_t) options:MTLResourceStorageModeShared];
+    id<MTLBuffer> bufOps = [rt->device newBufferWithLength:sizeof(uint32_t) options:MTLResourceStorageModeShared];
+
+    uint32_t* u = (uint32_t*)[bufU contents];
+    uint32_t* v = (uint32_t*)[bufV contents];
+    for (uint32_t i = 0; i < length; i++) {
+        u[i] = (i % 100) + 1;
+        v[i] = ((i * 7) % 100) + 1;
+    }
+    *(uint32_t*)[bufRes contents] = 0;
+    *(uint32_t*)[bufOps contents] = 0;
+
+    struct timespec ts_start, ts_end;
+    clock_gettime(CLOCK_MONOTONIC, &ts_start);
+
+    id<MTLCommandBuffer> cmdBuf = [rt->queue commandBuffer];
+    id<MTLComputeCommandEncoder> encoder = [cmdBuf computeCommandEncoder];
+
+    [encoder setComputePipelineState:rt->vectorPipeline];
+    [encoder setBuffer:bufU offset:0 atIndex:0];
+    [encoder setBuffer:bufV offset:0 atIndex:1];
+    [encoder setBuffer:bufRes offset:0 atIndex:2];
+    [encoder setBuffer:bufOps offset:0 atIndex:3];
+    [encoder setBytes:&length length:sizeof(uint32_t) atIndex:4];
+
+    NSUInteger threadgroupSize = 256;
+    MTLSize threadsPerGrid = MTLSizeMake(length, 1, 1);
+    MTLSize threadsPerThreadgroup = MTLSizeMake(threadgroupSize, 1, 1);
+
+    [encoder dispatchThreads:threadsPerGrid threadsPerThreadgroup:threadsPerThreadgroup];
+    [encoder endEncoding];
+
+    [cmdBuf commit];
+    [cmdBuf waitUntilCompleted];
+
+    clock_gettime(CLOCK_MONOTONIC, &ts_end);
+    double elapsed_s = (ts_end.tv_sec - ts_start.tv_sec) + (ts_end.tv_nsec - ts_start.tv_nsec) * 1e-9;
+    uint32_t result = *(uint32_t*)[bufRes contents];
+    uint32_t total_ops = *(uint32_t*)[bufOps contents];
+    double mips = (elapsed_s > 0 && total_ops > 0) ? ((double)total_ops / elapsed_s / 1e6) : 0.0;
+
+    if (json_out) {
+        printf("{\n");
+        printf("  \"workload\": \"vector_dot\",\n");
+        printf("  \"length\": %u,\n", length);
+        printf("  \"device\": \"%s\",\n", [[rt->device name] UTF8String]);
+        printf("  \"result\": %u,\n", result);
+        printf("  \"itrs\": %u,\n", total_ops);
+        printf("  \"time_s\": %.6f,\n", elapsed_s);
+        printf("  \"mips\": %.2f,\n", mips);
+        printf("  \"zero_copy\": true,\n");
+        printf("  \"status\": \"OK\"\n");
+        printf("}\n");
+    } else {
+        printf("\n=======================================================\n");
+        printf(" Coronet Native Apple Silicon Metal GPU Execution\n");
+        printf(" Device:    %s (Zero-Copy UMA)\n", [[rt->device name] UTF8String]);
+        printf(" Workload:  vector_dot (N = %u elements)\n", length);
+        printf(" Result:    %u\n", result);
+        printf(" - OPS:     %u\n", total_ops);
+        printf(" - TIME:    %.6fs\n", elapsed_s);
+        printf(" - MIPS:    %.2f\n", mips);
+        printf("=======================================================\n");
+    }
+}
+
 static void run_metal_gpu(MetalRuntime* rt, uint32_t max_steps, bool json_out, const char* workload_name) {
     struct timespec ts_start, ts_end;
     clock_gettime(CLOCK_MONOTONIC, &ts_start);
@@ -426,7 +534,7 @@ static void run_metal_gpu(MetalRuntime* rt, uint32_t max_steps, bool json_out, c
         id<MTLCommandBuffer> cmdBuf = [rt->queue commandBuffer];
         id<MTLComputeCommandEncoder> encoder = [cmdBuf computeCommandEncoder];
 
-        [encoder setComputePipelineState:rt->pipeline];
+        [encoder setComputePipelineState:rt->reducePipeline];
         [encoder setBuffer:rt->heapBuf offset:0 atIndex:0];
         [encoder setBuffer:cur_in_buf offset:0 atIndex:1];
         [encoder setBuffer:cur_out_buf offset:0 atIndex:2];
@@ -435,7 +543,7 @@ static void run_metal_gpu(MetalRuntime* rt, uint32_t max_steps, bool json_out, c
         [encoder setBuffer:rt->allocHeadBuf offset:0 atIndex:5];
         [encoder setBuffer:rt->itrsBuf offset:0 atIndex:6];
 
-        NSUInteger maxThreads = rt->pipeline.maxTotalThreadsPerThreadgroup;
+        NSUInteger maxThreads = rt->reducePipeline.maxTotalThreadsPerThreadgroup;
         NSUInteger threadgroupSize = (maxThreads > 256) ? 256 : maxThreads;
         if (threadgroupSize > rt->in_count) {
             threadgroupSize = ((rt->in_count + 31) / 32) * 32;
@@ -496,15 +604,12 @@ static void run_metal_gpu(MetalRuntime* rt, uint32_t max_steps, bool json_out, c
     }
 }
 
-#ifndef DEFAULT_WORKLOAD
-#define DEFAULT_WORKLOAD "raytracer"
-#endif
-
 int main(int argc, const char* argv[]) {
     @autoreleasepool {
-        const char* workload = DEFAULT_WORKLOAD;
+        const char* workload = "raytracer";
         const char* shader_path = NULL;
         uint32_t resolution = 32;
+        uint32_t vector_len = 1000000; // 1M elements default for vector
         bool json = false;
 
         for (int i = 1; i < argc; i++) {
@@ -514,6 +619,8 @@ int main(int argc, const char* argv[]) {
                 shader_path = argv[++i];
             } else if (strcmp(argv[i], "-r") == 0 && i + 1 < argc) {
                 resolution = (uint32_t)atoi(argv[++i]);
+            } else if (strcmp(argv[i], "-n") == 0 && i + 1 < argc) {
+                vector_len = (uint32_t)atoi(argv[++i]);
             } else if (strcmp(argv[i], "--json") == 0) {
                 json = true;
             }
@@ -521,15 +628,19 @@ int main(int argc, const char* argv[]) {
 
         MetalRuntime* rt = init_metal_runtime(shader_path);
 
-        if (strcmp(workload, "arith") == 0) {
-            setup_arith_benchmark(rt);
-        } else if (strcmp(workload, "tree") == 0) {
-            setup_tree_benchmark(rt, 12);
+        if (strcmp(workload, "vector") == 0 || strcmp(workload, "vector_dot") == 0) {
+            run_vector_benchmark(rt, vector_len, json);
         } else {
-            setup_raytracer_scale_benchmark(rt, resolution);
+            if (strcmp(workload, "arith") == 0) {
+                setup_arith_benchmark(rt);
+            } else if (strcmp(workload, "tree") == 0) {
+                setup_tree_benchmark(rt, 12);
+            } else {
+                setup_raytracer_scale_benchmark(rt, resolution);
+            }
+            run_metal_gpu(rt, 1000, json, workload);
         }
 
-        run_metal_gpu(rt, 1000, json, workload);
         return 0;
     }
 }

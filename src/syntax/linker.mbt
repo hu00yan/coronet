@@ -186,6 +186,96 @@ pub fn link_programs(programs : Array[Program]) -> Program {
   Program::new(unified_binds)
 }
 
+///| Tree-Shaking Dead Code Elimination (Whole-Program LTO) for CoreLite AST.
+///| Prunes any top-level bindings not transitively reachable from the specified roots.
+///| If no roots are specified or found, returns the program unmodified.
+pub fn prune_unreachable(prog : Program, extra_roots : Array[String]) -> Program {
+  let all = prog.all_bindings()
+  let defined_names : Array[String] = []
+  for p in all {
+    defined_names.push(p.0)
+  }
+
+  // 1. Establish roots
+  let roots : Array[String] = []
+  for r in extra_roots {
+    if defined_names.contains(r) && !roots.contains(r) {
+      roots.push(r)
+    }
+  }
+
+  // Well-known entry points
+  let default_entry_points = ["main", "result", "Main_main", ":Main.main", "_start", "coronet_main"]
+  for ep in default_entry_points {
+    if defined_names.contains(ep) && !roots.contains(ep) {
+      roots.push(ep)
+    }
+  }
+
+  // If no root is found, safely return program unmodified
+  if roots.is_empty() {
+    return prog
+  }
+
+  // 2. Reachability analysis (Transitive Closure via BFS)
+  let reachable : Array[String] = []
+  let queue : Array[String] = []
+  for r in roots {
+    reachable.push(r)
+    queue.push(r)
+  }
+
+  let mut head = 0
+  while head < queue.length() {
+    let curr = queue[head]
+    head = head + 1
+    match prog.lookup(curr) {
+      Some(expr) => {
+        let fvs : Array[String] = []
+        collect_free_vars_in_expr(expr, [], fvs)
+        for fv in fvs {
+          if defined_names.contains(fv) && !reachable.contains(fv) {
+            reachable.push(fv)
+            queue.push(fv)
+          }
+        }
+      }
+      None => ()
+    }
+  }
+
+  // 3. Filter top-level bindings
+  let new_binds : Array[Bind] = []
+  for b in prog.binds {
+    match b {
+      NonRec(n, e) => {
+        if reachable.contains(n) {
+          new_binds.push(NonRec(n, e))
+        }
+      }
+      Rec(pairs) => {
+        let kept_pairs : Array[(String, Expr)] = []
+        for pair in pairs {
+          if reachable.contains(pair.0) {
+            kept_pairs.push(pair)
+          }
+        }
+        if kept_pairs.length() > 0 {
+          new_binds.push(Rec(kept_pairs))
+        }
+      }
+    }
+  }
+
+  Program::new(new_binds)
+}
+
+///| Link multiple CoreLite programs with Whole-Program Tree-Shaking (LTO).
+pub fn link_programs_lto(programs : Array[Program], roots : Array[String]) -> Program {
+  let linked = link_programs(programs)
+  prune_unreachable(linked, roots)
+}
+
 ///| Merge two programs.
 pub fn Program::merge(self : Program, other : Program) -> Program {
   link_programs([self, other])

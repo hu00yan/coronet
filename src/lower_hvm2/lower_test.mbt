@@ -481,3 +481,16 @@ test "lower map core constructors" {
   assert_true(hvm.contains("@Tip"))
   assert_true(hvm.contains("@compare"))
 }
+
+test "lower multi-literal switch" {
+  let src =
+    #| f = \ c -> case c of {
+    #|   __DEFAULT -> 0#;
+    #|   '*' -> 1#;
+    #|   '+' -> 2#;
+    #|   '-' -> 3#
+    #| }
+    #| main = f 42#
+  let hvm = @lower_hvm2.lower_core(src).unwrap()
+  println("HVM MULTI-LIT:\n\{hvm}")
+}
