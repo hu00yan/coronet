@@ -1,0 +1,5 @@
+{
+  "source": "tests/packages/map_core.hs",
+  "timeout": 600,
+  "note": "Size-balanced BST with 100 insertions and lookups, no external packages."
+}

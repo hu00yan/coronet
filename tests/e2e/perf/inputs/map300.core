@@ -1,0 +1,292 @@
+empty
+  = Tip
+
+singleton
+  = \ k_aW2 v_aW3 ->
+      Bin 1# k_aW2 v_aW3 Tip Tip
+
+lvl_s3nY
+  = I# 0#
+
+size
+  = \ ds_d1Ro ->
+      case ds_d1Ro of wild_X1E {
+        Bin bx_d2t6 ds_d1Tu ds_d1Tv ds_d1Tw ds_d1Tx -> I# bx_d2t6;
+        Tip -> lvl_s3nY
+      }
+
+delta
+  = I# 3#
+
+gamma
+  = I# 2#
+
+Rec {
+balanceR
+  = \ k_aZg v_aZh l_aZi r_aZj ->
+      case l_aZi of wild_X1E {
+        Bin bx_d2tm ds_d2pk ds_d2pl ds_d2pm ds_d2pn -> case r_aZj of wild_X1 {
+        Bin bx_d2to rk_aZA rv_aZB rl_aZC rr_aZD -> case ># bx_d2to (*# 3# bx_d2tm) of lwild_s3pE {
+        __DEFAULT -> Bin (+# 1# (+# bx_d2to bx_d2tm)) k_aZg v_aZh wild_X1E wild_X1;
+        1# -> case rl_aZC of wild_X3 {
+        Bin bx_d2tq rlk_aZF rlv_aZG rll_aZH rlr_aZI -> let $j_s3oG = \ y_a2tT ->
+      case <# bx_d2tq (*# 2# y_a2tT) of lwild_s3pD {
+        __DEFAULT -> Bin (+# 1# (+# bx_d2to bx_d2tm)) rlk_aZF rlv_aZG (balanceL k_aZg v_aZh wild_X1E rll_aZH) (balanceR rk_aZA rv_aZB rlr_aZI rr_aZD);
+        1# -> Bin (+# 1# (+# bx_d2to bx_d2tm)) rk_aZA rv_aZB (balanceL k_aZg v_aZh wild_X1E wild_X3) rr_aZD
+      } in case rr_aZD of wild_X1F {
+        Bin bx_d2t6 ds_d1Tu ds_d1Tv ds_d1Tw ds_d1Tx -> $j_s3oG bx_d2t6;
+        Tip -> $j_s3oG 0#
+      };
+        Tip -> Bin (+# 1# (+# bx_d2to bx_d2tm)) k_aZg v_aZh (Bin (+# 1# bx_d2tm) k_aZg v_aZh wild_X1E Tip) rr_aZD
+      }
+      };
+        Tip -> Bin (+# 1# bx_d2tm) k_aZg v_aZh wild_X1E Tip
+      };
+        Tip -> case r_aZj of wild_X1 {
+        Bin bx_d2ts ds_d2lb ds_d2lc ds_d2ld ds_d2le -> case ds_d2ld of wild_X2 {
+        Bin bx_d2tu rlk_aZm rlv_aZn ds_d2ll ds_d2lm -> case ds_d2le of wild_X3 {
+        Bin bx_d2tw ds_d2ln ds_d2lo ds_d2lp ds_d2lq -> case <# bx_d2tu (*# 2# bx_d2tw) of lwild_s3pF {
+        __DEFAULT -> case ds_d2ll of wild_X1F {
+        Bin bx_d2t6 ds_d1Tu ds_d1Tv ds_d1Tw ds_d1Tx -> case ds_d2lm of wild_X1G {
+        Bin bx_X1H ds_X1I ds_X1J ds_X1K ds_X1L -> Bin (+# 1# bx_d2tw) rlk_aZm rlv_aZn (Bin (+# 1# bx_d2t6) k_aZg v_aZh Tip wild_X1F) (Bin (+# 1# (+# bx_X1H bx_d2tw)) ds_d2lb ds_d2lc wild_X1G Tip);
+        Tip -> Bin (+# 1# bx_d2tw) rlk_aZm rlv_aZn (Bin (+# 1# bx_d2t6) k_aZg v_aZh Tip wild_X1F) (Bin (+# 1# bx_d2tw) ds_d2lb ds_d2lc Tip Tip)
+      };
+        Tip -> case ds_d2lm of wild_X1G {
+        Bin bx_d2t6 ds_d1Tu ds_d1Tv ds_d1Tw ds_d1Tx -> Bin (+# 1# bx_d2tw) rlk_aZm rlv_aZn (Bin 1# k_aZg v_aZh Tip Tip) (Bin (+# 1# (+# bx_d2t6 bx_d2tw)) ds_d2lb ds_d2lc wild_X1G Tip);
+        Tip -> Bin (+# 1# bx_d2tw) rlk_aZm rlv_aZn (Bin 1# k_aZg v_aZh Tip Tip) (Bin (+# 1# bx_d2tw) ds_d2lb ds_d2lc Tip Tip)
+      }
+      };
+        1# -> Bin (+# 1# bx_d2tw) ds_d2lb ds_d2lc (Bin (+# 1# bx_d2tu) k_aZg v_aZh Tip wild_X2) (Bin bx_d2tw ds_d2lb ds_d2lc Tip Tip)
+      };
+        Tip -> Bin 3# rlk_aZm rlv_aZn (Bin 1# k_aZg v_aZh Tip Tip) (Bin 1# ds_d2lb ds_d2lc Tip Tip)
+      };
+        Tip -> case ds_d2le of wild_X3 {
+        Bin bx_d2ty ds_d2lg ds_d2lh ds_d2li ds_d2lj -> Bin 3# ds_d2lb ds_d2lc (Bin 1# k_aZg v_aZh Tip Tip) Tip;
+        Tip -> Bin 2# k_aZg v_aZh Tip wild_X1
+      }
+      };
+        Tip -> Bin 1# k_aZg v_aZh Tip Tip
+      }
+      };
+balanceL
+  = \ k_aW5 v_aW6 l_aW7 r_aW8 ->
+      case r_aW8 of wild_X1E {
+        Bin bx_d2t8 ds_d29n ds_d29o ds_d29p ds_d29q -> case l_aW7 of wild_X1 {
+        Bin bx_d2ta lk_aZ7 lv_aZ8 ll_aZ9 lr_aZa -> case ># bx_d2ta (*# 3# bx_d2t8) of lwild_s3pH {
+        __DEFAULT -> Bin (+# 1# (+# bx_d2t8 bx_d2ta)) k_aW5 v_aW6 wild_X1 wild_X1E;
+        1# -> case lr_aZa of wild_X3 {
+        Bin bx_d2tc lrk_aZc lrv_aZd lrl_aZe lrr_aZf -> let $j_s3oJ = \ y_a2tT ->
+      case <# bx_d2tc (*# 2# y_a2tT) of lwild_s3pG {
+        __DEFAULT -> Bin (+# 1# (+# bx_d2t8 bx_d2ta)) lrk_aZc lrv_aZd (balanceL lk_aZ7 lv_aZ8 ll_aZ9 lrl_aZe) (balanceR k_aW5 v_aW6 lrr_aZf wild_X1E);
+        1# -> Bin (+# 1# (+# bx_d2t8 bx_d2ta)) lk_aZ7 lv_aZ8 ll_aZ9 (balanceR k_aW5 v_aW6 wild_X3 wild_X1E)
+      } in case ll_aZ9 of wild_X1F {
+        Bin bx_d2t6 ds_d1Tu ds_d1Tv ds_d1Tw ds_d1Tx -> $j_s3oJ bx_d2t6;
+        Tip -> $j_s3oJ 0#
+      };
+        Tip -> Bin (+# 1# (+# bx_d2t8 bx_d2ta)) lk_aZ7 lv_aZ8 ll_aZ9 (Bin (+# 1# bx_d2t8) k_aW5 v_aW6 Tip wild_X1E)
+      }
+      };
+        Tip -> Bin (+# 1# bx_d2t8) k_aW5 v_aW6 Tip wild_X1E
+      };
+        Tip -> case l_aW7 of wild_X1 {
+        Bin bx_d2te ds_d25i ds_d25j ds_d25k ds_d25l -> case ds_d25k of wild_X2 {
+        Bin bx_d2tg ds_d25q ds_d25r ds_d25s ds_d25t -> case ds_d25l of wild_X3 {
+        Bin bx_d2ti lrk_aWj lrv_aWk lrl_aWl lrr_aWm -> case <# bx_d2ti (*# 2# bx_d2tg) of lwild_s3pI {
+        __DEFAULT -> case lrl_aWl of wild_X1F {
+        Bin bx_d2t6 ds_d1Tu ds_d1Tv ds_d1Tw ds_d1Tx -> case lrr_aWm of wild_X1G {
+        Bin bx_X1H ds_X1I ds_X1J ds_X1K ds_X1L -> Bin (+# 1# bx_d2tg) lrk_aWj lrv_aWk (Bin (+# 1# (+# bx_d2t6 bx_d2tg)) ds_d25i ds_d25j Tip wild_X1F) (Bin (+# 1# bx_X1H) k_aW5 v_aW6 wild_X1G Tip);
+        Tip -> Bin (+# 1# bx_d2tg) lrk_aWj lrv_aWk (Bin (+# 1# (+# bx_d2t6 bx_d2tg)) ds_d25i ds_d25j Tip wild_X1F) (Bin 1# k_aW5 v_aW6 Tip Tip)
+      };
+        Tip -> case lrr_aWm of wild_X1G {
+        Bin bx_d2t6 ds_d1Tu ds_d1Tv ds_d1Tw ds_d1Tx -> Bin (+# 1# bx_d2tg) lrk_aWj lrv_aWk (Bin (+# 1# bx_d2tg) ds_d25i ds_d25j Tip Tip) (Bin (+# 1# bx_d2t6) k_aW5 v_aW6 wild_X1G Tip);
+        Tip -> Bin (+# 1# bx_d2tg) lrk_aWj lrv_aWk (Bin (+# 1# bx_d2tg) ds_d25i ds_d25j Tip Tip) (Bin 1# k_aW5 v_aW6 Tip Tip)
+      }
+      };
+        1# -> Bin (+# 1# bx_d2tg) ds_d25i ds_d25j (Bin bx_d2tg ds_d25i ds_d25j Tip Tip) (Bin (+# 1# bx_d2ti) k_aW5 v_aW6 wild_X3 Tip)
+      };
+        Tip -> Bin 3# ds_d25i ds_d25j Tip (Bin 1# k_aW5 v_aW6 Tip Tip)
+      };
+        Tip -> case ds_d25l of wild_X3 {
+        Bin bx_d2tk lrk_aWb lrv_aWc ds_d25n ds_d25o -> Bin 3# lrk_aWb lrv_aWc (Bin 1# ds_d25i ds_d25j Tip Tip) (Bin 1# k_aW5 v_aW6 Tip Tip);
+        Tip -> Bin 2# k_aW5 v_aW6 wild_X1 Tip
+      }
+      };
+        Tip -> Bin 1# k_aW5 v_aW6 Tip Tip
+      }
+      };
+end Rec }
+
+Rec {
+$sinsert_s3nS
+  = \ kx_aZJ x_aZK ds_d2pt ->
+      case ds_d2pt of wild_X1E {
+        Bin bx_d2tA ky_aZO y_aZP l_aZQ r_aZR -> case ky_aZO of wild1_s3sQ {
+        I# y#_s3sR -> case kx_aZJ of wild_a3pL {
+        I# x#_a3pM -> case <# x#_a3pM y#_s3sR of lwild_a3pT {
+        __DEFAULT -> case ==# x#_a3pM y#_s3sR of lwild1_a3pU {
+        __DEFAULT -> balanceR wild1_s3sQ y_aZP l_aZQ ($sinsert_s3nS wild_a3pL x_aZK r_aZR);
+        1# -> Bin bx_d2tA wild_a3pL x_aZK l_aZQ r_aZR
+      };
+        1# -> balanceL wild1_s3sQ y_aZP ($sinsert_s3nS wild_a3pL x_aZK l_aZQ) r_aZR
+      }
+      }
+      };
+        Tip -> Bin 1# kx_aZJ x_aZK Tip Tip
+      };
+end Rec }
+
+Rec {
+insert
+  = \ $dOrd_a1AA kx_aZJ x_aZK ds_d2pt ->
+      case ds_d2pt of wild_X1E {
+        Bin bx_d2tA ky_aZO y_aZP l_aZQ r_aZR -> case compare $dOrd_a1AA kx_aZJ ky_aZO of wild_X1 {
+        LT -> balanceL ky_aZO y_aZP (insert $dOrd_a1AA kx_aZJ x_aZK l_aZQ) r_aZR;
+        EQ -> Bin bx_d2tA kx_aZJ x_aZK l_aZQ r_aZR;
+        GT -> balanceR ky_aZO y_aZP l_aZQ (insert $dOrd_a1AA kx_aZJ x_aZK r_aZR)
+      };
+        Tip -> Bin 1# kx_aZJ x_aZK Tip Tip
+      };
+end Rec }
+
+lvl_s3oj
+  = I# 1#
+
+$wbuildMap_s3ro
+  = \ ww_s3rm ->
+      let Rec { go_s3nG = \ i_a10a m_a10b ->
+      case i_a10a of i_X3 {
+        I# ipv_s2u3 -> case m_a10b of m_X4 {
+        __DEFAULT -> case ># ipv_s2u3 ww_s3rm of lwild_s3pY {
+        __DEFAULT -> go_s3nG (I# (+# ipv_s2u3 1#)) ($sinsert_s3nS i_X3 (I# (+# (*# ipv_s2u3 3#) 7#)) m_X4);
+        1# -> m_X4
+      }
+      }
+      } end Rec } in go_s3nG lvl_s3oj Tip
+
+buildMap
+  = \ n_s3rk ->
+      case n_s3rk of wild_X1E {
+        I# ww_s3rm -> $wbuildMap_s3ro ww_s3rm
+      }
+
+Rec {
+$sfindWithDefault_s3nN
+  = \ def_aZS ds_d1P8 ds_d1P9 ->
+      case ds_d1P9 of wild_X1E {
+        Bin bx_d2t4 ky_aZV y_aZW l_aZX r_aZY -> case ky_aZV of wild1_s3sT {
+        I# y#_s3sU -> case ds_d1P8 of wild_a3pL {
+        I# x#_a3pM -> case <# x#_a3pM y#_s3sU of lwild_a3pT {
+        __DEFAULT -> case ==# x#_a3pM y#_s3sU of lwild1_a3pU {
+        __DEFAULT -> $sfindWithDefault_s3nN def_aZS wild_a3pL r_aZY;
+        1# -> y_aZW
+      };
+        1# -> $sfindWithDefault_s3nN def_aZS wild_a3pL l_aZX
+      }
+      }
+      };
+        Tip -> def_aZS
+      };
+end Rec }
+
+Rec {
+findWithDefault
+  = \ $dOrd_a1ju def_aZS ds_d1P8 ds_d1P9 ->
+      case ds_d1P9 of wild_X1E {
+        Bin bx_d2t4 ky_aZV y_aZW l_aZX r_aZY -> case compare $dOrd_a1ju ds_d1P8 ky_aZV of wild_X1 {
+        LT -> findWithDefault $dOrd_a1ju def_aZS ds_d1P8 l_aZX;
+        EQ -> y_aZW;
+        GT -> findWithDefault $dOrd_a1ju def_aZS ds_d1P8 r_aZY
+      };
+        Tip -> def_aZS
+      };
+end Rec }
+
+$wqueryMap_s3rT
+  = \ m_s3rN ww_s3rQ ->
+      let Rec { $wgo_s3rK = \ i_s3rF ww_s3rI ->
+      case i_s3rF of i_X3 {
+        I# ipv_s2u5 -> case ># ipv_s2u5 ww_s3rQ of lwild_s3q1 {
+        __DEFAULT -> case $sfindWithDefault_s3nN lvl_s3nY i_X3 m_s3rN of wild1_a2u0 {
+        I# y_a2u1 -> $wgo_s3rK (I# (+# ipv_s2u5 1#)) (+# ww_s3rI y_a2u1)
+      };
+        1# -> ww_s3rI
+      }
+      } end Rec } in $wgo_s3rK lvl_s3oj 0#
+
+queryMap
+  = \ m_s3rN n_s3rO ->
+      case n_s3rO of wild_X1E {
+        I# ww_s3rQ -> case $wqueryMap_s3rT m_s3rN ww_s3rQ of ww_s3sJ {
+        __DEFAULT -> I# ww_s3sJ
+      }
+      }
+
+Rec {
+go_s3t0
+  = \ i_a10a m_a10b ->
+      case i_a10a of i_X3 {
+        I# ipv_s2u3 -> case m_a10b of m_X4 {
+        __DEFAULT -> case ># ipv_s2u3 300# of lwild_s3pY {
+        __DEFAULT -> go_s3t0 (I# (+# ipv_s2u3 1#)) ($sinsert_s3nS i_X3 (I# (+# (*# ipv_s2u3 3#) 7#)) m_X4);
+        1# -> m_X4
+      }
+      }
+      };
+end Rec }
+
+m_a10c
+  = go_s3t0 lvl_s3oj Tip
+
+Rec {
+$wgo_s3t2
+  = \ i_s3s0 ww_s3s3 ->
+      case i_s3s0 of i_X3 {
+        I# ipv_s2u5 -> case ># ipv_s2u5 300# of lwild_s3q1 {
+        __DEFAULT -> case $sfindWithDefault_s3nN lvl_s3nY i_X3 m_a10c of wild1_a2u0 {
+        I# y_a2u1 -> $wgo_s3t2 (I# (+# ipv_s2u5 1#)) (+# ww_s3s3 y_a2u1)
+      };
+        1# -> I# ww_s3s3
+      }
+      };
+end Rec }
+
+result
+  = $wgo_s3t2 lvl_s3oj 0#
+
+Rec {
+foldlWithKey
+  = \ ds_d1N0 z_aZZ ds_d1N1 ->
+      case z_aZZ of z_X0 {
+        __DEFAULT -> case ds_d1N1 of wild_X1 {
+        Bin bx_d2t2 kx_a102 x_a103 l_a104 r_a105 -> case foldlWithKey ds_d1N0 z_X0 l_a104 of z1_a106 {
+        __DEFAULT -> case ds_d1N0 z1_a106 kx_a102 x_a103 of z2_a107 {
+        __DEFAULT -> foldlWithKey ds_d1N0 z2_a107 r_a105
+      }
+      };
+        Tip -> z_X0
+      }
+      };
+end Rec }
+
+lvl_s3qa
+  = "Tip"#
+
+lvl_s3ox
+  = I# 11#
+
+lvl_s3t3
+  = "Bin "#
+
+$cshowList_a1DS
+  = \ $dShow_a1D2 $dShow_a1D3 ls_a2tJ s_a2tK ->
+      showList__ ($cshowsPrec_a1D5 $dShow_a1D2 $dShow_a1D3 lvl_s3nY) ls_a2tJ s_a2tK
+
+$cshow_a1DJ
+  = \ $dShow_a1D2 $dShow_a1D3 x_a2tG ->
+      $cshowsPrec_a1D5 $dShow_a1D2 $dShow_a1D3 lvl_s3nY x_a2tG []
+
+$fShowMap
+  = \ $dShow_a1D2 $dShow_a1D3 ->
+      C:Show ($cshowsPrec_a1D5 $dShow_a1D2 $dShow_a1D3) ($cshow_a1DJ $dShow_a1D2 $dShow_a1D3) ($cshowList_a1DS $dShow_a1D2 $dShow_a1D3)
+
+main = result

@@ -1,5 +1,13 @@
 {
-  "deps": ["containers-0.8"],
+  "deps": [
+    "containers-0.8"
+  ],
   "timeout": 900,
-  "note": "Map.fromList + foldl' over 100 entries; exercises Bin/Tip, balanceL/R, insert."
+  "note": "Map.fromList + foldl' over 100 entries; exercises Bin/Tip, balanceL/R, insert. Extra inlining keeps dictionary calls inside the program.",
+  "ghc_flags": [
+    "-O2",
+    "-fspecialise-aggressively",
+    "-fexpose-all-unfoldings",
+    "-funfolding-use-threshold=1000"
+  ]
 }

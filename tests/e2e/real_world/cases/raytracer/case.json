@@ -1,0 +1,5 @@
+{
+  "source": "tests/fixtures/heavy/Raytracer.hs",
+  "timeout": 600,
+  "note": "20 KB Core: fixed-point vector math, spheres, 256 rays."
+}

@@ -1,0 +1,118 @@
+Rec {
+append
+  = \ xs ys ->
+      case xs of {
+        Nil -> ys;
+        Cons z zs -> Cons z (append zs ys)
+      }
+end Rec }
+
+Rec {
+concatMapL
+  = \ f xs ->
+      case xs of {
+        Nil -> Nil;
+        Cons y ys -> append (f y) (concatMapL f ys)
+      }
+end Rec }
+
+Rec {
+$wlengthL
+  = \ xs ->
+      case xs of {
+        Nil -> 0#;
+        Cons ds rest -> case $wlengthL rest of ww { __DEFAULT -> +# 1# ww }
+      }
+end Rec }
+
+lengthL = \ xs -> case $wlengthL xs of ww { __DEFAULT -> I# ww }
+
+absInt
+  = \ x ->
+      case x of wild { I# x1 ->
+      case <# x1 0# of {
+        __DEFAULT -> wild;
+        1# -> I# (-# 0# x1)
+      }
+      }
+
+Rec {
+safe
+  = \ x d q ->
+      case q of {
+        Nil -> True;
+        Cons c rest ->
+          case x of wild1 { I# x1 ->
+          case c of { I# y ->
+          case ==# x1 y of {
+            __DEFAULT ->
+              let { x2 = -# x1 y } in
+              case <# x2 0# of {
+                __DEFAULT ->
+                  case d of { I# y1 ->
+                  case ==# x2 y1 of {
+                    __DEFAULT -> safe wild1 (I# (+# y1 1#)) rest;
+                    1# -> False
+                  }
+                  };
+                1# ->
+                  case d of { I# y1 ->
+                  case ==# (-# 0# x2) y1 of {
+                    __DEFAULT -> safe wild1 (I# (+# y1 1#)) rest;
+                    1# -> False
+                  }
+                  }
+              };
+            1# -> False
+          }
+          }
+          }
+      }
+end Rec }
+
+Rec {
+$wrangeL
+  = \ low ww ->
+      case low of wild { I# x ->
+      case ># x ww of {
+        __DEFAULT -> Cons wild ($wrangeL (I# (+# x 1#)) ww);
+        1# -> Nil
+      }
+      }
+end Rec }
+
+rangeL = \ low high -> case high of { I# ww -> $wrangeL low ww }
+
+lvl = Cons Nil Nil
+
+lvl1 = I# 1#
+
+Rec {
+$wqueens
+  = \ n ww ->
+      case <=# ww 0# of {
+        __DEFAULT ->
+          let { lvl2 = case n of { I# ww1 -> $wrangeL lvl1 ww1 } } in
+          concatMapL
+            (\ qs ->
+               concatMapL
+                 (\ c ->
+                    case safe c lvl1 qs of {
+                      False -> Nil;
+                      True -> Cons (Cons c qs) Nil
+                    })
+                 lvl2)
+            ($wqueens n (-# ww 1#));
+        1# -> lvl
+      }
+end Rec }
+
+queens = \ n k -> case k of { I# ww -> $wqueens n ww }
+
+result2 = I# 9#
+
+result1 = $wqueens result2 9#
+
+result = case $wlengthL result1 of ww { __DEFAULT -> I# ww }
+
+main = result

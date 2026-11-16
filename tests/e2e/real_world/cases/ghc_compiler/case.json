@@ -1,0 +1,5 @@
+{
+  "source": "tests/packages/ghc/GhcCompiler.hs",
+  "timeout": 900,
+  "note": "55 KB Core: a Core compiler with constant folding, beta reduction, inlining, DCE over a recursive AST."
+}

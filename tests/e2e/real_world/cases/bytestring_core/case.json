@@ -1,0 +1,6 @@
+{
+  "source": "tests/packages/bytestring_core.hs",
+  "deps": ["bytestring-0.12.2.0"],
+  "timeout": 900,
+  "note": "Real Hackage bytestring: C.pack over Addr#, plus foldl' over the buffer."
+}

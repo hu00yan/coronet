@@ -110,6 +110,34 @@ def dep_include_dirs(dep_root):
     return [p for p in (dep_root / "include",) if p.is_dir()]
 
 
+def dep_extensions(dep_root):
+    """default-extensions from the .cabal file: they apply package-wide, and a
+    package as ordinary as bytestring will not compile without them."""
+    names = []
+    for cabal in dep_root.glob("*.cabal"):
+        lines = cabal.read_text(errors="ignore").splitlines()
+        collecting = False
+        for line in lines:
+            stripped = line.strip()
+            if not stripped or stripped.startswith("--"):
+                collecting = False
+                continue
+            low = stripped.lower()
+            if low.startswith("default-extensions:") or low.startswith("default-extensions :"):
+                collecting = True
+                chunk = stripped.split(":", 1)[1]
+            elif collecting and not (":" in stripped) and line.startswith(" ") and ":" not in stripped:
+                chunk = stripped
+            else:
+                collecting = False
+                continue
+            for item in chunk.split(","):
+                item = item.strip()
+                if item and item not in names:
+                    names.append(item)
+    return names
+
+
 def dep_hides(dep_root):
     """Packages whose modules we compile from source must be hidden, otherwise
     GHC prefers the installed interface and the plugin never sees them."""
@@ -132,10 +160,16 @@ class Case:
     def __init__(self, directory):
         self.dir = directory
         self.name = directory.name
-        self.hs = directory / "case.hs"
         meta_path = directory / "case.json"
         self.meta = json.loads(meta_path.read_text()) if meta_path.exists() else {}
+        # A case either ships its own case.hs or points at an existing program in
+        # the repository (the package fixtures under tests/).
+        if "source" in self.meta:
+            self.hs = (REPO_ROOT / self.meta["source"]).resolve()
+        else:
+            self.hs = directory / "case.hs"
         self.timeout = self.meta.get("timeout", 600)
+        self.ghc_flags = self.meta.get("ghc_flags", ["-O2"])
 
 
 def extract_core(case, deps, work, verbose):
@@ -156,22 +190,21 @@ def extract_core(case, deps, work, verbose):
         for hide in dep_hides(dep):
             hide_args.append("-hide-package")
             hide_args.append(hide)
+        for ext in dep_extensions(dep):
+            hide_args.append("-X" + ext)
 
     # -M runs in --make mode, and --make cannot use a plugin whose source sits
     # on the -i path ("which is not loaded"). The module graph does not need the
     # plugin, so only the one-shot compile below carries it.
-    src_only = [which("ghc"), "-O2"] + src_args + include_args + hide_args
+    src_only = [which("ghc")] + case.ghc_flags + src_args + include_args + hide_args
 
-    common = [
-        which("ghc"),
-        "-O2",
-        # Coronet needs monomorphic Core: every class method left as a
-        # dictionary-passing call becomes a reference to a module of `base`
-        # that the project never compiles. Specialising aggressively is what
-        # turns `$fOrdInt`/`$fFoldableList` references into code.
-        "-fspecialise-aggressively",
-        "-fexpose-all-unfoldings",
-        "-funfolding-use-threshold=1000",
+    # -O2 by default, matching the rest of the repository's pipeline. A case may
+    # ask for more inlining, which is how dictionary-passing calls to `base` are
+    # turned back into code Coronet can see.
+    common = [which("ghc")] + case.ghc_flags + [
+        # The plugin only runs when GHC actually recompiles, and the dependency
+        # sources stay in place as a cache between runs.
+        "-fforce-recomp",
         "-package",
         "ghc",
         "-fplugin=CoronetPlugin",
@@ -225,6 +258,8 @@ def ghc_reference(case, deps, work, verbose):
             include_args.append("-I" + str(inc))
         for hide in dep_hides(dep):
             hide_args.extend(["-hide-package", hide])
+        for ext in dep_extensions(dep):
+            hide_args.append("-X" + ext)
     out_bin = work / "ghc_native"
     code, out, err, _ = run(
         [which("ghc"), "-O2", "-o", str(out_bin), "-outputdir", str(work / "native_obj")]
@@ -258,6 +293,25 @@ def coronet_compile(cores, target, out_file, timeout):
     return out_file, None, elapsed
 
 
+def gap_inventory(cores, timeout):
+    """Ask the compiler which references the linked program never defines."""
+    cmd = [which("moon"), "run", "cmd/main", "--"] + [str(c) for c in cores] + [
+        "--target",
+        "hvm2",
+        "--report-gaps",
+        "-o",
+        os.devnull,
+    ]
+    code, out, err, _ = run(cmd, timeout=timeout)
+    text = out + err
+    gaps = []
+    for line in text.splitlines():
+        line = line.strip()
+        if line.startswith("undefined:"):
+            gaps.append(line[len("undefined:") :].strip())
+    return gaps
+
+
 def run_target(target, hvm_file, timeout):
     runner = RUN_HVM2 if target == "hvm2" else RUN_HVM3
     code, out, err, elapsed = run([str(runner), str(hvm_file)], timeout=timeout)
@@ -287,6 +341,7 @@ def run_case(case, targets, verbose, refresh):
         "core_bytes": 0,
         "ghc": None,
         "targets": {},
+        "gaps": [],
         "note": case.meta.get("note", ""),
     }
     if not case.hs.exists():
@@ -313,6 +368,10 @@ def run_case(case, targets, verbose, refresh):
         verbose_only=True,
         verbose=verbose,
     )
+
+    result["gaps"] = gap_inventory(cores, case.timeout)
+    if result["gaps"]:
+        log("  gaps: %d" % len(result["gaps"]), verbose_only=True, verbose=verbose)
 
     for target in targets:
         entry = {}
@@ -364,6 +423,14 @@ def write_report(results, targets, path):
         lines.append("| %s | %s | %s | %s |" % (r["case"], ghc, " | ".join(cells), core))
     lines.append("")
     for r in results:
+        if r.get("gaps"):
+            lines.append("## %s — undefined references" % r["case"])
+            lines.append("")
+            lines.append("The linked program still needs %d symbol(s) no input defines:" % len(r["gaps"]))
+            lines.append("")
+            for g in r["gaps"]:
+                lines.append("- `%s`" % g)
+            lines.append("")
         if r.get("error"):
             lines.append("## %s — error" % r["case"])
             lines.append("")
@@ -394,7 +461,11 @@ def main():
 
     if not CASES_DIR.is_dir():
         sys.exit("no cases directory: %s" % CASES_DIR)
-    cases = [Case(d) for d in sorted(CASES_DIR.iterdir()) if d.is_dir() and (d / "case.hs").exists()]
+    cases = [
+        Case(d)
+        for d in sorted(CASES_DIR.iterdir())
+        if d.is_dir() and ((d / "case.hs").exists() or (d / "case.json").exists())
+    ]
     if args.filter:
         cases = [c for c in cases if args.filter in c.name]
     if not cases:

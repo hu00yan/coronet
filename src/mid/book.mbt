@@ -274,6 +274,29 @@ fn is_digit_char(c : UInt16) -> Bool {
   c >= '0' && c <= '9'
 }
 
+///| Follow a rename chain to the definition that actually survives.
+///| Merging runs in rounds, so `a -> b` and a later `b -> c` must both resolve
+///| to `c`; a single-hop rewrite would leave `@b` dangling.
+fn resolve_rename(renames : Array[(String, String)], name : String) -> String {
+  let mut current = name
+  let mut steps = 0
+  while steps <= renames.length() {
+    let mut next = current
+    for rename in renames {
+      if rename.0 == current {
+        next = rename.1
+        break
+      }
+    }
+    if next == current {
+      return current
+    }
+    current = next
+    steps = steps + 1
+  }
+  current
+}
+
 ///| Replace `@from` references with `@to` in a body, whole names only.
 fn rename_refs(body : String, renames : Array[(String, String)]) -> String {
   if renames.length() == 0 {
@@ -288,16 +311,11 @@ fn rename_refs(body : String, renames : Array[(String, String)]) -> String {
         end = end + 1
       }
       let name = body[i + 1:end].to_owned()
-      let mut replaced = false
-      for r in renames {
-        if r.0 == name {
-          buf.write_string("@")
-          buf.write_string(r.1)
-          replaced = true
-          break
-        }
-      }
-      if !replaced {
+      let target = resolve_rename(renames, name)
+      if target != name {
+        buf.write_string("@")
+        buf.write_string(target)
+      } else {
         buf.write_string(body[i:end].to_owned())
       }
       i = end
