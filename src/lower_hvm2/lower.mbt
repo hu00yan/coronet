@@ -557,6 +557,10 @@ priv struct LowerCtx {
   adt_families : Array[Array[(String, Int)]]
   mut is_64bit : Bool
   scaled_vars : Array[(String, String)] // (scaled_var, orig_var)
+  // Names the program already defined. The fallback constructor table must not
+  // shadow them: a program that declares `Nil | LCons` decides its own list
+  // family, whatever the built-in table guesses.
+  frozen_defs : Array[String]
 }
 
 fn LowerCtx::new() -> LowerCtx {
@@ -569,6 +573,7 @@ fn LowerCtx::new() -> LowerCtx {
     adt_families: [],
     is_64bit: false,
     scaled_vars: [],
+    frozen_defs: [],
   }
 }
 
@@ -583,6 +588,9 @@ fn LowerCtx::fresh_helper_name(self : LowerCtx, base : String) -> String {
 }
 
 fn LowerCtx::add_def(self : LowerCtx, name : String, net : Net) -> Unit {
+  if self.frozen_defs.contains(name) {
+    return
+  }
   self.defs.push((name, linearize_net(net)))
 }
 
@@ -2266,7 +2274,9 @@ fn LowerCtx::register_known_constructors(self : LowerCtx) -> Unit {
 }
 
 fn LowerCtx::register_program_adts(self : LowerCtx, prog : @syntax.Program) -> Unit {
-  self.register_known_constructors()
+  // The program is the authority on its own data families. Register them first,
+  // then let the built-in table fill in constructors the program never
+  // declared, without shadowing anything already defined.
   let families = @syntax.discover_adts(prog)
   for fam in families {
     let variants : Array[(String, Int)] = []
@@ -2278,18 +2288,13 @@ fn LowerCtx::register_program_adts(self : LowerCtx, prog : @syntax.Program) -> U
         self.register_single_constr(variants[0].0, variants[0].1)
       }
     } else if variants.length() > 1 {
-      let mut already_registered = false
-      for ctor in fam.ctors {
-        if self.find_constr(ctor.name) is Some(_) {
-          already_registered = true
-          break
-        }
-      }
-      if !already_registered {
-        self.register_adt(variants)
-      }
+      self.register_adt(variants)
     }
   }
+  for def in self.defs {
+    self.frozen_defs.push(def.0)
+  }
+  self.register_known_constructors()
 }
 
 // ----------------------------------------------------------------------------
