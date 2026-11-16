@@ -66,7 +66,17 @@ fn collect_free_vars_in_expr(expr : Expr, bound : Array[String], free : Array[St
         }
       }
     }
-    Constr(_, args) => {
+    Constr(name, args) => {
+      // A GHC top-level function keeps its module prefix through the frontend
+      // (`Data.Map.Internal.balanceR` -> `Data_Map_Internal_balanceR`), so the
+      // name starts with a capital letter and the parser classifies it as a
+      // constructor. If the program defines that name, it is a function and
+      // this is a real edge; if not, it is a constructor and the edge is
+      // dropped by the `defined_names` filter. Skipping this edge pruned whole
+      // library modules out of real projects.
+      if !bound.contains(name) && !free.contains(name) {
+        free.push(name)
+      }
       for a in args {
         collect_free_vars_in_expr(a, bound, free)
       }
