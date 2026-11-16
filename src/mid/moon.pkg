@@ -1,0 +1,3 @@
+import {
+  "coronet/src/syntax" @syntax,
+}

@@ -1,0 +1,15 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "coronet/src/mid"
+
+// Values
+pub fn book_def_names(String) -> Array[String]
+
+pub fn prune_book_text(String, Array[String]) -> String
+
+// Errors
+
+// Types and methods
+
+// Type aliases
+
+// Traits

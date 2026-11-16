@@ -4215,7 +4215,7 @@ pub fn lower_program(raw_prog : @syntax.Program) -> String {
   }
 
   let book = Book::{ defs: ctx.defs }
-  book.to_string()
+  @mid.prune_book_text(book.to_string(), ["main"])
 }
 
 ///| Lower an AST Program to HVM2 string (alias)

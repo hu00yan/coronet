@@ -1,3 +1,4 @@
 import {
   "coronet/src/syntax" @syntax,
+  "coronet/src/mid" @mid,
 }
