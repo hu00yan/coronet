@@ -8,6 +8,7 @@ options(
 
 import {
   "coronet/src/syntax" @syntax,
+  "coronet/src/mid" @mid,
   "coronet/src/lower_hvm2" @lower_hvm2,
   "coronet/src/lower_hvm3" @lower_hvm3,
   "moonbitlang/core/async",

@@ -1,14 +1,52 @@
 // Generated using `moon info`, DON'T EDIT IT
 package "coronet/src/mid"
 
+import {
+  "coronet/src/syntax",
+}
+
 // Values
 pub fn book_def_names(String) -> Array[String]
 
+pub fn canonical(@syntax.Expr) -> String
+
+pub fn canonical_body(String) -> String
+
+pub fn free_names(@syntax.Expr) -> Array[String]
+
+pub fn inline_trivial_lets(@syntax.Expr, MidStats) -> @syntax.Expr
+
+pub fn merge_alpha_duplicate_defs(String) -> String
+
+pub fn merge_alt_bodies(@syntax.Expr, MidStats, Array[Int32]) -> @syntax.Expr
+
+pub fn merge_top_bindings(@syntax.Program, MidStats) -> @syntax.Program
+
+pub fn optimize(@syntax.Program, MidStats) -> @syntax.Program
+
 pub fn prune_book_text(String, Array[String]) -> String
+
+pub fn prune_dead_lets(@syntax.Expr, MidStats) -> @syntax.Expr
+
+pub fn prune_top_bindings(@syntax.Program, MidStats) -> @syntax.Program
+
+pub fn reduce_known_cases(@syntax.Expr, MidStats) -> @syntax.Expr
+
+pub fn uses_name(@syntax.Expr, String) -> Bool
 
 // Errors
 
 // Types and methods
+pub(all) struct MidStats {
+  mut dead_lets : Int32
+  mut inlined_lets : Int32
+  mut cases_reduced : Int32
+  mut alts_merged : Int32
+  mut binds_merged : Int32
+  mut binds_pruned : Int32
+}
+pub fn MidStats::new() -> Self
+pub impl Show for MidStats
 
 // Type aliases
 

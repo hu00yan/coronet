@@ -1,11 +1,24 @@
 ///| Coronet CLI entrypoint
 
+///| Drop emitted definitions that `@main` never reaches.
+fn prune_generated(code : String, enabled : Bool) -> String {
+  if enabled {
+    let pruned = @mid.prune_book_text(code, ["main"])
+    let merged = @mid.merge_alpha_duplicate_defs(pruned)
+    @mid.prune_book_text(merged, ["main"])
+  } else {
+    code
+  }
+}
+
 ///|
 struct CliArgs {
   input_files : Array[String]
   target : String
   output_file : String?
   lto : Bool
+  prune : Bool
+  mid_stats : Bool
 }
 
 ///|
@@ -32,6 +45,9 @@ fn print_usage() -> Unit {
     #|  --cuda                       Shortcut for --target cuda
     #|  --hip                        Shortcut for --target hip
     #|  -o, --output <file>          Output destination file (default: stdout / execute)
+    #|  --no-lto                     Keep all linked top-level bindings
+    #|  --no-prune                   Keep definitions @main cannot reach, unmerged
+    #|  --mid-stats                  Report what the middle-end removed
     #|  -h, --help                   Show this help message and exit
   )
   println(usage)
@@ -43,6 +59,8 @@ fn parse_cli_args(args : Array[String]) -> CliArgs {
   let mut target : String? = None
   let mut output_file : String? = None
   let mut lto = true
+  let mut prune = true
+  let mut mid_stats = false
   let mut i = 1
   while i < args.length() {
     let arg = args[i]
@@ -61,6 +79,10 @@ fn parse_cli_args(args : Array[String]) -> CliArgs {
       lto = true
     } else if arg == "--no-lto" {
       lto = false
+    } else if arg == "--no-prune" {
+      prune = false
+    } else if arg == "--mid-stats" {
+      mid_stats = true
     } else if arg == "--target" {
       i = i + 1
       if i >= args.length() {
@@ -115,12 +137,12 @@ fn parse_cli_args(args : Array[String]) -> CliArgs {
     }
   }
 
-  { input_files, target: tgt, output_file, lto }
+  { input_files, target: tgt, output_file, lto, prune, mid_stats }
 }
 
 ///|
-async fn handle_metal_target(program : @syntax.Program, output_file : String?) -> Unit {
-  let hvm2_code = @lower_hvm2.lower(program)
+async fn handle_metal_target(program : @syntax.Program, output_file : String?, prune_enabled : Bool) -> Unit {
+  let hvm2_code = prune_generated(@lower_hvm2.lower(program), prune_enabled)
   let tmp_dir = "_build/metal"
   if !(@fs.exists(tmp_dir)) {
     let _ = @process.run("mkdir", ["-p", tmp_dir][:])
@@ -151,8 +173,8 @@ async fn handle_metal_target(program : @syntax.Program, output_file : String?) -
 }
 
 ///|
-async fn handle_gpu_target(program : @syntax.Program, output_file : String?) -> Unit {
-  let hvm2_code = @lower_hvm2.lower(program)
+async fn handle_gpu_target(program : @syntax.Program, output_file : String?, prune_enabled : Bool) -> Unit {
+  let hvm2_code = prune_generated(@lower_hvm2.lower(program), prune_enabled)
   let tmp_dir = "_build/gpu"
   if !(@fs.exists(tmp_dir)) {
     let _ = @process.run("mkdir", ["-p", tmp_dir][:])
@@ -243,25 +265,33 @@ async fn main {
     }
   }
 
-  let program = if cli.lto {
+  let linked = if cli.lto {
     @syntax.link_programs_lto(programs, ["main", "result"])
   } else {
     @syntax.link_programs(programs)
   }
+  let mid_stats = @mid.MidStats::new()
+  let program = if cli.mid_stats {
+    let optimized = @mid.optimize(linked, mid_stats)
+    println("middle-end: \{mid_stats}")
+    optimized
+  } else {
+    @mid.optimize(linked, mid_stats)
+  }
 
   if cli.target == "gpu" || cli.target == "cuda" || cli.target == "hip" {
-    handle_gpu_target(program, cli.output_file)
+    handle_gpu_target(program, cli.output_file, cli.prune)
     return
   }
 
   if cli.target == "metal" {
-    handle_metal_target(program, cli.output_file)
+    handle_metal_target(program, cli.output_file, cli.prune)
     return
   }
 
   let generated_code = match cli.target {
-    "hvm2" => @lower_hvm2.lower(program)
-    "hvm3" => @lower_hvm3.lower(program)
+    "hvm2" => prune_generated(@lower_hvm2.lower(program), cli.prune)
+    "hvm3" => prune_generated(@lower_hvm3.lower(program), cli.prune)
     _ => {
       println("Error: Unsupported target '\{cli.target}'")
       @env.exit(1)

@@ -2377,7 +2377,7 @@ pub fn lower_program(raw_program : @syntax.Program) -> String {
     }
   }
 
-  @mid.prune_book_text(join_strings(lines, "\n"), ["main"])
+  join_strings(lines, "\n")
 }
 
 ///| Alias for lower_program

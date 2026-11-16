@@ -154,14 +154,18 @@ pub fn prune_book_text(text : String, roots : Array[String]) -> String {
   while head < queue.length() {
     let name = queue[head]
     head = head + 1
-    let idx = match index_of(names, name) {
-      Some(i) => i
-      None => continue
-    }
-    for r in refs_of(bodies[idx]) {
-      if names.contains(r) && !reachable.contains(r) {
-        reachable.push(r)
-        queue.push(r)
+    // A book may define the same name twice. Both bodies load, so both
+    // contribute edges; scanning only the first one drops dependencies the
+    // runtime still needs.
+    for i, defined in names {
+      if defined != name {
+        continue
+      }
+      for r in refs_of(bodies[i]) {
+        if names.contains(r) && !reachable.contains(r) {
+          reachable.push(r)
+          queue.push(r)
+        }
       }
     }
   }
@@ -208,4 +212,203 @@ pub fn book_def_names(text : String) -> Array[String] {
     }
   }
   names
+}
+
+// ----------------------------------------------------------------------------
+// Merging alpha-identical definitions
+// ----------------------------------------------------------------------------
+
+///| Canonical form of a definition body: every local name becomes `vN` on its
+///| first occurrence, `@global` references keep their spelling. Two bodies with
+///| the same canonical form are the same net under a renaming of its wires.
+pub fn canonical_body(body : String) -> String {
+  let buf = StringBuilder()
+  let names : Array[String] = []
+  let mut i = 0
+  while i < body.length() {
+    let c = body[i]
+    if c == '@' {
+      let mut end = i + 1
+      while end < body.length() && is_name_char(body[end]) {
+        end = end + 1
+      }
+      buf.write_string(body[i:end].to_owned())
+      i = end
+    } else if is_name_char(c) && !is_digit_char(c) {
+      let mut end = i + 1
+      while end < body.length() && is_name_char(body[end]) {
+        end = end + 1
+      }
+      let name = body[i:end].to_owned()
+      let idx = match index_of(names, name) {
+        Some(found) => found
+        None => {
+          names.push(name)
+          names.length() - 1
+        }
+      }
+      buf.write_string("v\{idx}")
+      i = end
+    } else {
+      buf.write_string(body[i:i + 1].to_owned())
+      i = i + 1
+    }
+  }
+  buf.to_string()
+}
+
+///| The part of a definition block after its `=` header. The header names the
+///| definition, so two bodies that differ only there are still the same net.
+fn def_value(body : String) -> String {
+  let mut i = 0
+  while i < body.length() {
+    if body[i] == '=' {
+      return body[i + 1:].to_owned()
+    }
+    i = i + 1
+  }
+  body
+}
+
+fn is_digit_char(c : UInt16) -> Bool {
+  c >= '0' && c <= '9'
+}
+
+///| Replace `@from` references with `@to` in a body, whole names only.
+fn rename_refs(body : String, renames : Array[(String, String)]) -> String {
+  if renames.length() == 0 {
+    return body
+  }
+  let buf = StringBuilder()
+  let mut i = 0
+  while i < body.length() {
+    if body[i] == '@' {
+      let mut end = i + 1
+      while end < body.length() && is_name_char(body[end]) {
+        end = end + 1
+      }
+      let name = body[i + 1:end].to_owned()
+      let mut replaced = false
+      for r in renames {
+        if r.0 == name {
+          buf.write_string("@")
+          buf.write_string(r.1)
+          replaced = true
+          break
+        }
+      }
+      if !replaced {
+        buf.write_string(body[i:end].to_owned())
+      }
+      i = end
+    } else {
+      buf.write_string(body[i:i + 1].to_owned())
+      i = i + 1
+    }
+  }
+  buf.to_string()
+}
+
+///| Collapse definitions whose nets are identical under a renaming of their
+///| local wires. Every remaining reference points at the surviving definition,
+///| so the book carries one copy of the net instead of one per occurrence.
+pub fn merge_alpha_duplicate_defs(text : String) -> String {
+  let lines = lines_of(text)
+  let preamble : Array[String] = []
+  let names : Array[String] = []
+  let bodies : Array[String] = []
+  let current : Array[String] = []
+  let mut current_name : String? = None
+  for line in lines {
+    match def_name_of_line(line) {
+      Some(name) => {
+        match current_name {
+          Some(prev) => {
+            names.push(prev)
+            bodies.push(join_lines(current))
+            current.clear()
+          }
+          None => ()
+        }
+        current_name = Some(name)
+        current.push(line)
+      }
+      None => {
+        match current_name {
+          Some(_) => current.push(line)
+          None => preamble.push(line)
+        }
+      }
+    }
+  }
+  match current_name {
+    Some(prev) => {
+      names.push(prev)
+      bodies.push(join_lines(current))
+    }
+    None => return text
+  }
+
+  // The first definition of a name is the one an alpha-merge may redirect refs
+  // to; a name defined twice keeps both blocks, so a rename never changes which
+  // body the runtime loads last.
+  let duplicated_names : Array[String] = []
+  for i, name in names {
+    for j = i + 1; j < names.length(); j = j + 1 {
+      if names[j] == name && !duplicated_names.contains(name) {
+        duplicated_names.push(name)
+      }
+    }
+  }
+
+  let kept_alive : Array[Bool] = []
+  for _ in names {
+    kept_alive.push(true)
+  }
+  let renames : Array[(String, String)] = []
+
+  for round = 0; round < 3; round = round + 1 {
+    let keys : Array[String] = []
+    let owners : Array[String] = []
+    let round_renames : Array[(String, String)] = []
+    for i, name in names {
+      if !kept_alive[i] || duplicated_names.contains(name) {
+        continue
+      }
+      let key = canonical_body(def_value(rename_refs(bodies[i], renames)))
+      let owner = match index_of(keys, key) {
+        Some(found) => owners[found]
+        None => {
+          keys.push(key)
+          owners.push(name)
+          continue
+        }
+      }
+      if owner != name {
+        round_renames.push((name, owner))
+      }
+    }
+    if round_renames.length() == 0 {
+      break
+    }
+    for rename in round_renames {
+      renames.push(rename)
+      let idx = match index_of(names, rename.0) {
+        Some(found) => found
+        None => continue
+      }
+      kept_alive[idx] = false
+    }
+  }
+
+  let kept : Array[String] = []
+  for line in preamble {
+    kept.push(line)
+  }
+  for i, name in names {
+    if kept_alive[i] {
+      kept.push(rename_refs(bodies[i], renames))
+    }
+  }
+  join_lines(kept)
 }
