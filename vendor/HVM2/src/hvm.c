@@ -171,11 +171,82 @@ typedef struct TM {
   u32  vput; // next vars allocation attempt index
   u32  hput; // next hbag push index
   u32  rput; // next rbag push index
-  u32  sidx; // steal index
+  u32  vcur[TPC]; // per-victim steal cursor (CORONET-STEAL)
   u32  nloc[0xFFF]; // global node allocation indices
   u32  vloc[0xFFF]; // global vars allocation indices
   Pair hbag_buf[HLEN]; // high-priority redexes
+  // CORONET-DIAG3
+  u32  s_probes; // idle steal probes attempted
+  u32  s_hits;   // steal probes that got a redex
+  u32  s_stolen; // redexes taken in bulk by the scancap mode
+  u32  s_stuck;  // misses where the victim's rput sat far above the cursor
+  u32  s_max_stuck_rput; // highest victim rput seen while stuck
+  u32  s_max_bag; // max of hput+rput seen in the busy loop
+  u32  s_max_h;   // max hput seen
+  u32  s_max_r;   // max rput seen
+  // CORONET-DIAG3 end
 } TM;
+
+// CORONET-DIAG: per-def/per-rule interaction counters, enabled by HVM_DIAG=1.
+static _Atomic u64 G_DEF_ITRS[0x4000];
+static _Atomic u64 G_RULE_ITRS[8];
+static _Atomic u64 G_DIAG_TOTAL;
+static _Atomic u64 G_DIAG_ITRS;
+static _Atomic u64 G_TID_ITRS[TPC];
+// CORONET-DIAG3: per-thread steal probes/hits and bag depth maxima, HVM_DIAG=3.
+// Local counters updated on the idle path and one compare per loop pass; no
+// per-interaction atomics, so timings stay clean. G_TM mirrors the global
+// TM table because the evaluator's `tm` parameter shadows it.
+static TM* G_TM[TPC];
+static int G_DIAG = -1;
+static int diag_on(void) {
+  if (G_DIAG < 0) {
+    char* e = getenv("HVM_DIAG");
+    G_DIAG = (e != NULL && e[0] >= '1' && e[0] <= '3') ? (e[0] - '0') : 0;
+  }
+  return G_DIAG;
+}
+// CORONET-DIAG end
+
+// CORONET-STEAL: steal strategies. The default (HVM_STEAL unset or empty)
+// ships scancap: ring sweep + rput-hinted cursor walk + bounded bulk take.
+// HVM_STEAL=none selects the original one-slot, left-neighbor probe with
+// reset-on-miss cursor. Measured on M1 Pro (docs/PERF_BASELINE.md):
+// nqueens9 8t eval median 0.27s -> 0.06s, every cell flat or better, 1t
+// within noise.
+//   half     - a hit takes half of the victim's live run (bounded scan)
+//   walk     - on a miss the cursor walks up when the victim's stack top sits
+//              above it (stolen holes park below the live zone) and resets
+//              only when the stack receded below the cursor
+//   scan     - each idle tick sweeps every victim (self excluded, TPC > 1)
+//   scanwalk - scan + walk
+//   scancap  - scan + walk + a bounded bulk take (STEAL_BULK_CAP live slots)
+//   boot     - make the boot redex visible to thread 0's own pop
+#define STEAL_HALF 1
+#define STEAL_BULK 2
+#define STEAL_SCAN 4
+#define STEAL_BOOT 8
+#define STEAL_WALK 16
+#define STEAL_SCAN_CAP 4096 // bounds the half mode's live-run scan
+#define STEAL_BULK_CAP 16   // bounds the scancap mode's bulk take
+#define STEAL_DEFAULT (STEAL_SCAN | STEAL_WALK | STEAL_BULK)
+static int G_STEAL = -1;
+static int steal_mode(void) {
+  if (G_STEAL < 0) {
+    const char* e = getenv("HVM_STEAL");
+    if (e == NULL || e[0] == 0)          G_STEAL = STEAL_DEFAULT;
+    else if (strcmp(e, "none") == 0)     G_STEAL = 0;
+    else if (strcmp(e, "half") == 0)     G_STEAL = STEAL_HALF;
+    else if (strcmp(e, "walk") == 0)     G_STEAL = STEAL_WALK;
+    else if (strcmp(e, "scan") == 0)     G_STEAL = STEAL_SCAN;
+    else if (strcmp(e, "scanwalk") == 0) G_STEAL = STEAL_SCAN | STEAL_WALK;
+    else if (strcmp(e, "scancap") == 0)  G_STEAL = STEAL_SCAN | STEAL_WALK | STEAL_BULK;
+    else if (strcmp(e, "boot") == 0)     G_STEAL = STEAL_BOOT;
+    else G_STEAL = 0;
+  }
+  return G_STEAL;
+}
+// CORONET-STEAL end
 
 // Debugger
 // --------
@@ -629,13 +700,22 @@ TM* tm_new(u32 tid) {
   tm->vput = 1;
   tm->rput = 0;
   tm->hput = 0;
-  tm->sidx = 0;
+  memset(tm->vcur, 0, sizeof(tm->vcur));
+  tm->s_probes = 0;
+  tm->s_hits = 0;
+  tm->s_stolen = 0;
+  tm->s_stuck = 0;
+  tm->s_max_stuck_rput = 0;
+  tm->s_max_bag = 0;
+  tm->s_max_h = 0;
+  tm->s_max_r = 0;
   return tm;
 }
 
 void alloc_static_tms() {
   for (u32 t = 0; t < TPC; ++t) {
     tm[t] = tm_new(t);
+    G_TM[t] = tm[t];
   }
 }
 
@@ -901,6 +981,10 @@ static inline bool interact_call(Net* net, TM* tm, Port a, Port b, Book* book) {
   }
   link_pair(net, tm, new_pair(adjust_port(net, tm, def->root), b));
 
+  // CORONET-DIAG
+  if (diag_on() == 1) atomic_fetch_add_explicit(&G_DEF_ITRS[fid], 1, memory_order_relaxed);
+  // CORONET-DIAG end
+
   return true;
 }
 #endif
@@ -1093,6 +1177,9 @@ static inline bool interact(Net* net, TM* tm, Book* book) {
 
     // Dispatches interaction rule.
     bool success;
+    // CORONET-DIAG
+    if (diag_on() == 1) { atomic_fetch_add_explicit(&G_RULE_ITRS[rule], 1, memory_order_relaxed); atomic_fetch_add_explicit(&G_DIAG_TOTAL, 1, memory_order_relaxed); }
+    // CORONET-DIAG end
     switch (rule) {
       case LINK: success = interact_link(net, tm, a, b); break;
       #ifdef COMPILED
@@ -1115,6 +1202,7 @@ static inline bool interact(Net* net, TM* tm, Book* book) {
     // Else, increments the interaction count.
     } else if (rule != LINK) {
       tm->itrs += 1;
+      if (diag_on() == 1) atomic_fetch_add_explicit(&G_DIAG_ITRS, 1, memory_order_relaxed);
     }
   }
 
@@ -1132,6 +1220,8 @@ void evaluator(Net* net, TM* tm, Book* book) {
   // Performs some interactions
   u32  tick = 0;
   bool busy = tm->tid == 0;
+  int  d3   = diag_on() == 3;
+  int  smode = steal_mode();
   while (true) {
     tick += 1;
 
@@ -1140,6 +1230,15 @@ void evaluator(Net* net, TM* tm, Book* book) {
       // Update global idle counter
       if (!busy) atomic_fetch_sub_explicit(&net->idle, 1, memory_order_relaxed);
       busy = true;
+
+      // CORONET-DIAG3
+      if (d3) {
+        u32 L = rbag_len(net, tm);
+        if (L > tm->s_max_bag) tm->s_max_bag = L;
+        if (tm->hput > tm->s_max_h) tm->s_max_h = tm->hput;
+        if (tm->rput > tm->s_max_r) tm->s_max_r = tm->rput;
+      }
+      // CORONET-DIAG3 end
 
       // Perform an interaction
       #ifdef DEBUG
@@ -1153,18 +1252,70 @@ void evaluator(Net* net, TM* tm, Book* book) {
       if (busy) atomic_fetch_add_explicit(&net->idle, 1, memory_order_relaxed);
       busy = false;
 
-      //// Peeks a redex from target
-      u32 sid = (tm->tid - 1) % TPC;
-      u32 idx = sid*(G_RBAG_LEN/TPC) + (tm->sidx++);
-
-      // Stealing Everything: this will steal all redexes
-
-      Pair got = atomic_exchange_explicit(&net->rbag_buf[idx], 0, memory_order_relaxed);
+      //// Peeks a redex from a neighbor
+      // CORONET-STEAL: probes slot vcur[v] of the left neighbor (default) or
+      // sweeps every victim (scan; self excluded when TPC > 1). walk mode
+      // repositions the cursor on a miss using the victim's rput read racily
+      // as a hint; a wrong guess self-corrects on a later tick.
+      int  sm    = smode;
+      u32  first = (tm->tid + TPC - 1) % TPC;
+      u32  sid   = first;
+      Pair got   = 0;
+      // CORONET-DIAG3
+      for (u32 k = 0; k < TPC && got == 0; ++k) {
+        u32 v = (sm & STEAL_SCAN) ? (first + TPC - k) % TPC : first;
+        if ((sm & STEAL_SCAN) && TPC > 1 && v == tm->tid) continue;
+        got = atomic_exchange_explicit(&net->rbag_buf[v*(G_RBAG_LEN/TPC) + tm->vcur[v]], 0, memory_order_relaxed);
+        if (got != 0) {
+          sid = v;
+          tm->vcur[v] += 1;
+          if (tm->vcur[v] >= (G_RBAG_LEN/TPC)) tm->vcur[v] = 0;
+        } else if (sm & STEAL_WALK) {
+          u32 vr = G_TM[v]->rput;
+          if (vr < tm->vcur[v]) tm->vcur[v] = 0;
+          else if (vr > tm->vcur[v] && tm->vcur[v] + 1 < (G_RBAG_LEN/TPC)) tm->vcur[v] += 1;
+          if (!(sm & STEAL_SCAN)) break;
+        } else {
+          tm->vcur[v] = 0;
+          if (!(sm & STEAL_SCAN)) break;
+        }
+        if (d3) tm->s_probes += 1;
+      }
+      if (d3 && got != 0) tm->s_hits += 1;
+      // CORONET-DIAG3 end
       if (got != 0) {
         push_redex(net, tm, got);
+        // CORONET-STEAL: half takes half of the victim's live run (the bottom
+        // holds the oldest siblings); scancap drains up to STEAL_BULK_CAP
+        // slots. Both bounds keep the exchange burst short so the victim's
+        // own pops stay hot.
+        if (sm & (STEAL_HALF | STEAL_BULK)) {
+          u32 seg = sid*(G_RBAG_LEN/TPC);
+          u32 take = 0;
+          if (sm & STEAL_HALF) {
+            u32 cnt = 0;
+            u32 room = (G_RBAG_LEN/TPC) - tm->vcur[sid];
+            if (room > STEAL_SCAN_CAP) room = STEAL_SCAN_CAP;
+            while (cnt < room &&
+                   atomic_load_explicit(&net->rbag_buf[seg + tm->vcur[sid] + cnt], memory_order_relaxed) != 0) {
+              cnt++;
+            }
+            take = cnt / 2;
+          } else {
+            take = STEAL_BULK_CAP;
+          }
+          if (take > (G_RBAG_LEN/TPC) - tm->vcur[sid]) take = (G_RBAG_LEN/TPC) - tm->vcur[sid];
+          for (u32 i = 0; i < take; ++i) {
+            Pair g2 = atomic_exchange_explicit(&net->rbag_buf[seg + tm->vcur[sid] + i], 0, memory_order_relaxed);
+            if (g2 == 0) continue;
+            push_redex(net, tm, g2);
+            if (d3) tm->s_stolen += 1;
+          }
+          tm->vcur[sid] += take;
+          if (tm->vcur[sid] >= (G_RBAG_LEN/TPC)) tm->vcur[sid] = 0;
+        }
+        // CORONET-STEAL end
         continue;
-      } else {
-        tm->sidx = 0;
       }
 
       // Chill...
@@ -1181,6 +1332,7 @@ void evaluator(Net* net, TM* tm, Book* book) {
   sync_threads();
 
   atomic_fetch_add(&net->itrs, tm->itrs);
+  if (diag_on()) atomic_fetch_add_explicit(&G_TID_ITRS[tm->tid], tm->itrs, memory_order_relaxed);
   tm->itrs = 0;
 }
 
@@ -1204,6 +1356,15 @@ void* thread_func(void* arg) {
 void boot_redex(Net* net, Pair redex) {
   net->vars_buf[get_val(ROOT)] = NONE;
   net->rbag_buf[0] = redex;
+  // CORONET-STEAL: HVM_STEAL=boot makes the root poppable by thread 0
+  // itself. The plain store above leaves rput at 0, so at TPC >= 2 the root
+  // is invisible to the owning thread and always reaches the net through a
+  // single-redex steal by the left neighbor.
+  if (steal_mode() & STEAL_BOOT) {
+    tm[0]->rput = 1;
+    tm[0]->hput = 0;
+  }
+  // CORONET-STEAL end
 }
 
 // Evaluates all redexes.
@@ -1783,6 +1944,53 @@ void hvm_c(u32* book_buffer) {
   printf("- ITRS: %" PRIu64 "\n", itrs);
   printf("- TIME: %.2fs\n", duration);
   printf("- MIPS: %.2f\n", (double)itrs / duration / 1000000.0);
+
+  // CORONET-DIAG
+  if (diag_on() == 2) {
+    printf("- TID_ITRS:");
+    for (u32 t = 0; t < TPC; t++) {
+      printf(" %u=%" PRIu64, t, atomic_load(&G_TID_ITRS[t]));
+    }
+    printf("\n");
+  }
+  if (diag_on() == 3) {
+    printf("- TID_ITRS:");
+    for (u32 t = 0; t < TPC; t++) {
+      printf(" %u=%" PRIu64, t, atomic_load(&G_TID_ITRS[t]));
+    }
+    printf("\n");
+    printf("- STEAL:");
+    for (u32 t = 0; t < TPC; t++) {
+      TM* m = tm[t];
+      printf(" %u=p%u,h%u,stk%u,stuck%u,mr%u,bag%u,hmax%u,rmax%u", t,
+             m->s_probes, m->s_hits, m->s_stolen,
+             m->s_stuck, m->s_max_stuck_rput,
+             m->s_max_bag, m->s_max_h, m->s_max_r);
+    }
+    printf("\n");
+  }
+  if (diag_on() == 1) {
+    static const char* RULE_NAMES[8] = {"LINK","CALL","VOID","ERAS","ANNI","COMM","OPER","SWIT"};
+    printf("- RULE_ITRS: total=%" PRIu64 " itrs_inc=%" PRIu64 " LINK=%" PRIu64, atomic_load(&G_DIAG_TOTAL), atomic_load(&G_DIAG_ITRS), atomic_load(&G_RULE_ITRS[0]));
+    for (int r = 1; r < 8; r++) {
+      u64 v = atomic_load(&G_RULE_ITRS[r]);
+      if (v > 0) printf(" %s=%" PRIu64, RULE_NAMES[r], v);
+    }
+    printf("\n");
+    printf("- TID_ITRS:");
+    for (u32 t = 0; t < TPC; t++) {
+      printf(" %u=%" PRIu64, t, atomic_load(&G_TID_ITRS[t]));
+    }
+    printf("\n");
+    printf("- DEF_ITRS:\n");
+    for (u32 d = 0; d < book->defs_len; d++) {
+      u64 v = atomic_load(&G_DEF_ITRS[d]);
+      if (v > 0) {
+        printf("  %s %" PRIu64 "\n", book->defs_buf[d].name, v);
+      }
+    }
+  }
+  // CORONET-DIAG end
 
   // Frees everything
   free_static_tms();
