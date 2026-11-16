@@ -28,7 +28,18 @@ measurement.
 
 The patch touches no behavior when the variable is unset, and the drain-steal
 experiment below was reverted from the same file. Vendor changes stay in the
-worktree by policy and are listed here for review.
+worktree by policy and are listed here for review:
+
+- `src/hvm.c`: the `CORONET-DIAG` counters and the `HVM_TPC_L2` build override
+  in `build.rs` (measurement only).
+- `src/hvm.rs`: the DUP~REF interaction carries the C runtime's
+  `def.safe` guard again. The worktree it was cloned from had erased
+  DUP~REF unconditionally, which is sound but defeats the
+  expand-once-then-clone path: on the post-CAF-pass `map300` book the Rust
+  interpreter performed 135,290,287 interactions where the C runtime performs
+  2,134,946. With the guard restored both report 2,134,946.
+- The drain-steal steal-loop experiment was applied, measured, and reverted
+  (see the scheduling section).
 
 ## map300: where 450k interactions per element went
 
