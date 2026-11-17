@@ -92,11 +92,24 @@ Results (HVM2 C runtime, 1 thread):
 | `map300` | 135,290,287 | 2,134,946 | 63x, result 91400 unchanged |
 | `map_core` | 10,999,753 | 317,025 | 35x, result 10570 unchanged |
 
-The residual 2.13M is close to the floor this runtime model allows: each of
-the 301 readers needs its own copy of every node it touches, because CON-CON
-annihilation destroys the cell it reads. The post-pass rule mix (COMM 20%,
-ERAS 33%) is clone-and-discard traffic of exactly that kind. Cutting it
-further needs a read-only traversal encoding in the lowerer, not a tree pass.
+The residual 2.13M was clone-and-discard traffic: CON-CON annihilation
+destroys the cell a reader matches, so each of the 301 reads copied every node
+it touched (post-pass rule mix COMM 20%, ERAS 33%). The
+`rebuild_shared_reads` pass closes that without a new encoding: the loop's
+reader call is redirected to a pair-returning twin that returns
+`(result, node rebuilt from the sub-reads)`, so the reader puts the spine back
+and each read allocates one node per level instead of copying a subtree.
+
+| input | after CAF pass | after rebuild | |
+| --- | ---: | ---: | --- |
+| `map300` | 2,134,946 | 621,416 | 3.4x, result 91400 unchanged |
+| `map_core` | 317,025 | 154,766 | 2.0x, result 10570 unchanged |
+
+The pass fires only when the member's reader call feeds a `case`, the reader's
+recursive reads sit in tail position of its alternatives, and no path reads
+two children. Anything else is left alone, which is why nqueens9 and
+bytestring_core are unchanged: their data already flows through explicit
+recursion arguments.
 
 nqueens9 (22,884,287) and bytestring_core (33,229) are untouched by the pass:
 their data already flows through explicit recursion arguments. nqueens9's cost

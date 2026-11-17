@@ -38,6 +38,7 @@ a branch of one scrutinee. Two representations carry that shape:
 | --- | --- |
 | `prune_top_bindings` | top-level bindings no entry point reaches |
 | `thread_caf_sharing` | re-expansion of a computed top-level binding once per iteration of the recursive loop that reads it |
+| `rebuild_shared_reads` | per-read copying of a threaded CAF's nodes: the reader returns the node it rebuilt, so the loop threads a fresh one |
 | `prune_dead_lets` | `let` bindings their body never reads |
 | `inline_trivial_lets` | `let x = y` / `let x = lit` wires, refusing when substitution would capture |
 | `reduce_known_cases` | `case` on a constructor or literal, plus the alternatives that cannot be taken |
@@ -73,7 +74,8 @@ package: HVM2 `ITRS` for `map_core` is 10 999 753 both ways, for `GhcCompiler`
 and load it, not the reduction a program performs. Cutting runtime interactions
 needs a different encoding, not a smaller book.
 
-`thread_caf_sharing` is the one pass that does cut runtime interactions. A
+`thread_caf_sharing` and `rebuild_shared_reads` are the passes that cut runtime
+interactions rather than artifact size. A
 computed top-level binding (a CAF) lowers to a REF that re-expands on every
 activation of the net containing it; when that net is a recursive loop, the
 computation reruns per iteration. Threading the CAF as an explicit parameter

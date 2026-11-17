@@ -178,3 +178,21 @@ test "trivial and lambda-valued bindings are never threaded" {
   )
   assert_true(stats.cafs_threaded == 0)
 }
+
+///|
+test "a threaded CAF read by a case-matching reader gets a pair-returning twin" {
+  let stats = MidStats::new()
+  let prog = optimize(
+    parse(
+      #|m = build Tip
+      #|find = \ dflt k t -> case t of { Tip -> dflt; Bin kk v l r -> case ==# k kk of { 1# -> v; __DEFAULT -> find dflt k l } }
+      #|loop = \ i acc -> case i of { 0# -> acc; __DEFAULT -> case find 0# i m of x { __DEFAULT -> loop (+ i 1#) (+ acc x) } }
+      #|main = loop 3# 0#
+    ),
+    stats,
+  )
+  assert_eq(stats.readers_rebuilt, 1)
+  let text = prog.to_string()
+  assert_true(text.contains("find_rb"))
+  assert_true(text.contains("(,)"))
+}

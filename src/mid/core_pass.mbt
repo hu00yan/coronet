@@ -17,6 +17,7 @@ pub(all) struct MidStats {
   mut binds_merged : Int
   mut binds_pruned : Int
   mut cafs_threaded : Int
+  mut readers_rebuilt : Int
 }
 
 pub fn MidStats::new() -> MidStats {
@@ -28,12 +29,13 @@ pub fn MidStats::new() -> MidStats {
     binds_merged: 0,
     binds_pruned: 0,
     cafs_threaded: 0,
+    readers_rebuilt: 0,
   }
 }
 
 pub impl Show for MidStats with output(self, logger) {
   logger.write_string(
-    "dead lets \{self.dead_lets}, inlined lets \{self.inlined_lets}, cases reduced \{self.cases_reduced}, alternatives merged \{self.alts_merged}, binds merged \{self.binds_merged}, binds pruned \{self.binds_pruned}, cafs threaded \{self.cafs_threaded}",
+    "dead lets \{self.dead_lets}, inlined lets \{self.inlined_lets}, cases reduced \{self.cases_reduced}, alternatives merged \{self.alts_merged}, binds merged \{self.binds_merged}, binds pruned \{self.binds_pruned}, cafs threaded \{self.cafs_threaded}, readers rebuilt \{self.readers_rebuilt}",
   )
 }
 
@@ -1282,6 +1284,7 @@ pub fn thread_caf_sharing(prog : @syntax.Program, stats : MidStats) -> @syntax.P
   current
 }
 
+
 fn join_names(names : Array[String]) -> String {
   let buf = StringBuilder()
   for i, n in names {
@@ -1297,11 +1300,558 @@ fn array_contains(arr : Array[String], target : String) -> Bool {
   index_of_str(arr, target) is Some(_)
 }
 
+
+// ----------------------------------------------------------------------------
+// Rebuild-shared-reads pass
+// ----------------------------------------------------------------------------
+
+///| A threaded CAF's wire is consumed destructively by every reader: the case
+///| selector annihilates the Scott cells, so each reader needs its own copy and
+///| the per-iteration DUP split of the CAF degrades into a growing SUP chain
+///| whose crossings clone whole subtrees. The fix is to make the reader put the
+///| structure back: the reader returns ``Pair result rebuilt`` and the loop
+///| threads the rebuilt structure, which is freshly allocated and therefore
+///| singly referenced -- no DUP on the structure's wire at any point.
+
+///| A reader call site found in a threaded cycle member's body.
+priv struct ReaderCallSite {
+  fn_name : String
+  arg_pos : Int
+  args : Array[@syntax.Expr]
+}
+
+///| Unwinds a nested single-parameter lambda chain into its parameter list and
+///| the innermost body.
+fn unwind_reader_lams(expr : @syntax.Expr) -> (Array[String], @syntax.Expr) {
+  let params : Array[String] = []
+  let mut cur = expr
+  while true {
+    match cur {
+      Lam(p, rest) => {
+        params.push(p)
+        cur = rest
+      }
+      _ => break
+    }
+  }
+  (params, cur)
+}
+
+///| Reads of `name` in `expr` that no lambda, let or pattern binder shadows.
+fn param_uses(expr : @syntax.Expr, name : String) -> Int {
+  match expr {
+    Var(x) => if x == name { 1 } else { 0 }
+    LitInt(_) | LitChar(_) | LitString(_) => 0
+    App(f, a) => param_uses(f, name) + param_uses(a, name)
+    Lam(p, body) => if p == name { 0 } else { param_uses(body, name) }
+    Let(NonRec(n, v), body) =>
+      if n == name {
+        0
+      } else {
+        param_uses(v, name) + param_uses(body, name)
+      }
+    Let(Rec(pairs), body) => {
+      for p in pairs {
+        if p.0 == name {
+          return 0
+        }
+      }
+      let mut total = param_uses(body, name)
+      for p in pairs {
+        total = total + param_uses(p.1, name)
+      }
+      total
+    }
+    Case(scrut, binder, alts) => {
+      let mut total = param_uses(scrut, name)
+      for alt in alts {
+        let mut shadows = binder == name
+        match alt.pat {
+          Default(Some(v)) => if v == name { shadows = true }
+          Data(_, vars) =>
+            for v in vars {
+              if v == name {
+                shadows = true
+              }
+            }
+          _ => ()
+        }
+        if !shadows {
+          total = total + param_uses(alt.expr, name)
+        }
+      }
+      total
+    }
+    Constr(_, args) => {
+      let mut total = 0
+      for a in args {
+        total = total + param_uses(a, name)
+      }
+      total
+    }
+  }
+}
+
+///| Does `expr` apply `fn_name` anywhere?
+fn calls_fn(expr : @syntax.Expr, fn_name : String) -> Bool {
+  match expr {
+    App(_, _) => {
+      let (head, args) = expr.unwind_app()
+      let mut hit = false
+      match head {
+        Var(n) => if n == fn_name { hit = true }
+        _ => ()
+      }
+      if hit {
+        return true
+      }
+      if calls_fn(head, fn_name) {
+        return true
+      }
+      for a in args {
+        if calls_fn(a, fn_name) {
+          return true
+        }
+      }
+      false
+    }
+    Lam(_, body) => calls_fn(body, fn_name)
+    Let(bind, body) =>
+      match bind {
+        NonRec(_, v) => calls_fn(v, fn_name) || calls_fn(body, fn_name)
+        Rec(pairs) => {
+          for p in pairs {
+            if calls_fn(p.1, fn_name) {
+              return true
+            }
+          }
+          calls_fn(body, fn_name)
+        }
+      }
+    Case(scrut, _, alts) => {
+      if calls_fn(scrut, fn_name) {
+        return true
+      }
+      for alt in alts {
+        if calls_fn(alt.expr, fn_name) {
+          return true
+        }
+      }
+      false
+    }
+    Constr(_, args) => {
+      for a in args {
+        if calls_fn(a, fn_name) {
+          return true
+        }
+      }
+      false
+    }
+    _ => false
+  }
+}
+
+///| A direct application handing the threaded CAF parameter to a function of
+///| matching arity. The member's own self-calls are not readers.
+fn reader_call_site(
+  expr : @syntax.Expr,
+  param : String,
+  member : String,
+  prog : @syntax.Program
+) -> ReaderCallSite? {
+  match expr {
+    App(_, _) => {
+      let (head, args) = expr.unwind_app()
+      match head {
+        Var(n) =>
+          if n != member && args.length() > 0 {
+            for i, a in args {
+              match a {
+                Var(v) =>
+                  if v == param {
+                    match prog.lookup(n) {
+                      Some(fexpr) => {
+                        let (fparams, _) = unwind_reader_lams(fexpr)
+                        if fparams.length() == args.length() {
+                          return Some({ fn_name: n, arg_pos: i, args })
+                        }
+                      }
+                      _ => ()
+                    }
+                  }
+                _ => ()
+              }
+            }
+          }
+        _ => ()
+      }
+      None
+    }
+    _ => None
+  }
+}
+
+///| Rewrites one reader alternative body into an expression evaluating to
+///| `(result, node rebuilt from the recursive reads)`. A branch that reads no
+///| child returns the node unchanged, so exactly one pair is produced per path.
+fn rb_pair(
+  expr : @syntax.Expr,
+  ctor : String,
+  vars : Array[String],
+  fn_name : String,
+  twin : String,
+  read_pos : Int,
+  taken : Array[String]
+) -> Option[@syntax.Expr] {
+  match expr {
+    App(_, _) => {
+      let (head, args) = expr.unwind_app()
+      let mut is_self = false
+      match head {
+        Var(n) => if n == fn_name { is_self = true }
+        _ => ()
+      }
+      if !is_self {
+        return None
+      }
+      if args.length() <= read_pos {
+        return None
+      }
+      match args[read_pos] {
+        Var(v) =>
+          match index_of_str(vars, v) {
+            Some(j) => {
+              let y = fresh_name(fn_name + "_rbres", taken)
+              taken.push(y)
+              let m = fresh_name(fn_name + "_rbmap", taken)
+              taken.push(m)
+              let call_args : Array[@syntax.Expr] = []
+              for a in args {
+                call_args.push(a)
+              }
+              let call = @syntax.Expr::apps(Var(twin), call_args)
+              let fields : Array[@syntax.Expr] = []
+              for i, f in vars {
+                if i == j {
+                  fields.push(Var(m))
+                } else {
+                  fields.push(Var(f))
+                }
+              }
+              let rebuilt = @syntax.Constr(ctor, fields)
+              let pair = @syntax.Constr("(,)", [Var(y), rebuilt])
+              Some(@syntax.Case(call, "", [@syntax.Alt::data("(,)", [y, m], pair)]))
+            }
+            None => None
+          }
+        _ => None
+      }
+    }
+    Case(scrut, binder, alts) => {
+      if calls_fn(scrut, fn_name) {
+        return None
+      }
+      if binder.length() > 0 {
+        for v in vars {
+          if v == binder {
+            return None
+          }
+        }
+      }
+      let new_alts : Array[@syntax.Alt] = []
+      for alt in alts {
+        match rb_pair(alt.expr, ctor, vars, fn_name, twin, read_pos, taken) {
+          Some(e) => new_alts.push(@syntax.Alt::new(alt.pat, e))
+          None => return None
+        }
+      }
+      Some(@syntax.Case(scrut, binder, new_alts))
+    }
+    _ =>
+      if calls_fn(expr, fn_name) {
+        None
+      } else {
+        let fields : Array[@syntax.Expr] = []
+        for f in vars {
+          fields.push(Var(f))
+        }
+        Some(@syntax.Constr("(,)", [expr, @syntax.Constr(ctor, fields)]))
+      }
+  }
+}
+
+///| Builds the pair-returning twin of the reader `fn_name`: same parameters, and
+///| each alternative returns `(result, node)`. `None` when the reader's shape
+///| cannot carry a rebuilt node.
+fn build_reader_twin(
+  prog : @syntax.Program,
+  taken : Array[String],
+  fn_name : String,
+  arg_pos : Int
+) -> (String, @syntax.Expr)? {
+  match prog.lookup(fn_name) {
+    Some(fexpr) => {
+      let (params, body) = unwind_reader_lams(fexpr)
+      if arg_pos >= params.length() {
+        return None
+      }
+      let s = params[arg_pos]
+      match body {
+        Case(scrut, binder, alts) => {
+          let x : String = match scrut {
+            Var(v) => v
+            _ => return None
+          }
+          if !(x == s && alts.length() >= 2) {
+            return None
+          }
+          let twin = fresh_name(fn_name + "_rb", taken)
+          taken.push(twin)
+          let new_alts : Array[@syntax.Alt] = []
+          for alt in alts {
+            match alt.pat {
+              Data(ctor, vars) =>
+                match rb_pair(alt.expr, ctor, vars, fn_name, twin, arg_pos, taken) {
+                  Some(e) => new_alts.push(@syntax.Alt::data(ctor, vars, e))
+                  None => return None
+                }
+              _ => return None
+            }
+          }
+          let twin_body = @syntax.Case(@syntax.Var(x), binder, new_alts)
+          Some((twin, @syntax.Expr::lams(params, twin_body)))
+        }
+        _ => None
+      }
+    }
+    _ => None
+  }
+}
+
+///| Rewrites the `case` the reader call feeds: the twin takes the same arguments,
+///| its pair is destructured, and the body continues with the rebuilt node in
+///| place of the threaded parameter.
+fn wrap_reader_case(
+  site : ReaderCallSite,
+  binder : String,
+  alts : Array[@syntax.Alt],
+  param : String,
+  prog : @syntax.Program,
+  taken : Array[String],
+  twins : Map[String, String],
+  twin_defs : Array[(String, @syntax.Expr)]
+) -> Option[@syntax.Expr] {
+  let twin = match twins.get(site.fn_name) {
+    Some(t) => t
+    None =>
+      match build_reader_twin(prog, taken, site.fn_name, site.arg_pos) {
+        Some((name, def)) => {
+          twins[site.fn_name] = name
+          twin_defs.push((name, def))
+          name
+        }
+        None => return None
+      }
+  }
+  let y = fresh_name(site.fn_name + "_rbres", taken)
+  taken.push(y)
+  let m = fresh_name(site.fn_name + "_rbmap", taken)
+  taken.push(m)
+  let call = @syntax.Expr::apps(Var(twin), site.args)
+  let inner_alts : Array[@syntax.Alt] = []
+  for alt in alts {
+    let body = @syntax.substitute_var(alt.expr, param, Var(m))
+    inner_alts.push(@syntax.Alt::new(alt.pat, body))
+  }
+  let inner = @syntax.Case(Var(y), binder, inner_alts)
+  Some(@syntax.Case(call, "", [@syntax.Alt::data("(,)", [y, m], inner)]))
+}
+
+///| Finds the `case` the reader call feeds and wraps it. The wrap goes at the
+///| innermost point that still holds every read of the threaded parameter, so the
+///| rebuilt node is in scope everywhere the old one was.
+fn rewrite_member_body(
+  expr : @syntax.Expr,
+  param : String,
+  member : String,
+  prog : @syntax.Program,
+  taken : Array[String],
+  twins : Map[String, String],
+  twin_defs : Array[(String, @syntax.Expr)],
+  root_uses : Int
+) -> Option[@syntax.Expr] {
+  match expr {
+    Case(scrut, binder, alts) => {
+      let mut inside = param_uses(scrut, param)
+      for alt in alts {
+        inside = inside + param_uses(alt.expr, param)
+      }
+      if inside == root_uses {
+        match reader_call_site(scrut, param, member, prog) {
+          Some(site) =>
+            return wrap_reader_case(
+              site, binder, alts, param, prog, taken, twins, twin_defs,
+            )
+          None => ()
+        }
+      }
+      match rewrite_member_body(
+        scrut, param, member, prog, taken, twins, twin_defs, root_uses,
+      ) {
+        Some(s2) => return Some(@syntax.Case(s2, binder, alts))
+        None => ()
+      }
+      let new_alts : Array[@syntax.Alt] = []
+      let mut changed = false
+      for alt in alts {
+        match rewrite_member_body(
+          alt.expr, param, member, prog, taken, twins, twin_defs, root_uses,
+        ) {
+          Some(e2) => {
+            new_alts.push(@syntax.Alt::new(alt.pat, e2))
+            changed = true
+          }
+          None => new_alts.push(alt)
+        }
+      }
+      if changed {
+        Some(@syntax.Case(scrut, binder, new_alts))
+      } else {
+        None
+      }
+    }
+    Lam(p, body) => {
+      if p == param {
+        return None
+      }
+      match rewrite_member_body(
+        body, param, member, prog, taken, twins, twin_defs, root_uses,
+      ) {
+        Some(b2) => Some(Lam(p, b2))
+        None => None
+      }
+    }
+    Let(NonRec(n, v), body) => {
+      if n == param {
+        return None
+      }
+      match rewrite_member_body(v, param, member, prog, taken, twins, twin_defs, root_uses) {
+        Some(v2) => return Some(Let(NonRec(n, v2), body))
+        None => ()
+      }
+      match rewrite_member_body(
+        body, param, member, prog, taken, twins, twin_defs, root_uses,
+      ) {
+        Some(b2) => Some(Let(NonRec(n, v), b2))
+        None => None
+      }
+    }
+    Let(Rec(pairs), body) => {
+      for p in pairs {
+        if p.0 == param {
+          return None
+        }
+      }
+      let new_pairs : Array[(String, @syntax.Expr)] = []
+      let mut changed = false
+      for p in pairs {
+        match rewrite_member_body(
+          p.1, param, member, prog, taken, twins, twin_defs, root_uses,
+        ) {
+          Some(v2) => {
+            new_pairs.push((p.0, v2))
+            changed = true
+          }
+          None => new_pairs.push(p)
+        }
+      }
+      if changed {
+        return Some(Let(Rec(new_pairs), body))
+      }
+      match rewrite_member_body(
+        body, param, member, prog, taken, twins, twin_defs, root_uses,
+      ) {
+        Some(b2) => Some(Let(Rec(pairs), b2))
+        None => None
+      }
+    }
+    _ => None
+  }
+}
+
+///| The rebuild-shared-reads pass. Runs after ``thread_caf_sharing``: for a cycle
+///| member carrying a threaded CAF parameter, the call that hands the parameter
+///| to a reader is redirected to a pair-returning twin, and the member threads
+///| the node the twin rebuilt. The CAF wire is read exactly once.
+pub fn rebuild_shared_reads(
+  prog : @syntax.Program,
+  stats : MidStats
+) -> @syntax.Program {
+  let taken = collect_all_binders(prog)
+  let twins : Map[String, String] = Map([])
+  let twin_defs : Array[(String, @syntax.Expr)] = []
+  let new_binds : Array[@syntax.Bind] = []
+  for bind in prog.binds {
+    match bind {
+      NonRec(name, expr) =>
+        match rebuild_member(expr, name, prog, taken, twins, twin_defs) {
+          Some(expr2) => new_binds.push(NonRec(name, expr2))
+          None => new_binds.push(bind)
+        }
+      Rec(pairs) => {
+        let new_pairs : Array[(String, @syntax.Expr)] = []
+        for pair in pairs {
+          match rebuild_member(pair.1, pair.0, prog, taken, twins, twin_defs) {
+            Some(expr2) => new_pairs.push((pair.0, expr2))
+            None => new_pairs.push(pair)
+          }
+        }
+        new_binds.push(Rec(new_pairs))
+      }
+    }
+  }
+  if twin_defs.length() > 0 {
+    new_binds.push(Rec(twin_defs))
+    stats.readers_rebuilt = stats.readers_rebuilt + twin_defs.length()
+  }
+  @syntax.Program::new(new_binds)
+}
+
+///| Rewrites one cycle member's body around the reader call that consumes its
+///| threaded CAF parameter.
+fn rebuild_member(
+  expr : @syntax.Expr,
+  member : String,
+  prog : @syntax.Program,
+  taken : Array[String],
+  twins : Map[String, String],
+  twin_defs : Array[(String, @syntax.Expr)]
+) -> Option[@syntax.Expr] {
+  match expr {
+    Lam(param, body) =>
+      if param.has_prefix("__mid_caf_") {
+        let root_uses = param_uses(body, param)
+        if root_uses > 0 {
+          match rewrite_member_body(body, param, member, prog, taken, twins, twin_defs, root_uses) {
+            Some(b2) => Some(Lam(param, b2))
+            None => None
+          }
+        } else {
+          None
+        }
+      } else {
+        None
+      }
+    _ => None
+  }
+}
+
 ///| Run the middle-end. Passes run to a fixpoint so a reduction that exposes a
 ///| dead binding or a duplicate body is picked up in the same compile.
 pub fn optimize(prog : @syntax.Program, stats : MidStats) -> @syntax.Program {
   let mut current = prune_top_bindings(prog, stats)
   current = thread_caf_sharing(current, stats)
+  current = rebuild_shared_reads(current, stats)
   let counter : Array[Int] = [0]
   for pass = 0; pass < 3; pass = pass + 1 {
     let before = stats.dead_lets +
