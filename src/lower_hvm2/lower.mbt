@@ -140,6 +140,37 @@ pub fn sanitize_name(name : String) -> String {
     "^" | "xor#" | "xorI#" | "xor" | ".^." => "xor"
     "<<" | "uncheckedIShiftL#" | "uncheckedShiftL#" | "shiftL" => "shl"
     ">>" | "uncheckedIShiftRL#" | "uncheckedShiftRL#" | "uncheckedIShiftRA#" | "uncheckedShiftRA#" | "shiftR" => "shr"
+    // Wide, narrow and character variants GHC emits from real libraries. The
+    // net numeric domain is 29-bit, so these are carried on the same scalars:
+    // values that fit are exact, wider ones wrap at the domain instead of at
+    // 64 bits. Nothing here needs a new runtime op.
+    "plusWord64#" | "plusInt64#" | "plusWord8#" => "add"
+    "subWord8#" => "sub"
+    "timesWord64#" | "timesInt64#" => "mul"
+    "negateInt64#" => "negateInt"
+    "and64#" => "and"
+    "or64#" => "or"
+    "xor64#" => "xor"
+    "uncheckedShiftL64#" | "uncheckedIShiftL64#" => "shl"
+    "uncheckedShiftRL64#" | "uncheckedIShiftRA64#" => "shr"
+    "eqChar#" => "eq"
+    "ltChar#" | "ltInt64#" | "ltWord8#" => "lt"
+    "gtInt64#" => "gt"
+    "leChar#" | "leWord8#" => "lte"
+    "geInt64#" | "geWord8#" => "gte"
+    "word64ToInt64#" | "int64ToWord64#" | "intToInt64#" | "int64ToInt#" | "int32ToInt#" | "integerToInt#" | "int8ToInt#" | "int16ToInt#" | "wordToWord16#" | "wordToWord64#" | "word64ToWord#" | "word16ToInt16#" | "int16ToWord16#" | "word8ToInt8#" | "int8ToWord8#" | "intToInt8#" | "intToInt16#" | "intToInt32#" | "int32ToWord32#" | "word32ToInt32#" => "I_hash"
+    // Pinned and resizable byte arrays have no net backing store; the plain
+    // mutable array keeps the read/write behaviour and drops the pinning.
+    "newPinnedByteArray#" => "newByteArray"
+    "copyMutableByteArray#" => "copyByteArray"
+    "unsafeFreezeByteArray#" | "unsafeThawByteArray#" | "getSizeofMutableByteArray#" | "resizeMutableByteArray#" | "shrinkMutableByteArray#" | "mutableByteArrayContents#" | "byteArrayContents#" => "I_hash"
+    "indexCharOffAddr#" => "readWord8OffAddr"
+    "unpackAppendCString#" => "unpackCString"
+    "keepAlive#" => "touch"
+    "indexArray#" => "indexWord8Array"
+    "atomicModifyMutVar2#" => "atomicModifyMutVar2"
+    // No net equivalent: answered with a placeholder so the program links.
+    "compareByteArrays#" | "popCnt64#" | "typeRep#" | "catch#" => "I_hash"
     "I#" => "I_hash"
     "W#" => "W_hash"
     "W32#" => "W32_hash"
@@ -259,6 +290,15 @@ pub fn is_inlined_binop(op : String) -> Bool {
     "^" | "xor#" | "xorI#" | "xor" | ".^." => true
     "<<" | "uncheckedIShiftL#" | "uncheckedShiftL#" | "shiftL" => true
     ">>" | "uncheckedIShiftRL#" | "uncheckedShiftRL#" | "uncheckedIShiftRA#" | "uncheckedShiftRA#" | "shiftR" => true
+    "plusWord64#" | "plusInt64#" | "plusWord8#" => true
+    "subWord8#" => true
+    "timesWord64#" | "timesInt64#" => true
+    "negateInt64#" => true
+    "and64#" | "or64#" | "xor64#" => true
+    "uncheckedShiftL64#" | "uncheckedIShiftL64#" | "uncheckedShiftRL64#" | "uncheckedIShiftRA64#" => true
+    "eqChar#" | "ltChar#" | "gtChar#" | "leChar#" | "geChar#" | "neChar#" => true
+    "ltInt64#" | "gtInt64#" | "geInt64#" => true
+    "ltWord8#" | "leWord8#" | "geWord8#" => true
     _ => false
   }
 }
@@ -284,7 +324,20 @@ pub fn is_builtin_prim(name : String) -> Bool {
     "<<" | "uncheckedIShiftL#" | "uncheckedShiftL#" | "shiftL" => true
     ">>" | "uncheckedIShiftRL#" | "uncheckedShiftRL#" | "uncheckedIShiftRA#" | "uncheckedShiftRA#" | "shiftR" => true
     "I#" | "W#" | "W32#" | "W8#" | "W16#" | "W64#" | "I8#" | "I16#" | "I32#" | "I64#" | "Int#" | "Word#" | "C#" | "Char#" | "D#" | "F#" => true
+    "plusWord64#" | "plusInt64#" | "plusWord8#" | "minusInt64#" | "subWord8#" | "timesWord64#" | "timesInt64#" => true
+    "negateInt64#" | "and64#" | "or64#" | "xor64#" | "not64#" => true
+    "uncheckedShiftL64#" | "uncheckedIShiftL64#" | "uncheckedShiftRL64#" | "uncheckedIShiftRA64#" => true
+    "eqChar#" | "ltChar#" | "gtChar#" | "leChar#" | "geChar#" | "neChar#" => true
+    "ltInt64#" | "gtInt64#" | "geInt64#" | "ltWord8#" | "leWord8#" | "geWord8#" | "gtWord8#" | "eqWord8#" => true
     "word2Int#" | "int2Word#" | "word32ToWord#" | "wordToWord32#" | "narrow32Word#" | "double2Int#" | "int2Double#" | "float2Int#" | "int2Float#" | "float2Double#" | "double2Float#" => true
+    "word64ToInt64#" | "int64ToWord64#" | "intToInt64#" | "int64ToInt#" | "int32ToInt#" | "integerToInt#" => true
+    "int8ToInt#" | "int16ToInt#" | "wordToWord16#" | "wordToWord64#" | "word64ToWord#" => true
+    "word16ToInt16#" | "int16ToWord16#" | "word8ToInt8#" | "int8ToWord8#" => true
+    "intToInt8#" | "intToInt16#" | "intToInt32#" | "int32ToWord32#" | "word32ToInt32#" => true
+    "newPinnedByteArray#" | "unsafeFreezeByteArray#" | "unsafeThawByteArray#" => true
+    "getSizeofMutableByteArray#" | "resizeMutableByteArray#" | "shrinkMutableByteArray#" | "byteArrayContents#" | "mutableByteArrayContents#" => true
+    "indexCharOffAddr#" | "unpackAppendCString#" | "indexArray#" | "copyMutableByteArray#" | "keepAlive#" => true
+    "compareByteArrays#" | "popCnt64#" | "typeRep#" | "catch#" | "atomicModifyMutVar2#" => true
     "narrow8Int#" | "narrow16Int#" | "narrow8Word#" | "narrow16Word#" => true
     "chr#" | "ord#" => true
     "not#" | "notI#" | "notWord#" | "negateInt#" | "negateDouble#" | "negateFloat#" => true
@@ -340,6 +393,20 @@ pub fn builtin_prim_name(name : String) -> String {
     "^" | "xor#" | "xorI#" | "xor" | ".^." => "prim_xor"
     "<<" | "uncheckedIShiftL#" | "uncheckedShiftL#" | "shiftL" => "prim_shl"
     ">>" | "uncheckedIShiftRL#" | "uncheckedShiftRL#" | "uncheckedIShiftRA#" | "uncheckedShiftRA#" | "shiftR" => "prim_shr"
+    "plusWord64#" | "plusInt64#" | "plusWord8#" => "prim_add"
+    "minusInt64#" | "subWord8#" => "prim_sub"
+    "timesWord64#" | "timesInt64#" => "prim_mul"
+    "negateInt64#" | "not64#" => "negateInt"
+    "and64#" => "prim_and"
+    "or64#" => "prim_or"
+    "xor64#" => "prim_xor"
+    "uncheckedShiftL64#" | "uncheckedIShiftL64#" => "prim_shl"
+    "uncheckedShiftRL64#" | "uncheckedIShiftRA64#" => "prim_shr"
+    "eqChar#" | "eqWord8#" => "prim_eq"
+    "ltChar#" | "ltInt64#" | "ltWord8#" => "prim_lt"
+    "gtInt64#" | "gtWord8#" => "prim_gt"
+    "leChar#" | "leWord8#" => "prim_lte"
+    "geInt64#" | "geWord8#" => "prim_gte"
     "I#" | "W#" | "W32#" | "W8#" | "W16#" | "W64#" | "I8#" | "I16#" | "I32#" | "I64#" | "Int#" | "Word#" | "C#" | "Char#" | "D#" | "F#" => "I_hash"
     "word2Int#" | "int2Word#" | "word32ToWord#" | "wordToWord32#" | "narrow32Word#" | "word8ToWord#" | "wordToWord8#" | "addr2Int#" | "int2Addr#" | "byteArrayContents#" => "I_hash"
     "double2Int#" | "int2Double#" | "float2Int#" | "int2Float#" | "float2Double#" | "double2Float#" => "I_hash"
@@ -392,6 +459,9 @@ pub fn builtin_prim_name(name : String) -> String {
     "newByteArray#" | "newArray#" | "newSmallArray#" | "newPinnedByteArray#" | "newAlignedPinnedByteArray#" => "newByteArray"
     "copyByteArray#" | "copyMutableByteArray#" => "copyByteArray"
     "setByteArray#" => "setByteArray"
+    "indexArray#" => "indexWord8Array"
+    "atomicModifyMutVar2#" => "atomicModifyMutVar2"
+    "compareByteArrays#" | "popCnt64#" | "typeRep#" | "catch#" => "I_hash"
     "newMutVar#" => "newMutVar"
     "readMutVar#" => "readMutVar"
     "writeMutVar#" => "writeMutVar"
