@@ -330,7 +330,9 @@ renderExpr currentMod expr = case expr of
     "let " ++ renderInlineBind currentMod bind ++ " in " ++ renderExpr currentMod body
   Case scrut bndr _ alts ->
     let bndrStr = let n = bndrName bndr in if n == "_" then "" else " " ++ n
-    in "case " ++ renderExpr currentMod scrut ++ " of" ++ bndrStr ++ " {\n" ++
+    -- The scrutinee has to be an atom: a nested case (`case case f x of ...`)
+    -- or a lambda there is not readable back by Coronet's own parser.
+    in "case " ++ renderAtom currentMod scrut ++ " of" ++ bndrStr ++ " {\n" ++
        intercalate ";\n" (map (renderAlt currentMod) alts) ++ "\n      }"
 
 isTypeOrCoercion :: CoreExpr -> Bool

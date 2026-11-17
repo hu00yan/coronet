@@ -433,8 +433,9 @@ fn Lexer::next_token(self : Lexer) -> Result[Token, String] {
       self.pos = self.pos + 2
       return Ok(Token::DoubleColon)
     }
-    self.pos = self.pos + 1
-    return Ok(Token::Ident(":"))
+    // `:` alone is the list cons, but GHC also emits symbolic constructors and
+    // operators that start with it (`:=>`, `:+`). The operator branch below
+    // lexes the whole run, so a bare colon still comes out as ":".
   }
 
   // Type abstraction / application starting with @

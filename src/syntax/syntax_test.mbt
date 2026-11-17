@@ -1280,6 +1280,18 @@ test "parse char literal in case pattern" {
   assert_true(prog.lookup("testCharPattern") is Some(_))
 }
 
+test "parse symbolic constructor patterns starting with a colon" {
+  // GHC emits symbolic constructors such as `:=>`. The colon opens a symbol
+  // run, so the whole name has to reach the pattern parser as one constructor.
+  let src =
+    #|f = \ x -> case x of wild {
+    #|  :=> a b -> a;
+    #|  __DEFAULT -> b
+    #|}
+  let prog = @syntax.parse_program(src).unwrap()
+  assert_true(prog.lookup("f") is Some(_))
+}
+
 test "parse tests/packages/bytestring_core.core" {
   let src =
     #|addr#_a2v9
