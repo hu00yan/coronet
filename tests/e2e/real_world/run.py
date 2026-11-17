@@ -170,6 +170,14 @@ class Case:
             self.hs = directory / "case.hs"
         self.timeout = self.meta.get("timeout", 600)
         self.ghc_flags = self.meta.get("ghc_flags", ["-O2"])
+        # CLI cases drive a real application: argv, embedded input files, and a
+        # source tree laid out as {"label": {"dirs": [...], "includes": [...],
+        # "excludes": [regex...]}} plus a main source file.
+        self.kind = self.meta.get("kind", "value")
+        self.argv = self.meta.get("argv", [])
+        self.files = self.meta.get("files", {})
+        self.tree = self.meta.get("tree", {})
+        self.main = self.meta.get("main")
 
 
 def extract_core(case, deps, work, verbose):
@@ -327,6 +335,177 @@ def run_target(target, hvm_file, timeout):
         lines = [l.strip() for l in out.splitlines() if l.strip()]
         value = lines[-1] if lines else ""
     return value, None, elapsed
+
+
+
+# ---------------------------------------------------------------------------
+# CLI case pipeline: a real application run as `binary argv...`
+# ---------------------------------------------------------------------------
+
+
+def cli_source_dirs(case):
+    dirs, includes, excludes = [], [], []
+    for label, spec in case.tree.items():
+        base = DEPS_DIR / label
+        for d in spec.get("dirs", ["src"]):
+            candidate = base / d
+            if candidate.is_dir():
+                dirs.append("-i" + str(candidate))
+        for d in spec.get("includes", []):
+            candidate = base / d
+            if candidate.is_dir():
+                includes.append("-I" + str(candidate))
+        excludes.extend(spec.get("excludes", []))
+    return dirs, includes, excludes
+
+
+def cli_gen_module(case, work):
+    """cabal's generated Paths_<pkg> modules, synthesized once per tree."""
+    gen = work / "gen"
+    gen.mkdir(parents=True, exist_ok=True)
+    for label, spec in case.tree.items():
+        for module in spec.get("gen_modules", []):
+            name = module["name"]
+            path = gen / (name.replace(".", "_") + ".hs")
+            if not path.exists():
+                branch = ".".join(str(v) for v in module["version"])
+                path.write_text(
+                    "module %s (version) where\n"
+                    "import qualified Data.Version\n"
+                    "version :: Data.Version.Version\n"
+                    "version = Data.Version.Version {Data.Version.versionBranch = [%s],"
+                    " Data.Version.versionTags = []}\n" % (name, branch)
+                )
+    return gen
+
+
+def cli_build_reference(case, deps, work, verbose):
+    """Build the application with plain GHC and run the CLI call: the
+    reference stdout/stderr/exit the Coronet run must match."""
+    dirs, includes, excludes = cli_source_dirs(case)
+    gen = cli_gen_module(case, work)
+    out_bin = work / "ghc_native_bin"
+    code, out, err, _ = run(
+        [which("ghc"), "--make", "-O2", "-outputdir", str(work / "native_obj")]
+        + dirs
+        + ["-i" + str(gen)]
+        + includes
+        + [str(case.hs)],
+        cwd=work,
+        timeout=case.timeout,
+    )
+    if code != 0:
+        return None, "ghc native build failed:\n" + (err or out)[-4000:]
+    args = [str(a) for a in case.argv]
+    for name, content in case.files.items():
+        f = work / name
+        if not f.exists():
+            f.parent.mkdir(parents=True, exist_ok=True)
+            f.write_text(content)
+    code, out, err, _ = run([str(out_bin)] + args, cwd=work, timeout=case.timeout)
+    return {"stdout": out, "stderr": err, "exit": code}, None
+
+
+def cli_dump_core(case, deps, work, verbose):
+    """Whole-tree Core dump through scripts/dump_app.sh."""
+    dirs, includes, excludes = cli_source_dirs(case)
+    gen = cli_gen_module(case, work)
+    core_dir = work / "core"
+    core_dir.mkdir(parents=True, exist_ok=True)
+    script = REPO_ROOT / "scripts" / "dump_app.sh"
+    cmd = [str(script), "-o", str(core_dir), "-m", str(case.hs)] + dirs + ["-i" + str(gen)] + includes
+    for pattern in excludes:
+        cmd += ["-e", pattern]
+    code, out, err, _ = run(cmd, cwd=REPO_ROOT, timeout=case.timeout)
+    if code != 0:
+        return None, "dump_app.sh failed:\n" + (err or out)[-4000:]
+    cores = sorted(core_dir.glob("*.core"))
+    cores = [c for c in cores if c.stat().st_size > 0]
+    if not cores:
+        return None, "no CoreLite was emitted"
+    return cores, None
+
+
+def cli_gen_world(case, work):
+    """The initial batch world: argv, environment, and the input file table
+    embedded as plain CoreLite data."""
+    args = []
+    for a in case.argv:
+        args.append('CoronetPair "%s" ""' % a)
+    files = []
+    for name, content in case.files.items():
+        esc = content.replace("\\", "\\\\").replace('"', '\\"')
+        esc = esc.replace("\n", "\\n").replace("\t", "\\t")
+        files.append('CoronetPair "%s" "%s"' % (name, esc))
+    gen = work / "world0.core"
+    gen.write_text(
+        "coronet_argv = %s\n"
+        "coronet_env = Nil\n"
+        "coronet_inputs = %s\n"
+        "coronet_world0 = CWorld Nil 0# Nil\n" % (
+            " ".join(["Cons", args[0], "Nil"]) if args else "Nil",
+            " ".join(["Cons", files[0], "Nil"]) if files else "Nil",
+        )
+    )
+    return gen
+
+
+def cli_decode_world(text, verbose):
+    """Decode the final world value from the runtime's printed normal form."""
+    # Implemented in run_cli_case once the runtime output shape is known.
+    return text
+
+
+def run_cli_case(case, targets, verbose, refresh):
+    work = WORK_DIR / case.name
+    if refresh and work.exists():
+        shutil.rmtree(work)
+    work.mkdir(parents=True, exist_ok=True)
+    result = {
+        "case": case.name,
+        "deps": case.meta.get("deps", []),
+        "kind": "cli",
+        "n_core_files": 0,
+        "core_bytes": 0,
+        "targets": {},
+    }
+    deps = [ensure_dep(d, verbose) for d in case.meta.get("deps", [])]
+    reference, err = cli_build_reference(case, deps, work, verbose)
+    if reference is None:
+        result["error"] = err
+        return result
+    result["ghc"] = reference
+    cores, err = cli_dump_core(case, deps, work, verbose)
+    if cores is None:
+        result["error"] = err
+        return result
+    result["n_core_files"] = len(cores)
+    result["core_bytes"] = sum(c.stat().st_size for c in cores)
+    prelude = REPO_ROOT / "src" / "mid" / "io_prelude.core"
+    world = cli_gen_world(case, work)
+    inputs = [str(prelude), str(world)] + [str(c) for c in cores]
+    for target in targets:
+        entry = {}
+        hvm_file = work / ("out." + target)
+        _, err, compile_time = coronet_compile(inputs, target, hvm_file, case.timeout)
+        entry["compile_s"] = round(compile_time, 3)
+        if err is not None:
+            entry["status"] = "COMPILE-FAIL"
+            entry["detail"] = err[-4000:]
+            result["targets"][target] = entry
+            continue
+        value, err, run_time = run_target(target, hvm_file, case.timeout)
+        entry["run_s"] = round(run_time, 3)
+        if err is not None:
+            entry["status"] = "RUN-FAIL"
+            entry["detail"] = err[-4000:]
+            result["targets"][target] = entry
+            continue
+        entry["raw"] = value
+        entry["status"] = "DECODE"
+        result["targets"][target] = entry
+    return result
+
 
 
 def run_case(case, targets, verbose, refresh):

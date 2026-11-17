@@ -1,4 +1,5 @@
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 module CoronetPlugin (plugin) where
 
 import GHC.Plugins
@@ -9,6 +10,7 @@ import GHC.Types.Id.Info (IdDetails(..))
 import Data.Char (isAlphaNum, ord)
 import Data.List (isPrefixOf, isSuffixOf, isInfixOf, intercalate, nub)
 import System.IO
+import qualified Control.Exception
 import System.Directory (doesFileExist, createDirectoryIfMissing)
 import Control.Monad.IO.Class (liftIO)
 
@@ -39,7 +41,13 @@ coronetPass opts guts = do
         let outCorePath = dirPath ++ "/" ++ safeMName ++ ".core"
         writeFile outCorePath coreLiteText
         let manifestPath = dirPath ++ "/manifest.json"
-        updateManifest manifestPath mName (safeMName ++ ".core") exportedNames isMainMod
+        -- The manifest is a best-effort index: parallel -j builds race on its
+        -- read-modify-write and GHC's file locking turns that into an error.
+        -- Losing manifest entries never loses Core, so swallow the race.
+        Control.Exception.handle
+          (\(e :: Control.Exception.IOException) ->
+             hPutStrLn stderr ("CoronetPlugin: manifest update skipped (" ++ show e ++ ")"))
+          (updateManifest manifestPath mName (safeMName ++ ".core") exportedNames isMainMod)
       Nothing ->
         case parseOutPath opts of
           Just outPath -> writeFile outPath coreLiteText
@@ -67,20 +75,18 @@ parseDirOpt (opt:opts)
 sanitizeModName :: String -> String
 sanitizeModName = map (\c -> if c == '.' then '_' else c)
 
-isUserModule :: String -> Bool
-isUserModule mName =
-  not ("GHC." `isPrefixOf` mName ||
-       "System." `isPrefixOf` mName ||
-       "Control." `isPrefixOf` mName ||
-       "Data.Tuple" `isPrefixOf` mName)
-
 dumpCoreProgram :: Module -> CoreProgram -> (String, [String], Bool)
 dumpCoreProgram currentMod binds =
   let mName = moduleNameString (moduleName currentMod)
       safeMName = sanitizeModName mName
       isMain = mName == "Main"
 
-      filtered = filter (not . isMetadataBind) binds
+      -- `$tc*/$trModule*/$krep*` bindings used to be dropped as metadata, but
+      -- Typeable instances really reference them: `mkTrCon $tcFoo` and
+      -- `unpackCString# $tcFoo` leave a free variable behind when the binding
+      -- is gone, and the linked program then has no definition for it. They
+      -- are ordinary `= "Name"#` literals, so they stay.
+      filtered = binds
       hasResult = any hasResultBind filtered
       pruned = if hasResult then filter (not . isIoMainBind) filtered else filtered
 
@@ -132,17 +138,24 @@ mentionsIo expr = case expr of
   Tick _ e -> mentionsIo e
   _ -> False
 
+-- Names that pass through untouched: the primops the runtime answers as
+-- builtins. Every other operator spelling (class methods like (==), combinators
+-- like (.), (>>=)) becomes a word-escaped identifier, because a qualified
+-- reference ending in an operator character cannot be lexed downstream.
 isStandAloneOperator :: String -> Bool
 isStandAloneOperator s =
   s `elem`
-    [ "+", "-", "*", "/", "==", "/=", "<", "<=", ">", ">="
-    , "+#", "-#", "*#", "*H#", "==#", "/=#", "<#", "<=#", ">#", ">=#"
+    [ "+#", "-#", "*#", "*H#", "==#", "/=#", "<#", "<=#", ">#", ">=#"
+    , "negateInt#", "quotInt#", "remInt#", "quotRemInt#"
     ]
 
 sanitizeIdent :: String -> String
 sanitizeIdent raw
   | isStandAloneOperator raw = raw
   | isUnboxedTupleOcc raw || isUnboxedSumOcc raw = raw
+  -- Primops and primitive constructors end in #; every spelling they use
+  -- (`+##`, `==##`, `quotRemInt#`) must reach the runtime untouched.
+  | "#" `isSuffixOf` raw = raw
   | otherwise =
       let rep [] = []
           rep ('/':'=':xs) = '_' : 'n' : 'e' : '_' : rep xs
@@ -209,27 +222,44 @@ qualifyTopBinder currentMod b =
      then occ
      else sanitizeModName mName ++ "_" ++ occ
 
+-- Every external reference carries its defining module. Package-scale dumps
+-- define the same occname in several modules (foldr lives in GHC.Internal.Base,
+-- GHC.Internal.List and Data.Internal.OldList), so a bare occname cannot be
+-- resolved: only `Mod_occ` matches the qualified top binders other modules emit.
+-- Primitive names stay bare because the runtime answers them as builtins.
 qualifyVarUse :: Module -> CoreBndr -> String
 qualifyVarUse currentMod v
+  -- Workers are the constructors themselves and stay bare, matching the
+  -- patterns; wrappers are compiled functions and qualify like any other.
+  -- The primitive check uses the raw occname so an escape can never mangle a
+  -- name the runtime answers (`+##` would otherwise become `_plus_##`).
   | isLocalId v = normalizeVarName (bndrName v)
-  | isDataConWorkId v || isDataConWrapId v = normalizeVarName (bndrName v)
+  | isDataConWorkId v = normalizeVarName (bndrName v)
+  | isDataConWrapId v && isDataConWrapperBare (occNameString (getOccName v)) =
+      normalizeVarName (bndrName v)
+  | isPrimitiveName (occNameString (getOccName v)) =
+      normalizeVarName (bndrName v)
   | otherwise =
       let occ = bndrName v
           curMName = moduleNameString (moduleName currentMod)
-      in if isPrimitiveName occ
-         then normalizeVarName occ
-         else case nameModule_maybe (idName v) of
+      in case nameModule_maybe (idName v) of
            Just m ->
              let vMod = moduleNameString (moduleName m)
-             in if isUserModule vMod
-                then if vMod == curMName
-                     then if curMName == "Main" then occ else sanitizeModName curMName ++ "_" ++ occ
-                     else sanitizeModName vMod ++ "_" ++ occ
-                else normalizeVarName occ
+             in if vMod == curMName
+                then if curMName == "Main" then occ else sanitizeModName curMName ++ "_" ++ occ
+                else sanitizeModName vMod ++ "_" ++ occ
            Nothing ->
              if curMName /= "Main"
              then sanitizeModName curMName ++ "_" ++ occ
              else normalizeVarName occ
+
+-- Nullary and primitive-ish wrappers behave like their constructors. Real
+-- wrappers ($WBS, $WNode2) are functions of their fields and must carry their
+-- defining module.
+isDataConWrapperBare :: String -> Bool
+isDataConWrapperBare occ =
+  "#" `isSuffixOf` occ ||
+  occ `elem` ["()", "I#", "W#", "C#", "D#", "W8#", "W16#", "W32#", "W64#"]
 
 isUnboxedTupleOcc :: String -> Bool
 isUnboxedTupleOcc s =
@@ -245,7 +275,7 @@ isPrimitiveName :: String -> Bool
 isPrimitiveName occ =
   occ `elem`
     [ "I#", "W#", "W8#", "W16#", "W32#", "W64#", "I8#", "I16#", "I32#", "I64#", "C#"
-    , "True", "False", "+", "-", "*"
+    , "True", "False"
     , "+#", "-#", "*#", "*H#", "negateInt#"
     , "quotInt#", "remInt#", "quotRemInt#"
     , "==#", "/=#", "<#", "<=#", ">#", ">=#"
@@ -280,7 +310,7 @@ renderBind currentMod (NonRec b expr) =
       bodyStr = renderExpr currentMod expr
       aliasStr =
         let orig = bndrName b
-        in if qName /= orig && not (isMetadataName orig)
+        in if qName /= orig
            then "\n" ++ orig ++ " = " ++ qName ++ "\n"
            else ""
   in qName ++ "\n  = " ++ bodyStr ++ "\n" ++ aliasStr
@@ -291,7 +321,7 @@ renderBind currentMod (Rec pairs) =
       aliases = concatMap (\(b, _) ->
         let q = qualifyTopBinder currentMod b
             orig = bndrName b
-        in if q /= orig && not (isMetadataName orig)
+        in if q /= orig
            then orig ++ " = " ++ q ++ "\n"
            else ""
         ) pairs

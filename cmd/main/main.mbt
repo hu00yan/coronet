@@ -20,6 +20,8 @@ struct CliArgs {
   prune : Bool
   mid_stats : Bool
   report_gaps : Bool
+  dump_ast : Bool
+  no_mid : Bool
 }
 
 ///|
@@ -65,6 +67,8 @@ fn parse_cli_args(args : Array[String]) -> CliArgs {
   let mut prune = true
   let mut mid_stats = false
   let mut report_gaps = false
+  let mut dump_ast = false
+  let mut no_mid = false
   let mut i = 1
   while i < args.length() {
     let arg = args[i]
@@ -89,6 +93,10 @@ fn parse_cli_args(args : Array[String]) -> CliArgs {
       mid_stats = true
     } else if arg == "--report-gaps" {
       report_gaps = true
+    } else if arg == "--dump-ast" {
+      dump_ast = true
+    } else if arg == "--no-mid" {
+      no_mid = true
     } else if arg == "--target" {
       i = i + 1
       if i >= args.length() {
@@ -143,7 +151,7 @@ fn parse_cli_args(args : Array[String]) -> CliArgs {
     }
   }
 
-  { input_files, target: tgt, output_file, lto, prune, mid_stats, report_gaps }
+  { input_files, target: tgt, output_file, lto, prune, mid_stats, report_gaps, dump_ast, no_mid }
 }
 
 ///|
@@ -318,12 +326,21 @@ async fn main {
   }
   let mid_input = @syntax.strip_crash_messages(linked)
   let mid_stats = @mid.MidStats::new()
-  let program = if cli.mid_stats {
+  let program = if cli.no_mid {
+    mid_input
+  } else if cli.mid_stats {
     let optimized = @mid.optimize(mid_input, mid_stats)
     println("middle-end: \{mid_stats}")
     optimized
   } else {
     @mid.optimize(mid_input, mid_stats)
+  }
+
+  if cli.dump_ast {
+    for b in program.binds {
+      println("\{b}")
+    }
+    return
   }
 
   if cli.report_gaps {

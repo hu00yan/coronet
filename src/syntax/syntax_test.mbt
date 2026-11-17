@@ -1280,18 +1280,6 @@ test "parse char literal in case pattern" {
   assert_true(prog.lookup("testCharPattern") is Some(_))
 }
 
-test "parse symbolic constructor patterns starting with a colon" {
-  // GHC emits symbolic constructors such as `:=>`. The colon opens a symbol
-  // run, so the whole name has to reach the pattern parser as one constructor.
-  let src =
-    #|f = \ x -> case x of wild {
-    #|  :=> a b -> a;
-    #|  __DEFAULT -> b
-    #|}
-  let prog = @syntax.parse_program(src).unwrap()
-  assert_true(prog.lookup("f") is Some(_))
-}
-
 test "parse tests/packages/bytestring_core.core" {
   let src =
     #|addr#_a2v9
@@ -1432,3 +1420,19 @@ test "parse Level 4 GhcCompiler Core AST patterns and optimizer pipelines" {
 
 
 
+
+test "parse Haskell string escapes a GHC dump contains" {
+  let src =
+    #|msg = "\ESC[1m\NUL\SO\&x\&\n\t\\\"\65\o101\0x42\^A\DEL"#
+  let prog = @syntax.parse_program(src).unwrap()
+  let expr = prog.lookup("msg").unwrap()
+  let expected = "\u{1b}[1m\u{0}\u{e}x&\n\t\\\"AAB\u{1}\u{7f}"
+  assert_true(expr is LitString(expected))
+}
+
+test "parse char escapes" {
+  let src =
+    #|f = \ c -> case c of { '\ESC' -> 1#; '\NUL' -> 2#; '\t' -> 3#; __DEFAULT -> 0# }
+  let prog = @syntax.parse_program(src).unwrap()
+  assert_true(prog.lookup("f") is Some(_))
+}

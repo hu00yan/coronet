@@ -169,7 +169,9 @@ pub fn sanitize_name(name : String) -> String {
     "keepAlive#" => "touch"
     "indexArray#" => "indexWord8Array"
     "atomicModifyMutVar2#" => "atomicModifyMutVar2"
-    // No net equivalent: answered with a placeholder so the program links.
+    // No net equivalent: these are answered with a placeholder result so the
+    // program links. compareByteArrays# and popCnt64# only affect programs
+    // that hash or compare byte buffers.
     "compareByteArrays#" | "popCnt64#" | "typeRep#" | "catch#" => "I_hash"
     "I#" => "I_hash"
     "W#" => "W_hash"
@@ -290,15 +292,12 @@ pub fn is_inlined_binop(op : String) -> Bool {
     "^" | "xor#" | "xorI#" | "xor" | ".^." => true
     "<<" | "uncheckedIShiftL#" | "uncheckedShiftL#" | "shiftL" => true
     ">>" | "uncheckedIShiftRL#" | "uncheckedShiftRL#" | "uncheckedIShiftRA#" | "uncheckedShiftRA#" | "shiftR" => true
-    "plusWord64#" | "plusInt64#" | "plusWord8#" => true
-    "subWord8#" => true
-    "timesWord64#" | "timesInt64#" => true
-    "negateInt64#" => true
+    "plusWord64#" | "plusInt64#" | "plusWord8#" | "minusInt64#" | "subWord8#" => true
+    "timesWord64#" | "timesInt64#" | "negateInt64#" | "not64#" => true
     "and64#" | "or64#" | "xor64#" => true
     "uncheckedShiftL64#" | "uncheckedIShiftL64#" | "uncheckedShiftRL64#" | "uncheckedIShiftRA64#" => true
     "eqChar#" | "ltChar#" | "gtChar#" | "leChar#" | "geChar#" | "neChar#" => true
-    "ltInt64#" | "gtInt64#" | "geInt64#" => true
-    "ltWord8#" | "leWord8#" | "geWord8#" => true
+    "ltInt64#" | "gtInt64#" | "geInt64#" | "ltWord8#" | "leWord8#" | "geWord8#" | "gtWord8#" | "eqWord8#" => true
     _ => false
   }
 }
@@ -324,11 +323,6 @@ pub fn is_builtin_prim(name : String) -> Bool {
     "<<" | "uncheckedIShiftL#" | "uncheckedShiftL#" | "shiftL" => true
     ">>" | "uncheckedIShiftRL#" | "uncheckedShiftRL#" | "uncheckedIShiftRA#" | "uncheckedShiftRA#" | "shiftR" => true
     "I#" | "W#" | "W32#" | "W8#" | "W16#" | "W64#" | "I8#" | "I16#" | "I32#" | "I64#" | "Int#" | "Word#" | "C#" | "Char#" | "D#" | "F#" => true
-    "plusWord64#" | "plusInt64#" | "plusWord8#" | "minusInt64#" | "subWord8#" | "timesWord64#" | "timesInt64#" => true
-    "negateInt64#" | "and64#" | "or64#" | "xor64#" | "not64#" => true
-    "uncheckedShiftL64#" | "uncheckedIShiftL64#" | "uncheckedShiftRL64#" | "uncheckedIShiftRA64#" => true
-    "eqChar#" | "ltChar#" | "gtChar#" | "leChar#" | "geChar#" | "neChar#" => true
-    "ltInt64#" | "gtInt64#" | "geInt64#" | "ltWord8#" | "leWord8#" | "geWord8#" | "gtWord8#" | "eqWord8#" => true
     "word2Int#" | "int2Word#" | "word32ToWord#" | "wordToWord32#" | "narrow32Word#" | "double2Int#" | "int2Double#" | "float2Int#" | "int2Float#" | "float2Double#" | "double2Float#" => true
     "word64ToInt64#" | "int64ToWord64#" | "intToInt64#" | "int64ToInt#" | "int32ToInt#" | "integerToInt#" => true
     "int8ToInt#" | "int16ToInt#" | "wordToWord16#" | "wordToWord64#" | "word64ToWord#" => true
@@ -336,7 +330,7 @@ pub fn is_builtin_prim(name : String) -> Bool {
     "intToInt8#" | "intToInt16#" | "intToInt32#" | "int32ToWord32#" | "word32ToInt32#" => true
     "newPinnedByteArray#" | "unsafeFreezeByteArray#" | "unsafeThawByteArray#" => true
     "getSizeofMutableByteArray#" | "resizeMutableByteArray#" | "shrinkMutableByteArray#" | "byteArrayContents#" | "mutableByteArrayContents#" => true
-    "indexCharOffAddr#" | "unpackAppendCString#" | "indexArray#" | "copyMutableByteArray#" | "keepAlive#" => true
+    "indexCharOffAddr#" | "unpackAppendCString#" | "indexArray#" => true
     "compareByteArrays#" | "popCnt64#" | "typeRep#" | "catch#" | "atomicModifyMutVar2#" => true
     "narrow8Int#" | "narrow16Int#" | "narrow8Word#" | "narrow16Word#" => true
     "chr#" | "ord#" => true

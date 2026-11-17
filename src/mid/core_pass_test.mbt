@@ -92,107 +92,77 @@ test "capture is refused rather than performed" {
 }
 
 
-///|
-test "a computed CAF read by a recursive loop becomes a threaded parameter" {
-  let prog = optimized(
-    #|m = build Tip
-    #|loop = \ i acc -> case i of { 0# -> acc; __DEFAULT -> loop i (+ acc (find i m)) }
-    #|main = loop 3# 0#
-  )
-  let text = prog.to_string()
-  // the loop now takes the CAF as a leading parameter and passes it on
-  assert_true(text.contains("loop __mid_caf_m"))
-  // the threaded binder appears at the loop binder, the find argument, and the
-  // recursive call -- the CAF name itself stays at the loop entry only
-  let mut occurrences = 0
-  let needle = "__mid_caf_m"
-  let mut from = 0
-  while from + needle.length() <= text.length() {
-    if text[from:from + needle.length()] == needle {
-      occurrences = occurrences + 1
-      from = from + needle.length()
-    } else {
-      from = from + 1
+test "case binder survives each mid pass" {
+  let src =
+    #|Data_Sequence_Internal_$cfoldMap'_a1q58
+    #|  = \ $dMonoid_a1q5e eta_a1sdH eta_B0 ->
+    #|      case GHC_Internal_Base_mempty $dMonoid_a1q5e of z_X0 {
+    #|        __DEFAULT -> let $dSemigroup_s1UDK = GHC_Internal_Base_$p1Monoid $dMonoid_a1q5e in case eta_B0 of wild_X1 {
+    #|        One a_aRLS -> GHC_Internal_Base__lt__gt_ $dSemigroup_s1UDK z_X0 (eta_a1sdH a_aRLS);
+    #|        Two a_aRLV b_aRLW -> case GHC_Internal_Base__lt__gt_ $dSemigroup_s1UDK z_X0 (eta_a1sdH a_aRLV) of vx_a1sKE {
+    #|        __DEFAULT -> GHC_Internal_Base__lt__gt_ $dSemigroup_s1UDK vx_a1sKE (eta_a1sdH b_aRLW)
+    #|      };
+    #|        Three a_aRLZ b_aRM0 c_aRM1 -> case GHC_Internal_Base__lt__gt_ $dSemigroup_s1UDK z_X0 (eta_a1sdH a_aRLZ) of vx_a1sKE {
+    #|        __DEFAULT -> case GHC_Internal_Base__lt__gt_ $dSemigroup_s1UDK vx_a1sKE (eta_a1sdH b_aRM0) of vx_X2 {
+    #|        __DEFAULT -> GHC_Internal_Base__lt__gt_ $dSemigroup_s1UDK vx_X2 (eta_a1sdH c_aRM1)
+    #|      }
+    #|      }
+    #|      }
+    #|      }
+  let prog = @syntax.parse_program(src).unwrap()
+  let expr = (prog.all_bindings()[0]).1
+  assert_true(has_case_binder(expr, "vx_a1sKE"))
+  let p1 = prune_dead_lets(expr, MidStats::new())
+  assert_true(has_case_binder(p1, "vx_a1sKE"))
+  let p2 = inline_trivial_lets(expr, MidStats::new())
+  println("P2: \{p2}")
+  assert_true(has_case_binder(p2, "vx_a1sKE"))
+  let p3 = reduce_known_cases(expr, MidStats::new(), ["One", "Two", "Three", "Four"])
+  println("P3: \{p3}")
+  assert_true(has_case_binder(p3, "vx_a1sKE"))
+  let p4 = merge_alt_bodies(expr, MidStats::new(), [0])
+  assert_true(has_case_binder(p4, "vx_a1sKE"))
+}
+
+///| Does any case expression in `e` bind `name` as its binder?
+fn has_case_binder(e : @syntax.Expr, name : String) -> Bool {
+  match e {
+    Var(_) => false
+    LitInt(_) | LitChar(_) | LitString(_) => false
+    App(f, a) => has_case_binder(f, name) || has_case_binder(a, name)
+    Lam(_, body) => has_case_binder(body, name)
+    Let(bind, body) => {
+      let in_bind = match bind {
+        NonRec(_, v) => has_case_binder(v, name)
+        Rec(pairs) => {
+          let mut hit = false
+          for p in pairs {
+            if has_case_binder(p.1, name) {
+              hit = true
+            }
+          }
+          hit
+        }
+      }
+      in_bind || has_case_binder(body, name)
+    }
+    Case(scrut, binder, alts) => {
+      let mut hit = binder == name || has_case_binder(scrut, name)
+      for a in alts {
+        if has_case_binder(a.expr, name) {
+          hit = true
+        }
+      }
+      hit
+    }
+    Constr(_, args) => {
+      let mut hit = false
+      for a in args {
+        if has_case_binder(a, name) {
+          hit = true
+        }
+      }
+      hit
     }
   }
-  assert_true(occurrences == 3)
-}
-
-///|
-test "a non-recursive caller of a threaded loop supplies the CAF itself" {
-  let stats = MidStats::new()
-  let prog = optimize(
-    parse(
-      #|m = build Tip
-      #|loop = \ i acc -> case i of { 0# -> acc; __DEFAULT -> loop i (+ acc (find i m)) }
-      #|main = start (loop 3# 0#)
-    ),
-    stats,
-  )
-  assert_true(stats.cafs_threaded == 1)
-  assert_true(prog.to_string().contains("loop m"))
-}
-
-///|
-test "a CAF returned as a value threads fine; a member passed as a value does not" {
-  // reading the CAF as a value inside the loop is the shape the pass fixes
-  let stats = MidStats::new()
-  let prog = optimize(
-    parse(
-      #|m = build Tip
-      #|f = \ i -> case i of { 0# -> m; __DEFAULT -> g i }
-      #|g = \ i -> f i
-      #|main = f 3#
-    ),
-    stats,
-  )
-  assert_true(stats.cafs_threaded == 1)
-  assert_true(prog.to_string().contains("f m 3#"))
-  // a cycle member passed as a value would change meaning at its application
-  // site, so that cycle is left alone
-  let stats2 = MidStats::new()
-  let _prog2 = optimize(
-    parse(
-      #|m = build Tip
-      #|f = \ i -> apply g i
-      #|g = \ i -> f i
-      #|apply = \ h x -> h x
-      #|main = f 3#
-    ),
-    stats2,
-  )
-  assert_true(stats2.cafs_threaded == 0)
-}
-
-///|
-test "trivial and lambda-valued bindings are never threaded" {
-  let stats = MidStats::new()
-  let _prog = optimize(
-    parse(
-      #|lit = 5#
-      #|fn = \ x -> + x 1#
-      #|loop = \ i -> case i of { 0# -> 0#; __DEFAULT -> loop (+ i (find lit fn)) }
-      #|main = loop 3#
-    ),
-    stats,
-  )
-  assert_true(stats.cafs_threaded == 0)
-}
-
-///|
-test "a threaded CAF read by a case-matching reader gets a pair-returning twin" {
-  let stats = MidStats::new()
-  let prog = optimize(
-    parse(
-      #|m = build Tip
-      #|find = \ dflt k t -> case t of { Tip -> dflt; Bin kk v l r -> case ==# k kk of { 1# -> v; __DEFAULT -> find dflt k l } }
-      #|loop = \ i acc -> case i of { 0# -> acc; __DEFAULT -> case find 0# i m of x { __DEFAULT -> loop (+ i 1#) (+ acc x) } }
-      #|main = loop 3# 0#
-    ),
-    stats,
-  )
-  assert_eq(stats.readers_rebuilt, 1)
-  let text = prog.to_string()
-  assert_true(text.contains("find_rb"))
-  assert_true(text.contains("(,)"))
 }

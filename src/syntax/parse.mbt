@@ -159,6 +159,131 @@ fn Lexer::char_at(self : Lexer, pos : Int) -> Char {
   self.src[pos].to_int().unsafe_to_char()
 }
 
+///| Control-character names the Haskell Report allows inside escapes.
+fn named_escape_code(name : String) -> Int {
+  match name {
+    "NUL" => 0
+    "SOH" => 1
+    "STX" => 2
+    "ETX" => 3
+    "EOT" => 4
+    "ENQ" => 5
+    "ACK" => 6
+    "BEL" => 7
+    "BS" => 8
+    "HT" => 9
+    "LF" => 10
+    "VT" => 11
+    "FF" => 12
+    "CR" => 13
+    "SO" => 14
+    "SI" => 15
+    "DLE" => 16
+    "DC1" => 17
+    "DC2" => 18
+    "DC3" => 19
+    "DC4" => 20
+    "NAK" => 21
+    "SYN" => 22
+    "ETB" => 23
+    "CAN" => 24
+    "EM" => 25
+    "SUB" => 26
+    "ESC" => 27
+    "FS" => 28
+    "GS" => 29
+    "RS" => 30
+    "US" => 31
+    "SP" => 32
+    "DEL" => 127
+    _ => -1
+  }
+}
+
+///| Decode the escape after a backslash; self.pos sits on its first
+///| character. Named escapes match their longest table prefix so a dump
+///| like \ESC[ does not swallow the following character. A trailing \& gap
+///| and caret (\^X) and numeric (\o..\d) forms are consumed the same way.
+fn Lexer::lex_escape(self : Lexer) -> Char {
+  let c = self.char_at(self.pos)
+  self.pos = self.pos + 1
+  let ch = match c {
+    '&' => return self.lex_escape()
+    'n' => '\n'
+    't' => '\t'
+    'r' => '\r'
+    'a' => '\u{07}'
+    'b' => '\u{08}'
+    'f' => '\u{0c}'
+    'v' => '\u{0b}'
+    '"' => '"'
+    '\'' => '\''
+    '\\' => '\\'
+    '^' => {
+      if self.pos < self.src.length() {
+        let code = self.char_at(self.pos).to_int() ^ 0x40
+        self.pos = self.pos + 1
+        Char::from_int(code)
+      } else {
+        '^'
+      }
+    }
+    'o' | 'x' | '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' => {
+      let radix = if c == 'o' { 8 } else if c == 'x' { 16 } else { 10 }
+      let mut n = 0
+      while self.pos < self.src.length() {
+        let d = self.char_at(self.pos)
+        let v = if d >= '0' && d <= '9' {
+          d.to_int() - '0'.to_int()
+        } else if d >= 'a' && d <= 'f' && radix == 16 {
+          d.to_int() - 'a'.to_int() + 10
+        } else if d >= 'A' && d <= 'F' && radix == 16 {
+          d.to_int() - 'A'.to_int() + 10
+        } else {
+          break
+        }
+        if v >= radix {
+          break
+        }
+        n = n * radix + v
+        self.pos = self.pos + 1
+      }
+      if self.pos < self.src.length() && self.char_at(self.pos) == '&' {
+        self.pos = self.pos + 1
+      }
+      Char::from_int(n)
+    }
+    other if other >= 'A' && other <= 'Z' => {
+      let start = self.pos - 1
+      while self.pos < self.src.length() {
+        let d = self.char_at(self.pos)
+        if (d >= 'A' && d <= 'Z') || (d >= 'a' && d <= 'z') {
+          self.pos = self.pos + 1
+        } else {
+          break
+        }
+      }
+      let run = self.src[start:self.pos].to_owned()
+      let mut matched : Char = other
+      let mut matched_end = start + 1
+      for i in 1..=run.length() {
+        let code = named_escape_code(run.substring(start=0, end=i))
+        if code >= 0 {
+          matched = Char::from_int(code)
+          matched_end = start + i
+        }
+      }
+      self.pos = matched_end
+      if self.pos < self.src.length() && self.char_at(self.pos) == '&' {
+        self.pos = self.pos + 1
+      }
+      matched
+    }
+    other => other
+  }
+  ch
+}
+
 fn Lexer::starts_with(self : Lexer, prefix : String) -> Bool {
   let len = prefix.length()
   if self.pos + len > self.src.length() {
@@ -471,17 +596,16 @@ fn Lexer::next_token(self : Lexer) -> Result[Token, String] {
     self.pos = self.pos + 1
     let buf = StringBuilder()
     while self.pos < self.src.length() && self.char_at(self.pos) != '"' {
-      if self.char_at(self.pos) == '\\' && self.pos + 1 < self.src.length() {
+      let ch = self.char_at(self.pos)
+      if ch == '\\' {
         self.pos = self.pos + 1
-        let esc = self.char_at(self.pos)
-        if esc == 'n' { buf.write_char('\n') }
-        else if esc == 't' { buf.write_char('\t') }
-        else if esc == '\\' { buf.write_char('\\') }
-        else if esc == '"' { buf.write_char('"') }
-        else { buf.write_char(esc) }
-      } else {
-        buf.write_char(self.char_at(self.pos))
+        if self.pos >= self.src.length() {
+          break
+        }
+        buf.write_char(self.lex_escape())
+        continue
       }
+      buf.write_char(ch)
       self.pos = self.pos + 1
     }
     if self.pos < self.src.length() && self.char_at(self.pos) == '"' {
@@ -512,14 +636,15 @@ fn Lexer::next_token(self : Lexer) -> Result[Token, String] {
     self.pos = self.pos + 1
     let mut ch = ' '
     if self.pos < self.src.length() {
-      if self.char_at(self.pos) == '\\' && self.pos + 1 < self.src.length() {
+      if self.char_at(self.pos) == '\\' {
         self.pos = self.pos + 1
-        let esc = self.char_at(self.pos)
-        ch = if esc == 'n' { '\n' } else if esc == 't' { '\t' } else { esc }
+        if self.pos < self.src.length() {
+          ch = self.lex_escape()
+        }
       } else {
         ch = self.char_at(self.pos)
+        self.pos = self.pos + 1
       }
-      self.pos = self.pos + 1
     }
     if self.pos < self.src.length() && self.char_at(self.pos) == '\'' {
       self.pos = self.pos + 1

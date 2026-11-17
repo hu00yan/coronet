@@ -640,9 +640,9 @@ pub fn is_known_builtin(name : String) -> Bool {
     "int8ToInt#" | "int16ToInt#" | "wordToWord16#" | "wordToWord64#" | "word64ToWord#" => true
     "word16ToInt16#" | "int16ToWord16#" | "word8ToInt8#" | "int8ToWord8#" => true
     "intToInt8#" | "intToInt16#" | "intToInt32#" | "int32ToWord32#" | "word32ToInt32#" => true
-    "newPinnedByteArray#" | "unsafeFreezeByteArray#" | "unsafeThawByteArray#" => true
+    "newPinnedByteArray#" | "unsafeFreezeByteArray#" | "unsafeThawByteArray#" | "copyMutableByteArray#" | "keepAlive#" => true
     "getSizeofMutableByteArray#" | "resizeMutableByteArray#" | "shrinkMutableByteArray#" | "byteArrayContents#" => true
-    "indexCharOffAddr#" | "unpackAppendCString#" | "indexArray#" | "copyMutableByteArray#" | "keepAlive#" => true
+    "indexCharOffAddr#" | "unpackAppendCString#" | "indexArray#" => true
     "compareByteArrays#" | "popCnt64#" | "typeRep#" | "catch#" | "atomicModifyMutVar2#" => true
     "narrow8Int#" | "narrow16Int#" | "narrow32Int#" | "narrow8Word#" | "narrow16Word#" => true
     "chr#" | "ord#" => true
