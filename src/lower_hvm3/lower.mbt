@@ -113,6 +113,23 @@ pub fn sanitize_name(raw_name : String) -> String {
     "not#" | "notWord#" | "notI#" => "not"
     "<<" | "uncheckedIShiftL#" | "uncheckedShiftL#" | "shiftL" => "shl"
     ">>" | "uncheckedIShiftRL#" | "uncheckedShiftRL#" | "uncheckedIShiftRA#" | "uncheckedShiftRA#" | "shiftR" => "shr"
+    "plusWord8#" | "plusWord64#" | "plusInt64#" => "add"
+    "subWord8#" => "sub"
+    "timesWord8#" | "timesWord64#" | "timesInt64#" => "mul"
+    "quotWord8#" => "div"
+    "remWord8#" => "mod"
+    "eqWord8#" | "eqChar#" => "eq"
+    "neWord8#" | "neChar#" => "ne"
+    "ltWord8#" | "ltChar#" => "lt"
+    "gtWord8#" | "gtChar#" => "gt"
+    "leWord8#" | "leChar#" => "lte"
+    "geWord8#" | "geChar#" => "gte"
+    "andWord8#" | "and64#" => "and"
+    "orWord8#" | "or64#" => "or"
+    "xorWord8#" | "xor64#" => "xor"
+    "not64#" | "negateInt64#" => "not"
+    "uncheckedShiftL64#" | "uncheckedIShiftL64#" | "uncheckedShiftLWord8#" => "shl"
+    "uncheckedShiftRL64#" | "uncheckedIShiftRA64#" | "uncheckedShiftRLWord8#" => "shr"
     "plusAddr#" => "plusAddr_"
     "eqAddr#" => "eqAddr_"
     "readWord8OffAddr#" => "readWord8OffAddr_"
@@ -184,6 +201,23 @@ fn is_binop(op : String) -> (Bool, String) {
     "^" | "xor#" | "xorI#" | "xorWord#" | "xor64#" | "xor" | ".^." => (true, "^")
     "<<" | "uncheckedIShiftL#" | "uncheckedShiftL#" | "uncheckedShiftL64#" | "shiftL" => (true, "<<")
     ">>" | "uncheckedIShiftRL#" | "uncheckedShiftRL#" | "uncheckedShiftRL64#" | "uncheckedIShiftRA64#" | "shiftR" => (true, ">>")
+    // Narrow and character spellings ride on the same scalar operators.
+    "plusWord8#" => (true, "+")
+    "subWord8#" => (true, "-")
+    "timesWord8#" => (true, "*")
+    "quotWord8#" => (true, "/")
+    "remWord8#" => (true, "%")
+    "eqWord8#" | "eqChar#" => (true, "==")
+    "neWord8#" | "neChar#" => (true, "!=")
+    "ltWord8#" | "ltChar#" => (true, "<")
+    "gtWord8#" | "gtChar#" => (true, ">")
+    "leWord8#" | "leChar#" => (true, "<=")
+    "geWord8#" | "geChar#" => (true, ">=")
+    "andWord8#" => (true, "&")
+    "orWord8#" => (true, "|")
+    "xorWord8#" => (true, "^")
+    "uncheckedShiftLWord8#" => (true, "<<")
+    "uncheckedShiftRLWord8#" => (true, ">>")
     _ => (false, "")
   }
 }
@@ -700,7 +734,22 @@ fn lower_expr_ctx(expr : @syntax.Expr, ctx : LowerContext) -> String {
         name == "narrow32Word#" ||
         name == "narrow32Int#" ||
         name == "chr#" ||
-        name == "ord#" {
+        name == "ord#" ||
+        name == "word64ToInt64#" ||
+        name == "int64ToWord64#" ||
+        name == "intToInt64#" ||
+        name == "int64ToInt#" ||
+        name == "int32ToInt#" ||
+        name == "integerToInt#" ||
+        name == "int8ToInt#" ||
+        name == "int16ToInt#" ||
+        name == "wordToWord16#" ||
+        name == "wordToWord64#" ||
+        name == "word64ToWord#" ||
+        name == "word16ToInt16#" ||
+        name == "int16ToWord16#" ||
+        name == "word8ToInt8#" ||
+        name == "int8ToWord8#" {
         return "(λ&x x)"
       }
       if name == "narrow8Word#" {
@@ -1944,6 +1993,17 @@ fn is_known_builtin(name : String) -> Bool {
     "<<" | "uncheckedIShiftL#" | "uncheckedShiftL#" | "shiftL" => true
     ">>" | "uncheckedIShiftRL#" | "uncheckedShiftRL#" | "uncheckedIShiftRA#" | "uncheckedShiftRA#" | "shiftR" => true
     "word2Int#" | "int2Word#" | "word32ToWord#" | "wordToWord32#" | "narrow32Word#" => true
+    "plusWord64#" | "plusInt64#" | "plusWord8#" | "minusInt64#" | "subWord8#" => true
+    "timesWord64#" | "timesInt64#" | "timesWord8#" | "negateInt64#" | "not64#" => true
+    "quotWord8#" | "remWord8#" | "andWord8#" | "orWord8#" | "xorWord8#" => true
+    "and64#" | "or64#" | "xor64#" => true
+    "uncheckedShiftL64#" | "uncheckedIShiftL64#" | "uncheckedShiftRL64#" | "uncheckedIShiftRA64#" => true
+    "uncheckedShiftLWord8#" | "uncheckedShiftRLWord8#" => true
+    "eqChar#" | "ltChar#" | "gtChar#" | "leChar#" | "geChar#" | "neChar#" => true
+    "ltInt64#" | "gtInt64#" | "geInt64#" | "ltWord8#" | "leWord8#" | "geWord8#" | "gtWord8#" | "eqWord8#" | "neWord8#" => true
+    "word64ToInt64#" | "int64ToWord64#" | "intToInt64#" | "int64ToInt#" | "int32ToInt#" | "integerToInt#" => true
+    "int8ToInt#" | "int16ToInt#" | "wordToWord16#" | "wordToWord64#" | "word64ToWord#" => true
+    "word16ToInt16#" | "int16ToWord16#" | "word8ToInt8#" | "int8ToWord8#" => true
     "narrow8Int#" | "narrow16Int#" | "narrow32Int#" | "narrow8Word#" | "narrow16Word#" => true
     "chr#" | "ord#" => true
     "not#" | "notI#" | "notWord#" | "negateInt#" => true
