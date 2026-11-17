@@ -650,6 +650,7 @@ pub fn is_known_builtin(name : String) -> Bool {
     "runRW#" | "newByteArray#" | "writeIntArray#" | "readIntArray#" | "writeByteArray#" | "readByteArray#" => true
     "sizeofByteArray#" | "sizeofMutableByteArray#" | "indexWord8Array#" | "readWord8Array#" | "writeWord8Array#" | "indexIntArray#" | "copyByteArray#" | "setByteArray#" => true
     "newMutVar#" | "readMutVar#" | "writeMutVar#" => true
+    "newTVar#" | "readTVar#" | "writeTVar#" | "readTVarIO#" | "atomically#" | "retry#" | "catchRetry#" | "catchSTM#" => true
     "plusAddr#" | "eqAddr#" | "readWord8OffAddr#" | "touch#" | "word8ToWord#" | "wordToWord8#" | "compare" => true
     "unpackCString#" | "unpackCStringUtf8#" | "Addr#" => true
     "raise#" | "raiseIO#" | "patError" | "patError#" | "absentError" => true

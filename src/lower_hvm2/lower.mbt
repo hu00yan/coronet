@@ -203,6 +203,14 @@ pub fn sanitize_name(name : String) -> String {
     "newMutVar#" => "newMutVar"
     "readMutVar#" => "readMutVar"
     "writeMutVar#" => "writeMutVar"
+    "newTVar#" => "newTVar"
+    "readTVar#" => "readTVar"
+    "writeTVar#" => "writeTVar"
+    "readTVarIO#" => "readTVarIO"
+    "atomically#" => "atomically"
+    "retry#" => "retry"
+    "catchRetry#" => "catchRetry"
+    "catchSTM#" => "catchSTM"
     "unpackCString#" => "unpackCString"
     "unpackCStringUtf8#" => "unpackCString"
     "raise#" => "raise"
@@ -343,6 +351,7 @@ pub fn is_builtin_prim(name : String) -> Bool {
     "newArray#" | "readArray#" | "writeArray#" | "indexArray#" | "sizeofArray#" | "sizeofMutableArray#" | "sameMutableArray#" | "sameMutableByteArray#" | "byteArrayContents#" => true
     "newSmallArray#" | "readSmallArray#" | "writeSmallArray#" | "indexSmallArray#" | "sizeofSmallArray#" | "sizeofSmallMutableArray#" => true
     "newMutVar#" | "readMutVar#" | "writeMutVar#" | "casMutVar#" | "atomicModifyMutVar2#" => true
+    "newTVar#" | "readTVar#" | "writeTVar#" | "readTVarIO#" | "atomically#" | "retry#" | "catchRetry#" | "catchSTM#" => true
     "newMVar#" | "takeMVar#" | "tryTakeMVar#" | "putMVar#" | "tryPutMVar#" | "readMVar#" | "tryReadMVar#" | "isEmptyMVar#" => true
     "fork#" | "forkOn#" | "killThread#" | "yield#" | "myThreadId#" | "labelThread#" | "isCurrentThreadBound#" | "noDuplicate#" | "spark#" | "seq#" | "keepAlive#" => true
     "plusAddr#" | "minusAddr#" | "remAddr#" | "addr2Int#" | "int2Addr#" | "eqAddr#" | "neAddr#" | "ltAddr#" | "leAddr#" | "gtAddr#" | "geAddr#" => true
@@ -459,6 +468,14 @@ pub fn builtin_prim_name(name : String) -> String {
     "newMutVar#" => "newMutVar"
     "readMutVar#" => "readMutVar"
     "writeMutVar#" => "writeMutVar"
+    "newTVar#" => "newTVar"
+    "readTVar#" => "readTVar"
+    "writeTVar#" => "writeTVar"
+    "readTVarIO#" => "readTVarIO"
+    "atomically#" => "atomically"
+    "retry#" => "retry"
+    "catchRetry#" => "catchRetry"
+    "catchSTM#" => "catchSTM"
     "casMutVar#" => "casMutVar"
     "atomicModifyMutVar2#" => "atomicModifyMutVar2"
     "newMVar#" => "newMVar"
@@ -1344,6 +1361,63 @@ fn LowerCtx::add_builtin_prims(self : LowerCtx) -> Unit {
         snd: Swi(Con(Ref("read_at_0"), Ref("read_at_next")), Con(Var("s"), Var("ret"))),
       },
     ],
+  })
+
+  // STM primitives. A TVar# is represented exactly like a MutVar#: a cell in
+  // the threaded state store. The runtime reduces one interaction at a time and
+  // has no scheduler, so a transaction is just the action applied to the state:
+  // there is never a concurrent writer to serialise against, which is precisely
+  // what `atomically` has to guarantee. `retry#` blocks forever in GHC too when
+  // nothing can write the TVar, so it is lowered to a blackhole (a stuck net)
+  // rather than to a fabricated value.
+  self.add_def("newTVar", Net::{
+    root: Con(Var("val"), Con(Var("s"), Var("ret"))),
+    redexes: [
+      { fst: Var("ret"), snd: Con(Con(Var("val"), Var("s")), Num(0)) },
+    ],
+  })
+  self.add_def("readTVar", Net::{
+    root: Con(Var("tv"), Con(Var("s"), Var("ret"))),
+    redexes: [
+      {
+        fst: Var("tv"),
+        snd: Swi(Con(Ref("read_at_0"), Ref("read_at_next")), Con(Var("s"), Var("ret"))),
+      },
+    ],
+  })
+  self.add_def("writeTVar", Net::{
+    root: Con(Var("tv"), Con(Var("val"), Con(Var("s"), Var("ret")))),
+    redexes: [
+      {
+        fst: Var("tv"),
+        snd: Swi(Con(Ref("write_at_0"), Ref("write_at_next")), Con(Var("val"), Con(Var("s"), Var("ret")))),
+      },
+    ],
+  })
+  self.add_def("readTVarIO", Net::{
+    root: Con(Var("tv"), Con(Var("s"), Var("ret"))),
+    redexes: [
+      {
+        fst: Var("tv"),
+        snd: Swi(Con(Ref("read_at_0"), Ref("read_at_next")), Con(Var("s"), Var("ret"))),
+      },
+    ],
+  })
+  self.add_def("atomically", Net::{
+    root: Con(Var("action"), Con(Var("s"), Var("ret"))),
+    redexes: [{ fst: Var("action"), snd: Con(Var("s"), Var("ret")) }],
+  })
+  self.add_def("retry", Net::{
+    root: Con(Era, Var("ret")),
+    redexes: [],
+  })
+  self.add_def("catchRetry", Net::{
+    root: Con(Var("action"), Con(Var("handler"), Con(Var("s"), Var("ret")))),
+    redexes: [{ fst: Var("action"), snd: Con(Var("s"), Var("ret")) }],
+  })
+  self.add_def("catchSTM", Net::{
+    root: Con(Var("action"), Con(Var("handler"), Con(Var("s"), Var("ret")))),
+    redexes: [{ fst: Var("action"), snd: Con(Var("s"), Var("ret")) }],
   })
 
   // Raise and error primitives

@@ -1,4 +1,4 @@
-use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicU32, AtomicU64, AtomicUsize, Ordering};
 use std::alloc::{alloc, dealloc, Layout};
 use std::mem;
 
@@ -93,6 +93,16 @@ pub struct GNet<'a> {
   pub node: &'a mut [APair], // node buffer
   pub vars: &'a mut [APort], // vars buffer
   pub itrs: AtomicU64, // interaction count
+  // CORONET-DIAG: per-definition/per-rule interaction counters, enabled by
+  // HVM_DIAG=1. Mirrors the same-named counters in hvm.c so one parser reads
+  // either runtime.
+  pub diag: bool, // profiling enabled
+  pub def_itrs: Vec<AtomicU64>, // per-definition CALL interactions
+  pub rule_itrs: [AtomicU64; 8], // per-rule interactions
+  pub diag_total: AtomicU64, // every interaction
+  pub diag_inc: AtomicU64, // interactions that keep the ITRS definition
+  pub peak_nput: AtomicUsize, // high-water mark of node allocation
+  pub peak_vput: AtomicUsize, // high-water mark of var allocation
 }
 
 // Thread Memory
@@ -459,7 +469,29 @@ impl<'a> GNet<'a> {
     let vptr = unsafe { alloc(vlay) as *mut APort };
     let node = unsafe { std::slice::from_raw_parts_mut(nptr, nlen) };
     let vars = unsafe { std::slice::from_raw_parts_mut(vptr, vlen) };
-    GNet { nlen, vlen, node, vars, itrs: AtomicU64::new(0) }
+    GNet {
+      nlen,
+      vlen,
+      node,
+      vars,
+      itrs: AtomicU64::new(0),
+      diag: false,
+      def_itrs: Vec::new(),
+      rule_itrs: std::array::from_fn(|_| AtomicU64::new(0)),
+      diag_total: AtomicU64::new(0),
+      diag_inc: AtomicU64::new(0),
+      peak_nput: AtomicUsize::new(0),
+      peak_vput: AtomicUsize::new(0),
+    }
+  }
+
+  // CORONET-DIAG: turns on per-definition interaction counting. Costs one
+  // relaxed atomic increment per interaction, so it stays off unless asked for.
+  pub fn enable_diag(&mut self, defs: usize) {
+    if self.def_itrs.is_empty() {
+      self.def_itrs = (0..defs).map(|_| AtomicU64::new(0)).collect();
+      self.diag = true;
+    }
   }
 
   pub fn node_create(&self, loc: usize, val: Pair) {
@@ -653,6 +685,11 @@ impl TMem {
   // The Call Interaction.
   pub fn interact_call(&mut self, net: &GNet, a: Port, b: Port, book: &Book) -> bool {
     let fid = (a.get_val() as usize) & 0xFFFFFFF;
+    if net.diag {
+      if let Some(count) = net.def_itrs.get(fid) {
+        count.fetch_add(1, Ordering::Relaxed);
+      }
+    }
     let def = &book.defs[fid];
 
     // Copy Optimization.
@@ -871,6 +908,11 @@ impl TMem {
 
     //println!("[{:04x}] REDUCE {} ~ {} | {}", self.tid, a.show(), b.show(), rule);
 
+    if net.diag {
+      net.rule_itrs[rule as usize].fetch_add(1, Ordering::Relaxed);
+      net.diag_total.fetch_add(1, Ordering::Relaxed);
+    }
+
     let success = match rule {
       LINK => self.interact_link(net, a, b),
       CALL => self.interact_call(net, a, b, book),
@@ -890,6 +932,9 @@ impl TMem {
     // Else, increments the interaction count.
     } else if rule != LINK {
       self.itrs += 1;
+      if net.diag {
+        net.diag_inc.fetch_add(1, Ordering::Relaxed);
+      }
       true
     } else {
       true
@@ -938,6 +983,11 @@ impl TMem {
 
     net.itrs.fetch_add(self.itrs as u64, Ordering::Relaxed);
     self.itrs = 0;
+
+    // Records the allocator high-water marks: the leak signal. A net that keeps
+    // growing never reuses freed slots, so these grow with the program.
+    net.peak_nput.fetch_max(self.nput, Ordering::Relaxed);
+    net.peak_vput.fetch_max(self.vput, Ordering::Relaxed);
   }
 }
 

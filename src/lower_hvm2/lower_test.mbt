@@ -441,6 +441,33 @@ test "lower mutvar primops" {
   assert_true(hvm.contains("@readMutVar"))
 }
 
+test "lower stm primops" {
+  let src =
+    #| stmAct
+    #|   = \ s -> (# s, 1# #)
+    #| testSTM
+    #|   = \ x ->
+    #|       runRW# (\ s0 ->
+    #|       case newTVar# x s0 of {
+    #|         (# s1, tv #) -> case atomically# stmAct s1 of {
+    #|         (# s2, old #) -> case readTVar# tv s2 of {
+    #|         (# s3, cur #) -> case writeTVar# tv cur s3 of { s4 ->
+    #|         case readTVarIO# tv s4 of {
+    #|         (# s5, now #) -> +# old now
+    #|       }
+    #|       }
+    #|       }
+    #|       }
+    #|       })
+    #| main = testSTM 41#
+  let hvm = @lower_hvm2.lower_core(src).unwrap()
+  assert_true(hvm.contains("@newTVar"))
+  assert_true(hvm.contains("@readTVar"))
+  assert_true(hvm.contains("@writeTVar"))
+  assert_true(hvm.contains("@readTVarIO"))
+  assert_true(hvm.contains("@atomically"))
+}
+
 test "lower bytestring core and rolling hash" {
   let src =
     #| addr#_a2v9 = "Coronet Implicit Parallel Graph Reduction"#

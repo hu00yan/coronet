@@ -23,7 +23,8 @@ measurement.
 
 - `HVM_DIAG=1` — per-rule, per-definition and per-thread interaction counts.
   The per-interaction atomics serialize the threads, so timings under mode 1
-  are meaningless; counts are exact (atomic).
+  are meaningless; counts are exact (atomic). `scripts/hvm_profile.py` drives
+  this mode and adds the memory numbers (see below).
 - `HVM_DIAG=2` — per-thread interaction totals only, recorded once per thread
   at evaluator exit. No per-interaction cost; timings are clean.
 - `HVM_DIAG=3` — per-thread steal probes/hits/bulk-taken, bag-depth maxima,
@@ -47,6 +48,45 @@ in the worktree by policy and are listed here for review:
 - The drain-steal steal-loop experiment was applied, measured, and reverted
   (see the scheduling section); its successor strategies live behind
   `HVM_STEAL` with `scancap` shipped as the default.
+- `src/main.rs` + `src/hvm.rs`: the same `HVM_DIAG=1` counters for the Rust
+  interpreter, printing the identical `RULE_ITRS`/`TID_ITRS`/`DEF_ITRS`
+  lines, plus `- NODES:`/`- VARS:` allocator high-water marks (below).
+
+## Profiling and leak hunting
+
+GHC's profiling and heap tooling describe GHC's RTS (cost centres on ticked
+closures, a generational moving collector) and cannot be ported to an
+interaction net. The quantities that do exist are:
+
+| quantity | what it means |
+| --- | --- |
+| `ITRS` | interactions performed, the unit of work |
+| `NODES` / `VARS` | peak live slots, the leak signal |
+| `DEF_ITRS` | call interactions per definition, i.e. cost centres |
+| `RULE_ITRS` | interaction mix, which rule dominates |
+| RSS | resident memory, sampled from outside the process |
+
+`scripts/hvm_profile.py <prog.hvm>` runs a compiled program under the
+interpreter with `HVM_DIAG=1`, samples the child's RSS, and prints all of the
+above (`--json` for the raw numbers, `--top N` to cut the table):
+
+```
+$ python3 scripts/hvm_profile.py /tmp/loop.hvm --top 5
+itrs       9,017
+nodes      17,027 / 536,870,912 (0.003%)
+rules      9,017: LINK 0 (0%), CALL 1,003 (11%), VOID 503 (6%), ERAS 1,001
+           (11%), ANNI 2,506 (28%), OPER 3,503 (39%), SWIT 501 (6%)
+profile    4 definition(s), 1,003 call interactions
+           501   50.0%  go
+           500   49.9%  branch_else__C1
+```
+
+A leak is `NODES`/RSS that keeps climbing while the result is unchanged. The
+node counter is the allocator high-water mark, so it reports the peak live
+graph rather than total work: a definition that keeps a graph alive shows up
+there even when `ITRS` is flat. Both runtimes accept the same `HVM_DIAG=1`,
+so a discrepancy between the interpreter and the compiled C build is visible
+by running the same program through both.
 
 ## map300: where 450k interactions per element went
 

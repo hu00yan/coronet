@@ -643,6 +643,13 @@ fn lower_expr_ctx(expr : @syntax.Expr, ctx : LowerContext) -> String {
         name == "newMutVar#" ||
         name == "readMutVar#" ||
         name == "writeMutVar#" ||
+        name == "newTVar#" ||
+        name == "readTVar#" ||
+        name == "writeTVar#" ||
+        name == "readTVarIO#" ||
+        name == "atomically#" ||
+        name == "catchRetry#" ||
+        name == "catchSTM#" ||
         name == "plusAddr#" ||
         name == "eqAddr#" ||
         name == "readWord8OffAddr#" ||
@@ -1952,6 +1959,7 @@ fn is_known_builtin(name : String) -> Bool {
     "newArray#" | "readArray#" | "writeArray#" | "indexArray#" | "sizeofArray#" | "sizeofMutableArray#" | "sameMutableArray#" | "sameMutableByteArray#" | "byteArrayContents#" => true
     "newSmallArray#" | "readSmallArray#" | "writeSmallArray#" | "indexSmallArray#" | "sizeofSmallArray#" | "sizeofSmallMutableArray#" => true
     "newMutVar#" | "readMutVar#" | "writeMutVar#" | "casMutVar#" | "atomicModifyMutVar2#" => true
+    "newTVar#" | "readTVar#" | "writeTVar#" | "readTVarIO#" | "atomically#" | "retry#" | "catchRetry#" | "catchSTM#" => true
     "newMVar#" | "takeMVar#" | "tryTakeMVar#" | "putMVar#" | "tryPutMVar#" | "readMVar#" | "tryReadMVar#" | "isEmptyMVar#" => true
     "fork#" | "forkOn#" | "killThread#" | "yield#" | "myThreadId#" | "labelThread#" | "isCurrentThreadBound#" | "noDuplicate#" | "spark#" | "seq#" | "keepAlive#" => true
     "plusAddr#" | "minusAddr#" | "remAddr#" | "addr2Int#" | "int2Addr#" | "eqAddr#" | "neAddr#" | "ltAddr#" | "leAddr#" | "gtAddr#" | "geAddr#" => true
@@ -2293,6 +2301,14 @@ pub fn lower_program(raw_program : @syntax.Program) -> String {
   lines.push("@newMutVar_ = (λ&val (λ&s ((@Pair (λ&i (~ (== i 0) { 0: (s i) 1+_: val }))) 0)))")
   lines.push("@readMutVar_ = (λ&var (λ&s ((@Pair s) (s var))))")
   lines.push("@writeMutVar_ = (λ&var (λ&val (λ&s (λ&i (~ (== i var) { 0: (s i) 1+_: val })))))")
+  lines.push("@newTVar_ = @newMutVar_")
+  lines.push("@readTVar_ = @readMutVar_")
+  lines.push("@writeTVar_ = @writeMutVar_")
+  lines.push("@readTVarIO_ = @readMutVar_")
+  lines.push("@atomically_ = (λ&action (λ&s (action s)))")
+  lines.push("@retry_ = (λ&s 0)")
+  lines.push("@catchRetry_ = (λ&action (λ&handler (λ&s (action s))))")
+  lines.push("@catchSTM_ = (λ&action (λ&handler (λ&s (action s))))")
   lines.push("@newMVar_ = (λ&s ((@Pair 0) 0))")
   lines.push("@takeMVar_ = (λ&mv (λ&s ((@Pair s) 0)))")
   lines.push("@tryTakeMVar_ = (λ&mv (λ&s (((@Tuple3 s) 1) 0)))")

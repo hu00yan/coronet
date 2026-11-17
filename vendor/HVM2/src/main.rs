@@ -159,7 +159,16 @@ fn main() {
 
 pub fn run(book: &hvm::Book) {
   // Initializes the global net
-  let net = hvm::GNet::new(1 << 29, 1 << 29);
+  let mut net = hvm::GNet::new(1 << 29, 1 << 29);
+
+  // CORONET-DIAG: per-definition interaction counting, off unless HVM_DIAG=1,
+  // matching the same switch in the C runtime.
+  let diag = std::env::var("HVM_DIAG")
+    .map(|v| v.as_bytes().first() == Some(&b'1'))
+    .unwrap_or(false);
+  if diag {
+    net.enable_diag(book.defs.len());
+  }
 
   // Initializes threads
   let mut tm = hvm::TMem::new(0, 1);
@@ -193,4 +202,37 @@ pub fn run(book: &hvm::Book) {
   println!("- ITRS: {}", itrs);
   println!("- TIME: {:.2}s", duration.as_secs_f64());
   println!("- MIPS: {:.2}", itrs as f64 / duration.as_secs_f64() / 1_000_000.0);
+
+  // Prints the allocator high-water marks. This is the leak signal: a net that
+  // keeps hostile references alive never reuses slots, so these track the peak
+  // live size of the graph rather than the total work done.
+  let peak_nput = net.peak_nput.load(std::sync::atomic::Ordering::Relaxed);
+  let peak_vput = net.peak_vput.load(std::sync::atomic::Ordering::Relaxed);
+  println!("- NODES: {} / {}", peak_nput, net.nlen);
+  println!("- VARS: {} / {}", peak_vput, net.vlen);
+
+  if diag {
+    const RULE_NAMES: [&str; 8] = ["LINK", "CALL", "VOID", "ERAS", "ANNI", "COMM", "OPER", "SWIT"];
+    print!(
+      "- RULE_ITRS: total={} itrs_inc={} LINK={}",
+      net.diag_total.load(std::sync::atomic::Ordering::Relaxed),
+      net.diag_inc.load(std::sync::atomic::Ordering::Relaxed),
+      net.rule_itrs[0].load(std::sync::atomic::Ordering::Relaxed),
+    );
+    for r in 1..8 {
+      let v = net.rule_itrs[r].load(std::sync::atomic::Ordering::Relaxed);
+      if v > 0 {
+        print!(" {}={}", RULE_NAMES[r], v);
+      }
+    }
+    println!();
+    println!("- TID_ITRS: 0={}", itrs);
+    println!("- DEF_ITRS:");
+    for (i, def) in book.defs.iter().enumerate() {
+      let v = net.def_itrs[i].load(std::sync::atomic::Ordering::Relaxed);
+      if v > 0 {
+        println!("  {} {}", def.name, v);
+      }
+    }
+  }
 }
