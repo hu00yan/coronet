@@ -88,6 +88,26 @@ fn LowerCtx::register_adt(self : LowerCtx, variants : Array[(String, Int)]) -> U
   }
 }
 
+fn build_balanced_bytes(bytes : Array[Int], prefix : Int, step : Int, max_depth : Int) -> Tree {
+  if step == max_depth {
+    if prefix < bytes.length() {
+      Num(bytes[prefix])
+    } else {
+      Num(0)
+    }
+  } else {
+    let left = build_balanced_bytes(bytes, prefix, step + 1, max_depth)
+    let right = build_balanced_bytes(bytes, prefix | (1 << step), step + 1, max_depth)
+    let z_name = "z\{max_depth - step}"
+    let z_prev = "z\{max_depth - step - 1}"
+    match (left, right) {
+      (Num(0), Num(0)) => Ref(z_name)
+      (Ref(l), Ref(r)) if l == z_prev && r == z_prev => Ref(z_name)
+      _ => Con(left, right)
+    }
+  }
+}
+
 fn LowerCtx::register_known_constructors(self : LowerCtx) -> Unit {
   // Standard fixtures ADTs:
   self.register_adt([("MyNil", 0), ("MyCons", 2)])
@@ -273,13 +293,167 @@ fn LowerCtx::register_known_constructors(self : LowerCtx) -> Unit {
     ],
   })
 
-  self.add_def("new_array", Net::{
-    root: Con(Num(0), Con(Num(0), Con(Num(0), Con(Num(0), Con(Num(0), Con(Num(0), Con(Num(0), Con(Num(0), Era)))))))),
+  self.add_def("z0", Net::{ root: Num(0), redexes: [] })
+  for i = 1; i <= 15; i = i + 1 {
+    let prev = "z\{i - 1}"
+    self.add_def("z\{i}", Net::{ root: Con(Ref(prev), Ref(prev)), redexes: [] })
+  }
+  self.add_def("new_array", Net::{ root: Con(Ref("z15"), Ref("z15")), redexes: [] })
+
+  self.add_def("tree_write", Net::{
+    root: Con(Var("depth"), Con(Var("idx"), Con(Var("val"), Con(Var("tree"), Var("ret"))))),
+    redexes: [
+      {
+        fst: Var("depth"),
+        snd: Swi(
+          Con(Ref("tree_write_leaf"), Ref("tree_write_step")),
+          Con(Var("idx"), Con(Var("val"), Con(Var("tree"), Var("ret")))),
+        ),
+      },
+    ],
+  })
+  self.add_def("tree_write_leaf", Net::{
+    root: Con(Era, Con(Var("val"), Con(Era, Var("val")))),
     redexes: [],
+  })
+  self.add_def("tree_write_step", Net::{
+    root: Con(Var("pred"), Con(Var("idx"), Con(Var("val"), Con(Con(Var("left"), Var("right")), Var("ret"))))),
+    redexes: [
+      { fst: Dup(Var("idx_b"), Var("idx_s")), snd: Var("idx") },
+      { fst: Var("idx_b"), snd: Opr(OpSym("[&]"), Opr(Num(1), Var("bit"))) },
+      { fst: Var("idx_s"), snd: Opr(OpSym("[>>]"), Opr(Num(1), Var("next_idx"))) },
+      {
+        fst: Var("bit"),
+        snd: Swi(
+          Con(Ref("write_go_left"), Ref("write_go_right")),
+          Con(Var("pred"), Con(Var("next_idx"), Con(Var("val"), Con(Var("left"), Con(Var("right"), Var("ret")))))),
+        ),
+      },
+    ],
+  })
+  self.add_def("write_go_left", Net::{
+    root: Con(Var("pred"), Con(Var("next_idx"), Con(Var("val"), Con(Var("left"), Con(Var("right"), Con(Var("new_left"), Var("right"))))))),
+    redexes: [
+      {
+        fst: Ref("tree_write"),
+        snd: Con(Var("pred"), Con(Var("next_idx"), Con(Var("val"), Con(Var("left"), Var("new_left"))))),
+      },
+    ],
+  })
+  self.add_def("write_go_right", Net::{
+    root: Con(Era, Con(Var("pred"), Con(Var("next_idx"), Con(Var("val"), Con(Var("left"), Con(Var("right"), Con(Var("left"), Var("new_right")))))))),
+    redexes: [
+      {
+        fst: Ref("tree_write"),
+        snd: Con(Var("pred"), Con(Var("next_idx"), Con(Var("val"), Con(Var("right"), Var("new_right"))))),
+      },
+    ],
+  })
+
+  self.add_def("tree_read", Net::{
+    root: Con(Var("depth"), Con(Var("idx"), Con(Var("tree"), Var("ret")))),
+    redexes: [
+      {
+        fst: Var("depth"),
+        snd: Swi(
+          Con(Ref("tree_read_leaf"), Ref("tree_read_step")),
+          Con(Var("idx"), Con(Var("tree"), Var("ret"))),
+        ),
+      },
+    ],
+  })
+  self.add_def("tree_read_leaf", Net::{
+    root: Con(Era, Con(Var("val"), Con(Var("v1"), Var("v2")))),
+    redexes: [
+      { fst: Dup(Var("v1"), Var("v2")), snd: Var("val") },
+    ],
+  })
+  self.add_def("tree_read_step", Net::{
+    root: Con(Var("pred"), Con(Var("idx"), Con(Con(Var("left"), Var("right")), Var("ret")))),
+    redexes: [
+      { fst: Dup(Var("idx_b"), Var("idx_s")), snd: Var("idx") },
+      { fst: Var("idx_b"), snd: Opr(OpSym("[&]"), Opr(Num(1), Var("bit"))) },
+      { fst: Var("idx_s"), snd: Opr(OpSym("[>>]"), Opr(Num(1), Var("next_idx"))) },
+      {
+        fst: Var("bit"),
+        snd: Swi(
+          Con(Ref("read_go_left"), Ref("read_go_right")),
+          Con(Var("pred"), Con(Var("next_idx"), Con(Var("left"), Con(Var("right"), Var("ret"))))),
+        ),
+      },
+    ],
+  })
+  self.add_def("read_go_left", Net::{
+    root: Con(Var("pred"), Con(Var("next_idx"), Con(Var("left"), Con(Var("right"), Con(Con(Var("new_left"), Var("right")), Var("val")))))),
+    redexes: [
+      {
+        fst: Ref("tree_read"),
+        snd: Con(Var("pred"), Con(Var("next_idx"), Con(Var("left"), Con(Var("new_left"), Var("val"))))),
+      },
+    ],
+  })
+  self.add_def("read_go_right", Net::{
+    root: Con(Era, Con(Var("pred"), Con(Var("next_idx"), Con(Var("left"), Con(Var("right"), Con(Con(Var("left"), Var("new_right")), Var("val"))))))),
+    redexes: [
+      {
+        fst: Ref("tree_read"),
+        snd: Con(Var("pred"), Con(Var("next_idx"), Con(Var("right"), Con(Var("new_right"), Var("val"))))),
+      },
+    ],
+  })
+
+  self.add_def("tree_get", Net::{
+    root: Con(Var("depth"), Con(Var("idx"), Con(Var("tree"), Var("ret")))),
+    redexes: [
+      {
+        fst: Var("depth"),
+        snd: Swi(
+          Con(Ref("tree_get_leaf"), Ref("tree_get_step")),
+          Con(Var("idx"), Con(Var("tree"), Var("ret"))),
+        ),
+      },
+    ],
+  })
+  self.add_def("tree_get_leaf", Net::{
+    root: Con(Era, Con(Var("val"), Var("val"))),
+    redexes: [],
+  })
+  self.add_def("tree_get_step", Net::{
+    root: Con(Var("pred"), Con(Var("idx"), Con(Var("tree"), Var("ret")))),
+    redexes: [
+      { fst: Dup(Var("idx_b"), Var("idx_s")), snd: Var("idx") },
+      { fst: Var("idx_b"), snd: Opr(OpSym("[&]"), Opr(Num(1), Var("bit"))) },
+      { fst: Var("idx_s"), snd: Opr(OpSym("[>>]"), Opr(Num(1), Var("next_idx"))) },
+      {
+        fst: Var("bit"),
+        snd: Swi(
+          Con(Ref("get_go_left"), Ref("get_go_right")),
+          Con(Var("pred"), Con(Var("next_idx"), Con(Var("tree"), Var("ret")))),
+        ),
+      },
+    ],
+  })
+  self.add_def("get_go_left", Net::{
+    root: Con(Var("pred"), Con(Var("next_idx"), Con(Con(Var("left"), Era), Var("ret")))),
+    redexes: [
+      {
+        fst: Ref("tree_get"),
+        snd: Con(Var("pred"), Con(Var("next_idx"), Con(Var("left"), Var("ret")))),
+      },
+    ],
+  })
+  self.add_def("get_go_right", Net::{
+    root: Con(Era, Con(Var("pred"), Con(Var("next_idx"), Con(Con(Era, Var("right")), Var("ret"))))),
+    redexes: [
+      {
+        fst: Ref("tree_get"),
+        snd: Con(Var("pred"), Con(Var("next_idx"), Con(Var("right"), Var("ret")))),
+      },
+    ],
   })
 
   self.add_def("sizeofByteArray", Net::{
-    root: Con(Era, Num(64)),
+    root: Con(Era, Num(65536)),
     redexes: [],
   })
 
@@ -287,25 +461,8 @@ fn LowerCtx::register_known_constructors(self : LowerCtx) -> Unit {
     root: Con(Var("arr"), Con(Var("idx"), Var("ret"))),
     redexes: [
       {
-        fst: Var("idx"),
-        snd: Swi(Con(Ref("index_at_0"), Ref("index_at_next")), Con(Var("arr"), Var("ret"))),
-      },
-    ],
-  })
-  self.add_def("index_at_0", Net::{
-    root: Con(Var("arr"), Var("ret")),
-    redexes: [
-      { fst: Var("arr"), snd: Con(Var("head"), Era) },
-      { fst: Var("ret"), snd: Var("head") },
-    ],
-  })
-  self.add_def("index_at_next", Net::{
-    root: Con(Var("pred"), Con(Var("arr"), Var("ret"))),
-    redexes: [
-      { fst: Var("arr"), snd: Con(Era, Var("tail")) },
-      {
-        fst: Ref("indexWord8Array"),
-        snd: Con(Var("tail"), Con(Var("pred"), Var("ret"))),
+        fst: Ref("tree_get"),
+        snd: Con(Num(16), Con(Var("idx"), Con(Var("arr"), Var("ret")))),
       },
     ],
   })
@@ -331,11 +488,10 @@ fn LowerCtx::register_known_constructors(self : LowerCtx) -> Unit {
     32, 80, 97, 114, 97, 108, 108, 101, 108, 32, 71, 114, 97, 112, 104, 32,
     82, 101, 100, 117, 99, 116, 105, 111, 110,
   ]
-  let mut s_tree : Tree = Era
-  for i = bs_bytes.length() - 1; i >= 0; i = i - 1 {
-    s_tree = Con(Num(bs_bytes[i]), s_tree)
-  }
-  self.add_def("coronet_str", Net::{ root: s_tree, redexes: [] })
+  self.add_def("coronet_str", Net::{
+    root: build_balanced_bytes(bs_bytes, 0, 0, 16),
+    redexes: [],
+  })
 
   self.add_def("readWord8OffAddr", Net::{
     root: Con(Var("ptr"), Con(Var("off"), Con(Var("s"), Var("ret")))),
@@ -796,28 +952,8 @@ fn LowerCtx::register_known_constructors(self : LowerCtx) -> Unit {
     root: Con(Era, Con(Var("idx"), Con(Var("val"), Con(Var("s"), Var("ret"))))),
     redexes: [
       {
-        fst: Var("idx"),
-        snd: Swi(Con(Ref("write_at_0"), Ref("write_at_next")), Con(Var("val"), Con(Var("s"), Var("ret")))),
-      },
-    ],
-  })
-
-  self.add_def("write_at_0", Net::{
-    root: Con(Var("val"), Con(Var("s"), Var("ret"))),
-    redexes: [
-      { fst: Var("s"), snd: Con(Era, Var("rest")) },
-      { fst: Var("ret"), snd: Con(Var("val"), Var("rest")) },
-    ],
-  })
-
-  self.add_def("write_at_next", Net::{
-    root: Con(Var("pred"), Con(Var("val"), Con(Var("s"), Var("ret")))),
-    redexes: [
-      { fst: Var("s"), snd: Con(Var("head"), Var("tail")) },
-      { fst: Var("ret"), snd: Con(Var("head"), Var("new_tail")) },
-      {
-        fst: Ref("writeIntArray"),
-        snd: Con(Era, Con(Var("pred"), Con(Var("val"), Con(Var("tail"), Var("new_tail"))))),
+        fst: Ref("tree_write"),
+        snd: Con(Num(16), Con(Var("idx"), Con(Var("val"), Con(Var("s"), Var("ret"))))),
       },
     ],
   })
@@ -826,29 +962,8 @@ fn LowerCtx::register_known_constructors(self : LowerCtx) -> Unit {
     root: Con(Era, Con(Var("idx"), Con(Var("s"), Var("ret")))),
     redexes: [
       {
-        fst: Var("idx"),
-        snd: Swi(Con(Ref("read_at_0"), Ref("read_at_next")), Con(Var("s"), Var("ret"))),
-      },
-    ],
-  })
-
-  self.add_def("read_at_0", Net::{
-    root: Con(Var("s"), Var("ret")),
-    redexes: [
-      { fst: Var("s"), snd: Con(Var("head"), Var("tail")) },
-      { fst: Var("ret"), snd: Con(Con(Var("head_d1"), Var("tail")), Var("head_d2")) },
-      { fst: Dup(Var("head_d1"), Var("head_d2")), snd: Var("head") },
-    ],
-  })
-
-  self.add_def("read_at_next", Net::{
-    root: Con(Var("pred"), Con(Var("s"), Var("ret"))),
-    redexes: [
-      { fst: Var("s"), snd: Con(Var("head"), Var("tail")) },
-      { fst: Var("ret"), snd: Con(Con(Var("head"), Var("new_tail")), Var("val")) },
-      {
-        fst: Ref("readIntArray"),
-        snd: Con(Era, Con(Var("pred"), Con(Var("tail"), Con(Var("new_tail"), Var("val"))))),
+        fst: Ref("tree_read"),
+        snd: Con(Num(16), Con(Var("idx"), Con(Var("s"), Var("ret")))),
       },
     ],
   })
@@ -949,7 +1064,13 @@ fn LowerCtx::lower_case_expr(
     match alts[0].pat {
       Data(c, vars) if @syntax.is_unboxed_ctor(c) && vars.length() == 1 => {
         let scrut_tree = self.lower_expr_to_tree(scrut, redexes)
-        let scrut_val = if binder.length() > 0 && binder != vars[0] {
+        let binder_used = if binder.length() > 0 && binder != vars[0] {
+          let fvs = get_free_vars(alts[0].expr, [])
+          array_contains(fvs, binder)
+        } else {
+          false
+        }
+        let scrut_val = if binder_used {
           let b_name = sanitize_name(binder)
           redexes.push({ fst: scrut_tree, snd: Var(b_name) })
           Var(b_name)
@@ -961,7 +1082,13 @@ fn LowerCtx::lower_case_expr(
       }
       Data(c, vars) if c == "Cons" && vars.length() == 2 => {
         let scrut_tree = self.lower_expr_to_tree(scrut, redexes)
-        let scrut_val = if binder.length() > 0 {
+        let binder_used = if binder.length() > 0 {
+          let fvs = get_free_vars(alts[0].expr, [])
+          array_contains(fvs, binder)
+        } else {
+          false
+        }
+        let scrut_val = if binder_used {
           let b_name = sanitize_name(binder)
           redexes.push({ fst: scrut_tree, snd: Var(b_name) })
           Var(b_name)
@@ -1013,7 +1140,13 @@ fn LowerCtx::lower_case_expr(
       }
       Data(_, vars) => {
         let scrut_tree = self.lower_expr_to_tree(scrut, redexes)
-        let scrut_val = if binder.length() > 0 {
+        let binder_used = if binder.length() > 0 {
+          let fvs = get_free_vars(alts[0].expr, [])
+          array_contains(fvs, binder)
+        } else {
+          false
+        }
+        let scrut_val = if binder_used {
           let b_name = sanitize_name(binder)
           redexes.push({ fst: scrut_tree, snd: Var(b_name) })
           Var(b_name)
@@ -1036,7 +1169,13 @@ fn LowerCtx::lower_case_expr(
       Default(opt_v) => {
         let bndr_name = if opt_v is Some(v) { v } else if binder.length() > 0 { binder } else { self.fresh_var("bndr") }
         let scrut_tree = self.lower_expr_to_tree(scrut, redexes)
-        let scrut_val = if binder.length() > 0 && binder != bndr_name {
+        let binder_used = if binder.length() > 0 && binder != bndr_name {
+          let fvs = get_free_vars(alts[0].expr, [])
+          array_contains(fvs, binder)
+        } else {
+          false
+        }
+        let scrut_val = if binder_used {
           let b_name = sanitize_name(binder)
           redexes.push({ fst: scrut_tree, snd: Var(b_name) })
           Var(b_name)
@@ -1109,7 +1248,14 @@ fn LowerCtx::lower_case_expr(
   // Case 2A: 1# vs __DEFAULT (boolean comparison)
   if has_lit1 && !has_lit0 && lit1_expr is Some(then_e) && default_expr is Some(else_e) {
     let cond_tree = self.lower_expr_to_tree(scrut, redexes)
-    let cond_val = if binder.length() > 0 {
+    let binder_used = if binder.length() > 0 {
+      let then_fvs = get_free_vars(then_e, [])
+      let else_fvs = get_free_vars(else_e, [])
+      array_contains(then_fvs, binder) || array_contains(else_fvs, binder)
+    } else {
+      false
+    }
+    let cond_val = if binder_used {
       let b_name = sanitize_name(binder)
       redexes.push({ fst: cond_tree, snd: Var(b_name) })
       Var(b_name)
@@ -1180,7 +1326,14 @@ fn LowerCtx::lower_case_expr(
   // Case 2B: 0# vs __DEFAULT
   if has_lit0 && !has_lit1 && lit0_expr is Some(zero_e) && default_expr is Some(def_e) {
     let cond_tree = self.lower_expr_to_tree(scrut, redexes)
-    let cond_val = if binder.length() > 0 {
+    let binder_used = if binder.length() > 0 {
+      let zero_fvs = get_free_vars(zero_e, [])
+      let def_fvs = get_free_vars(def_e, [])
+      array_contains(zero_fvs, binder) || array_contains(def_fvs, binder)
+    } else {
+      false
+    }
+    let cond_val = if binder_used {
       let b_name = sanitize_name(binder)
       redexes.push({ fst: cond_tree, snd: Var(b_name) })
       Var(b_name)
@@ -1246,7 +1399,15 @@ fn LowerCtx::lower_case_expr(
   // Case 2C: 0# vs 1# vs __DEFAULT
   if has_lit0 && has_lit1 && lit0_expr is Some(zero_e) && lit1_expr is Some(one_e) && default_expr is Some(def_e) {
     let cond_tree = self.lower_expr_to_tree(scrut, redexes)
-    let cond_val = if binder.length() > 0 {
+    let binder_used = if binder.length() > 0 {
+      let zero_fvs = get_free_vars(zero_e, [])
+      let one_fvs = get_free_vars(one_e, [])
+      let def_fvs = get_free_vars(def_e, [])
+      array_contains(zero_fvs, binder) || array_contains(one_fvs, binder) || array_contains(def_fvs, binder)
+    } else {
+      false
+    }
+    let cond_val = if binder_used {
       let b_name = sanitize_name(binder)
       redexes.push({ fst: cond_tree, snd: Var(b_name) })
       Var(b_name)

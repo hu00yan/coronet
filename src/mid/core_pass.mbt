@@ -2555,17 +2555,125 @@ fn expr_size(expr : @syntax.Expr) -> Int {
   }
 }
 
+///| Parse a profile JSON file (emitted by scripts/hvm_profile.py --json) into a map of def name -> iteration count.
+pub fn parse_pgo_profile(json_str : String) -> Map[String, Int] {
+  let profile_map : Map[String, Int] = Map([])
+  try {
+    let json = @json.parse(json_str[:])
+    match json {
+      Object(obj) => {
+        match obj.get("profile") {
+          Some(Array(rows)) => {
+            for row in rows {
+              match row {
+                Object(row_obj) => {
+                  let def_name = match row_obj.get("def") {
+                    Some(String(s)) => s
+                    _ => ""
+                  }
+                  let count = match row_obj.get("count") {
+                    Some(Number(n, ..)) => n.to_int()
+                    _ => 0
+                  }
+                  if def_name.length() > 0 && count > 0 {
+                    profile_map[def_name] = count
+                    if def_name.has_prefix("@") {
+                      profile_map[def_name[1:].to_owned()] = count
+                    } else {
+                      profile_map["@" + def_name] = count
+                    }
+                  }
+                }
+                _ => ()
+              }
+            }
+          }
+          _ => ()
+        }
+      }
+      _ => ()
+    }
+  } catch {
+    _ => ()
+  }
+  profile_map
+}
+
+pub(all) struct PgoContext {
+  counts : Map[String, Int]
+  hot_defs : Map[String, Bool]
+}
+
+pub fn PgoContext::new(pgo : Map[String, Int]?) -> PgoContext {
+  let counts : Map[String, Int] = match pgo {
+    Some(m) => m
+    None => Map([])
+  }
+  let hot_defs : Map[String, Bool] = Map([])
+  let mut max_count = 0
+  for _, c in counts {
+    if c > max_count {
+      max_count = c
+    }
+  }
+  for k, c in counts {
+    let is_hot = if max_count >= 100 {
+      c * 5 >= max_count || c >= 100
+    } else {
+      c > 0
+    }
+    if is_hot {
+      hot_defs[k] = true
+      if k.has_prefix("@") {
+        hot_defs[k[1:].to_owned()] = true
+      } else {
+        hot_defs["@" + k] = true
+      }
+    }
+  }
+  { counts, hot_defs }
+}
+
+pub fn PgoContext::is_hot(self : PgoContext, name : String) -> Bool {
+  self.hot_defs.get(name).unwrap_or(false)
+}
+
+pub fn PgoContext::get_count(self : PgoContext, name : String) -> Int {
+  match self.counts.get(name) {
+    Some(c) => c
+    None => {
+      let alt = if name.has_prefix("@") { name[1:].to_owned() } else { "@" + name }
+      self.counts.get(alt).unwrap_or(0)
+    }
+  }
+}
+
 pub fn inline_known_calls(expr : @syntax.Expr, stats : MidStats) -> @syntax.Expr {
+  inline_known_calls_pgo(expr, stats, Map([]), PgoContext::new(None))
+}
+
+pub fn inline_known_calls_pgo(
+  expr : @syntax.Expr,
+  stats : MidStats,
+  top_defs : Map[String, @syntax.Expr],
+  pgo_ctx : PgoContext
+) -> @syntax.Expr {
   match expr {
     Let(NonRec(name, value), body) => {
-      let value = inline_known_calls(value, stats)
-      let body = inline_known_calls(body, stats)
+      let value = inline_known_calls_pgo(value, stats, top_defs, pgo_ctx)
+      let body = inline_known_calls_pgo(body, stats, top_defs, pgo_ctx)
       if name.has_prefix("_caf_force_") {
         return Let(NonRec(name, value), body)
       }
       let uses = count_name_uses(body, name)
-      // Inline when used exactly once and the value is small enough
-      if uses == 1 && expr_size(value) <= 6 {
+      let is_hot = pgo_ctx.is_hot(name)
+      // Relax size heuristic when hot according to PGO
+      let can_inline = if is_hot {
+        (uses == 1 && expr_size(value) <= 50) || (uses <= 3 && expr_size(value) <= 20)
+      } else {
+        uses == 1 && expr_size(value) <= 6
+      }
+      if can_inline {
         match substitute_without_capture(body, name, value) {
           Some(inlined) => {
             stats.known_calls_inlined = stats.known_calls_inlined + 1
@@ -2580,20 +2688,25 @@ pub fn inline_known_calls(expr : @syntax.Expr, stats : MidStats) -> @syntax.Expr
     Let(Rec(pairs), body) => {
       let new_pairs : Array[(String, @syntax.Expr)] = []
       for pair in pairs {
-        new_pairs.push((pair.0, inline_known_calls(pair.1, stats)))
+        new_pairs.push((pair.0, inline_known_calls_pgo(pair.1, stats, top_defs, pgo_ctx)))
       }
-      Let(Rec(new_pairs), inline_known_calls(body, stats))
+      Let(Rec(new_pairs), inline_known_calls_pgo(body, stats, top_defs, pgo_ctx))
     }
     App(f, a) => {
-      let f = inline_known_calls(f, stats)
-      let a = inline_known_calls(a, stats)
+      let f = inline_known_calls_pgo(f, stats, top_defs, pgo_ctx)
+      let a = inline_known_calls_pgo(a, stats, top_defs, pgo_ctx)
       match f {
         Lam(p, body) => {
-          if count_name_uses(body, p) <= 1 || is_trivial_value(a) {
+          let uses = count_name_uses(body, p)
+          let is_hot_arg = match a {
+            Var(v) => pgo_ctx.is_hot(v)
+            _ => false
+          }
+          if uses <= 1 || is_trivial_value(a) || is_hot_arg || (expr_size(a) <= 15 && uses <= 3) {
             match substitute_without_capture(body, p, a) {
               Some(inlined) => {
                 stats.known_calls_inlined = stats.known_calls_inlined + 1
-                inline_known_calls(inlined, stats)
+                inline_known_calls_pgo(inlined, stats, top_defs, pgo_ctx)
               }
               None => Let(NonRec(p, a), body)
             }
@@ -2601,21 +2714,74 @@ pub fn inline_known_calls(expr : @syntax.Expr, stats : MidStats) -> @syntax.Expr
             Let(NonRec(p, a), body)
           }
         }
+        Var(fn_name) => {
+          let is_hot = pgo_ctx.is_hot(fn_name)
+          if is_hot {
+            match top_defs.get(fn_name) {
+              Some(fn_body) => {
+                if count_name_uses(fn_body, fn_name) == 0 {
+                  match fn_body {
+                    Lam(p, body) => {
+                      match substitute_without_capture(body, p, a) {
+                        Some(inlined) => {
+                          stats.known_calls_inlined = stats.known_calls_inlined + 1
+                          inline_known_calls_pgo(inlined, stats, top_defs, pgo_ctx)
+                        }
+                        None => App(f, a)
+                      }
+                    }
+                    _ => {
+                      if expr_size(fn_body) <= 30 {
+                        stats.known_calls_inlined = stats.known_calls_inlined + 1
+                        inline_known_calls_pgo(App(fn_body, a), stats, top_defs, pgo_ctx)
+                      } else {
+                        App(f, a)
+                      }
+                    }
+                  }
+                } else {
+                  App(f, a)
+                }
+              }
+              None => App(f, a)
+            }
+          } else {
+            App(f, a)
+          }
+        }
         _ => App(f, a)
       }
     }
-    Lam(p, body) => Lam(p, inline_known_calls(body, stats))
+    Var(fn_name) => {
+      let is_hot = pgo_ctx.is_hot(fn_name)
+      if is_hot {
+        match top_defs.get(fn_name) {
+          Some(fn_body) => {
+            if count_name_uses(fn_body, fn_name) == 0 && expr_size(fn_body) <= 15 {
+              stats.known_calls_inlined = stats.known_calls_inlined + 1
+              fn_body
+            } else {
+              expr
+            }
+          }
+          None => expr
+        }
+      } else {
+        expr
+      }
+    }
+    Lam(p, body) => Lam(p, inline_known_calls_pgo(body, stats, top_defs, pgo_ctx))
     Case(scrut, binder, alts) => {
       let new_alts : Array[@syntax.Alt] = []
       for alt in alts {
-        new_alts.push({ pat: alt.pat, expr: inline_known_calls(alt.expr, stats) })
+        new_alts.push({ pat: alt.pat, expr: inline_known_calls_pgo(alt.expr, stats, top_defs, pgo_ctx) })
       }
-      Case(inline_known_calls(scrut, stats), binder, new_alts)
+      Case(inline_known_calls_pgo(scrut, stats, top_defs, pgo_ctx), binder, new_alts)
     }
     Constr(c, args) => {
       let new_args : Array[@syntax.Expr] = []
       for a in args {
-        new_args.push(inline_known_calls(a, stats))
+        new_args.push(inline_known_calls_pgo(a, stats, top_defs, pgo_ctx))
       }
       Constr(c, new_args)
     }
@@ -2637,12 +2803,60 @@ fn alts_all_constructors(alts : Array[@syntax.Alt]) -> Bool {
   true
 }
 
+fn try_fuse_case_constr(
+  c : String,
+  args : Array[@syntax.Expr],
+  binder : String,
+  alts : Array[@syntax.Alt]
+) -> @syntax.Expr? {
+  let norm_c = @syntax.normalize_ctor_name(c)
+  for alt in alts {
+    match alt.pat {
+      Data(pat_c, vars) => {
+        let norm_pat = @syntax.normalize_ctor_name(pat_c)
+        if (norm_c == norm_pat || c == pat_c) && vars.length() == args.length() {
+          let mut body = alt.expr
+          for i = 0; i < vars.length(); i = i + 1 {
+            let v = vars[i]
+            let a = args[i]
+            match substitute_without_capture(body, v, a) {
+              Some(subst) => body = subst
+              None => body = Let(NonRec(v, a), body)
+            }
+          }
+          if binder.length() > 0 && binder != "_" {
+            match substitute_without_capture(body, binder, Constr(c, args)) {
+              Some(subst) => body = subst
+              None => ()
+            }
+          }
+          return Some(body)
+        }
+      }
+      Default(_) => {
+        let mut body = alt.expr
+        if binder.length() > 0 && binder != "_" {
+          match substitute_without_capture(body, binder, Constr(c, args)) {
+            Some(subst) => body = subst
+            None => ()
+          }
+        }
+        return Some(body)
+      }
+      _ => ()
+    }
+  }
+  None
+}
+
 ///| Deforest producer-consumer chains on intermediate data structures:
-///| 1. Case-of-case deforestation: `case (case inner of alts1) of alts2`
+///| 1. General user ADT constructor fusion: `case (Constr c args) of alts`
+///|    eliminates intermediate constructor nets across all user ADTs.
+///| 2. Case-of-case deforestation: `case (case inner of alts1) of alts2`
 ///|    distributes the consumer into each producer branch, eliminating intermediate
 ///|    constructor nets when branches produce constructors.
-///| 2. Stream pipeline fusion: `map f (map g xs)` -> `map (\x -> f (g x)) xs`.
-///| 3. Immediate list consumer fusion: `map f (Cons x xs)` -> `Cons (f x) (map f xs)`,
+///| 3. Stream pipeline fusion: `map f (map g xs)` -> `map (\x -> f (g x)) xs`.
+///| 4. Immediate list consumer fusion: `map f (Cons x xs)` -> `Cons (f x) (map f xs)`,
 ///|    `map f Nil` -> `Nil`.
 pub fn deforest_streams(
   expr : @syntax.Expr,
@@ -2650,14 +2864,68 @@ pub fn deforest_streams(
   ctor_names : Array[String]
 ) -> @syntax.Expr {
   match expr {
-    // 1. Case-of-case deforestation
+    // Let-bound intermediate constructor consumed by case
+    Let(NonRec(x, Constr(c, args)), Case(Var(v), binder, alts)) => {
+      if v == x {
+        match try_fuse_case_constr(c, args, binder, alts) {
+          Some(fused) => {
+            stats.streams_fused = stats.streams_fused + 1
+            deforest_streams(fused, stats, ctor_names)
+          }
+          None => Let(NonRec(x, Constr(c, args)), Case(Var(v), binder, alts))
+        }
+      } else {
+        Let(NonRec(x, Constr(c, args)), deforest_streams(Case(Var(v), binder, alts), stats, ctor_names))
+      }
+    }
+    // Intermediate constructor chain inside let-scrutinee
+    Case(Let(NonRec(v, val), Constr(c, args)), outer_bndr, outer_alts) => {
+      match try_fuse_case_constr(c, args, outer_bndr, outer_alts) {
+        Some(fused) => {
+          stats.streams_fused = stats.streams_fused + 1
+          Let(NonRec(v, val), deforest_streams(fused, stats, ctor_names))
+        }
+        None => {
+          let outer_case : @syntax.Expr = Case(Constr(c, args), outer_bndr, outer_alts)
+          Let(NonRec(v, val), deforest_streams(outer_case, stats, ctor_names))
+        }
+      }
+    }
+    // Applied lambda consuming general user ADT constructor
+    App(Lam(p, Case(Var(v), bndr, alts)), Constr(c, args)) => {
+      if p == v {
+        match try_fuse_case_constr(c, args, bndr, alts) {
+          Some(fused) => {
+            stats.streams_fused = stats.streams_fused + 1
+            deforest_streams(fused, stats, ctor_names)
+          }
+          None => App(Lam(p, Case(Var(v), bndr, alts)), Constr(c, args))
+        }
+      } else {
+        App(Lam(p, deforest_streams(Case(Var(v), bndr, alts), stats, ctor_names)), Constr(c, args))
+      }
+    }
+    // Case-of-case deforestation across general user ADTs
     Case(Case(inner_scrut, inner_bndr, inner_alts), outer_bndr, outer_alts) => {
-      if alts_all_constructors(inner_alts) || outer_alts.length() <= 2 {
+      if alts_all_constructors(inner_alts) || outer_alts.length() <= 3 {
         let new_inner_alts : Array[@syntax.Alt] = []
         for alt in inner_alts {
-          let outer_case : @syntax.Expr = Case(alt.expr, outer_bndr, outer_alts)
-          let fused_branch = deforest_streams(outer_case, stats, ctor_names)
-          new_inner_alts.push({ pat: alt.pat, expr: fused_branch })
+          let fused_expr = match alt.expr {
+            Constr(c, args) => {
+              match try_fuse_case_constr(c, args, outer_bndr, outer_alts) {
+                Some(fused) => deforest_streams(fused, stats, ctor_names)
+                None => {
+                  let outer_case : @syntax.Expr = Case(alt.expr, outer_bndr, outer_alts)
+                  deforest_streams(outer_case, stats, ctor_names)
+                }
+              }
+            }
+            _ => {
+              let outer_case : @syntax.Expr = Case(alt.expr, outer_bndr, outer_alts)
+              deforest_streams(outer_case, stats, ctor_names)
+            }
+          }
+          new_inner_alts.push({ pat: alt.pat, expr: fused_expr })
         }
         stats.streams_fused = stats.streams_fused + 1
         Case(deforest_streams(inner_scrut, stats, ctor_names), inner_bndr, new_inner_alts)
@@ -2922,14 +3190,47 @@ fn propagate_scrutinee_info(
 ///| Supercompilation / Symbolic Driving:
 ///| 1. Drives case expressions by propagating pattern constraints into alternatives.
 ///| 2. Flattens nested function calls on known constructors into single-step rules.
+///| 3. Unrolls hot recursive steps and drives hot branches according to PGO weights.
 pub fn symbolic_supercompile(
   expr : @syntax.Expr,
   stats : MidStats,
   ctor_names : Array[String]
 ) -> @syntax.Expr {
+  symbolic_supercompile_pgo(expr, stats, ctor_names, Map([]), PgoContext::new(None))
+}
+
+pub fn symbolic_supercompile_pgo(
+  expr : @syntax.Expr,
+  stats : MidStats,
+  ctor_names : Array[String],
+  top_defs : Map[String, @syntax.Expr],
+  pgo_ctx : PgoContext
+) -> @syntax.Expr {
   match expr {
     Case(scrut, binder, alts) => {
-      let scrut = symbolic_supercompile(scrut, stats, ctor_names)
+      let scrut = symbolic_supercompile_pgo(scrut, stats, ctor_names, top_defs, pgo_ctx)
+      // If scrutinee is an application of a hot definition, drive it
+      let scrut = match scrut {
+        App(Var(f), arg) => {
+          if pgo_ctx.is_hot(f) {
+            match top_defs.get(f) {
+              Some(Lam(p, f_body)) => {
+                match substitute_without_capture(f_body, p, arg) {
+                  Some(driven) => {
+                    stats.supercompiled = stats.supercompiled + 1
+                    symbolic_supercompile_pgo(driven, stats, ctor_names, top_defs, pgo_ctx)
+                  }
+                  None => scrut
+                }
+              }
+              _ => scrut
+            }
+          } else {
+            scrut
+          }
+        }
+        _ => scrut
+      }
       let scrut_var = match scrut {
         Var(v) => Some(v)
         _ => None
@@ -2961,9 +3262,17 @@ pub fn symbolic_supercompile(
                 branch_body = driven
               }
             }
+            // Drive hot branches deeper
+            let is_hot_branch = pgo_ctx.is_hot(c) || (scrut_var != None && pgo_ctx.is_hot(scrut_var.unwrap()))
+            let driven_body = symbolic_supercompile_pgo(branch_body, stats, ctor_names, top_defs, pgo_ctx)
+            let final_body = if is_hot_branch {
+              symbolic_supercompile_pgo(driven_body, stats, ctor_names, top_defs, pgo_ctx)
+            } else {
+              driven_body
+            }
             new_alts.push({
               pat: alt.pat,
-              expr: symbolic_supercompile(branch_body, stats, ctor_names),
+              expr: final_body,
             })
           }
           Lit(n) => {
@@ -2981,54 +3290,105 @@ pub fn symbolic_supercompile(
             }
             new_alts.push({
               pat: alt.pat,
-              expr: symbolic_supercompile(branch_body, stats, ctor_names),
+              expr: symbolic_supercompile_pgo(branch_body, stats, ctor_names, top_defs, pgo_ctx),
             })
           }
           Default(_) => {
             new_alts.push({
               pat: alt.pat,
-              expr: symbolic_supercompile(alt.expr, stats, ctor_names),
+              expr: symbolic_supercompile_pgo(alt.expr, stats, ctor_names, top_defs, pgo_ctx),
             })
           }
         }
       }
       Case(scrut, binder, new_alts)
     }
+    // Unroll hot recursion / call on known constructor
+    App(Var(f), Constr(c, args)) => {
+      if pgo_ctx.is_hot(f) {
+        match top_defs.get(f) {
+          Some(Lam(p, body)) => {
+            match substitute_without_capture(body, p, Constr(c, args)) {
+              Some(unrolled) => {
+                stats.supercompiled = stats.supercompiled + 1
+                symbolic_supercompile_pgo(unrolled, stats, ctor_names, top_defs, pgo_ctx)
+              }
+              None => App(Var(f), Constr(c, args))
+            }
+          }
+          _ => App(Var(f), Constr(c, args))
+        }
+      } else {
+        App(Var(f), Constr(c, args))
+      }
+    }
+    // Unroll hot recursion / call on known integer literal
+    App(Var(f), LitInt(n)) => {
+      if pgo_ctx.is_hot(f) {
+        match top_defs.get(f) {
+          Some(Lam(p, body)) => {
+            match substitute_without_capture(body, p, LitInt(n)) {
+              Some(unrolled) => {
+                stats.supercompiled = stats.supercompiled + 1
+                symbolic_supercompile_pgo(unrolled, stats, ctor_names, top_defs, pgo_ctx)
+              }
+              None => App(Var(f), LitInt(n))
+            }
+          }
+          _ => App(Var(f), LitInt(n))
+        }
+      } else {
+        App(Var(f), LitInt(n))
+      }
+    }
     App(Lam(p, body), Constr(c, args)) => {
       match substitute_without_capture(body, p, Constr(c, args)) {
         Some(driven) => {
           stats.supercompiled = stats.supercompiled + 1
-          symbolic_supercompile(driven, stats, ctor_names)
+          symbolic_supercompile_pgo(driven, stats, ctor_names, top_defs, pgo_ctx)
         }
         None =>
           App(
-            Lam(p, symbolic_supercompile(body, stats, ctor_names)),
+            Lam(p, symbolic_supercompile_pgo(body, stats, ctor_names, top_defs, pgo_ctx)),
             Constr(c, args),
+          )
+      }
+    }
+    App(Lam(p, body), LitInt(n)) => {
+      match substitute_without_capture(body, p, LitInt(n)) {
+        Some(driven) => {
+          stats.supercompiled = stats.supercompiled + 1
+          symbolic_supercompile_pgo(driven, stats, ctor_names, top_defs, pgo_ctx)
+        }
+        None =>
+          App(
+            Lam(p, symbolic_supercompile_pgo(body, stats, ctor_names, top_defs, pgo_ctx)),
+            LitInt(n),
           )
       }
     }
     App(f, a) =>
       App(
-        symbolic_supercompile(f, stats, ctor_names),
-        symbolic_supercompile(a, stats, ctor_names),
+        symbolic_supercompile_pgo(f, stats, ctor_names, top_defs, pgo_ctx),
+        symbolic_supercompile_pgo(a, stats, ctor_names, top_defs, pgo_ctx),
       )
-    Lam(p, body) => Lam(p, symbolic_supercompile(body, stats, ctor_names))
+    Lam(p, body) => Lam(p, symbolic_supercompile_pgo(body, stats, ctor_names, top_defs, pgo_ctx))
     Let(NonRec(n, v), body) =>
       Let(
-        NonRec(n, symbolic_supercompile(v, stats, ctor_names)),
-        symbolic_supercompile(body, stats, ctor_names),
+        NonRec(n, symbolic_supercompile_pgo(v, stats, ctor_names, top_defs, pgo_ctx)),
+        symbolic_supercompile_pgo(body, stats, ctor_names, top_defs, pgo_ctx),
       )
     Let(Rec(pairs), body) => {
       let new_pairs : Array[(String, @syntax.Expr)] = []
       for pair in pairs {
-        new_pairs.push((pair.0, symbolic_supercompile(pair.1, stats, ctor_names)))
+        new_pairs.push((pair.0, symbolic_supercompile_pgo(pair.1, stats, ctor_names, top_defs, pgo_ctx)))
       }
-      Let(Rec(new_pairs), symbolic_supercompile(body, stats, ctor_names))
+      Let(Rec(new_pairs), symbolic_supercompile_pgo(body, stats, ctor_names, top_defs, pgo_ctx))
     }
     Constr(c, args) => {
       let new_args : Array[@syntax.Expr] = []
       for a in args {
-        new_args.push(symbolic_supercompile(a, stats, ctor_names))
+        new_args.push(symbolic_supercompile_pgo(a, stats, ctor_names, top_defs, pgo_ctx))
       }
       Constr(c, new_args)
     }
@@ -3042,13 +3402,28 @@ pub fn symbolic_supercompile(
 
 ///| Run the middle-end. Passes run to a fixpoint so a reduction that exposes a
 ///| dead binding or a duplicate body is picked up in the same compile.
-pub fn optimize(prog : @syntax.Program, stats : MidStats) -> @syntax.Program {
+pub fn optimize(
+  prog : @syntax.Program,
+  stats : MidStats,
+  pgo? : Map[String, Int]
+) -> @syntax.Program {
+  let pgo_ctx = PgoContext::new(pgo)
   let mut current = prune_top_bindings(prog, stats)
   current = thread_caf_sharing(current, stats)
   current = rebuild_shared_reads(current, stats)
   let ctor_names = collect_ctor_names(current)
   let counter : Array[Int] = [0]
   for pass = 0; pass < 3; pass = pass + 1 {
+    let top_defs : Map[String, @syntax.Expr] = Map([])
+    for bind in current.binds {
+      match bind {
+        NonRec(name, expr) => top_defs[name] = expr
+        Rec(pairs) =>
+          for pair in pairs {
+            top_defs[pair.0] = pair.1
+          }
+      }
+    }
     let before = stats.dead_lets +
       stats.inlined_lets +
       stats.cases_reduced +
@@ -3071,13 +3446,13 @@ pub fn optimize(prog : @syntax.Program, stats : MidStats) -> @syntax.Program {
           let expr = fold_constants(expr, stats)
           let expr = prune_dead_lets(expr, stats)
           let expr = inline_trivial_lets(expr, stats)
-          let expr = inline_known_calls(expr, stats)
+          let expr = inline_known_calls_pgo(expr, stats, top_defs, pgo_ctx)
           let expr = simplify_unboxed(expr, stats, ctor_names)
           let expr = prune_dead_alts(expr, stats, ctor_names)
           let expr = reduce_known_cases(expr, stats, ctor_names)
           let expr = deforest_streams(expr, stats, ctor_names)
           let expr = sink_dominator_dups(expr, stats)
-          let expr = symbolic_supercompile(expr, stats, ctor_names)
+          let expr = symbolic_supercompile_pgo(expr, stats, ctor_names, top_defs, pgo_ctx)
           let expr = push_let_into_case(expr, stats)
           let expr = merge_alt_bodies(expr, stats, counter)
           new_binds.push(NonRec(name, expr))
@@ -3089,13 +3464,13 @@ pub fn optimize(prog : @syntax.Program, stats : MidStats) -> @syntax.Program {
             let expr = fold_constants(expr, stats)
             let expr = prune_dead_lets(expr, stats)
             let expr = inline_trivial_lets(expr, stats)
-            let expr = inline_known_calls(expr, stats)
+            let expr = inline_known_calls_pgo(expr, stats, top_defs, pgo_ctx)
             let expr = simplify_unboxed(expr, stats, ctor_names)
             let expr = prune_dead_alts(expr, stats, ctor_names)
             let expr = reduce_known_cases(expr, stats, ctor_names)
             let expr = deforest_streams(expr, stats, ctor_names)
             let expr = sink_dominator_dups(expr, stats)
-            let expr = symbolic_supercompile(expr, stats, ctor_names)
+            let expr = symbolic_supercompile_pgo(expr, stats, ctor_names, top_defs, pgo_ctx)
             let expr = push_let_into_case(expr, stats)
             let expr = merge_alt_bodies(expr, stats, counter)
             new_pairs.push((pair.0, expr))

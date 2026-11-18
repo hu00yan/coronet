@@ -1,3 +1,4 @@
 import {
   "hu00yan/coronet/src/syntax" @syntax,
+  "moonbitlang/core/json" @json,
 }

@@ -337,3 +337,93 @@ test "symbolic supercompilation propagates pattern constraint to eliminate neste
   let text = prog.to_string()
   assert_false(text.contains("Cons a b"))
 }
+
+///|
+test "PGO profile JSON parser extracts definition counts correctly" {
+  let json_str = (
+    #|{
+    #|  "result": "42",
+    #|  "itrs": 10500,
+    #|  "profile": [
+    #|    { "def": "hot_fn", "count": 8000 },
+    #|    { "def": "cold_fn", "count": 20 }
+    #|  ]
+    #|}
+  )
+  let pgo_map = parse_pgo_profile(json_str)
+  assert_eq(pgo_map.get("hot_fn"), Some(8000))
+  assert_eq(pgo_map.get("cold_fn"), Some(20))
+  let ctx = PgoContext::new(Some(pgo_map))
+  assert_true(ctx.is_hot("hot_fn"))
+  assert_false(ctx.is_hot("cold_fn"))
+}
+
+///|
+test "PGO-guided inlining aggressively inlines hot function exceeding normal size threshold" {
+  let src = (
+    #|hot_compute = \ x -> + (+ (+ x 1#) (+ x 2#)) (+ (+ x 3#) 4#)
+    #|main = hot_compute 10#
+  )
+  let stats_no_pgo = MidStats::new()
+  let _ = optimize(parse(src), stats_no_pgo)
+
+  let stats_pgo = MidStats::new()
+  let pgo_map : Map[String, Int] = { "hot_compute": 5000, "main": 100 }
+  let prog_pgo = optimize(parse(src), stats_pgo, pgo=pgo_map)
+
+  assert_true(stats_pgo.known_calls_inlined >= 1)
+  assert_false(prog_pgo.to_string().contains("hot_compute 10#"))
+}
+
+///|
+test "PGO unrolls hot recursion step on known constructor" {
+  let src = (
+    #|sum_list = \ xs -> case xs of { Cons x rest -> + x (sum_list rest); Nil -> 0# }
+    #|main = sum_list (Cons 42# Nil)
+  )
+  let stats = MidStats::new()
+  let pgo_map : Map[String, Int] = { "sum_list": 10000, "main": 50 }
+  let prog = optimize(parse(src), stats, pgo=pgo_map)
+  assert_true(stats.supercompiled >= 1 || stats.streams_fused >= 1)
+  assert_true(prog.to_string().contains("42#"))
+}
+
+///|
+test "general user ADT constructor deforestation eliminates intermediate Tree constructors" {
+  let src = (
+    #|f = \ v -> case (Leaf v) of { Leaf x -> + x 10#; Node l r -> 0# }
+    #|main = f 32#
+  )
+  let stats = MidStats::new()
+  let prog = optimize(parse(src), stats)
+  assert_true(stats.streams_fused >= 1 || stats.cases_reduced >= 1)
+  let text = prog.to_string()
+  assert_false(text.contains("Leaf"))
+  assert_false(text.contains("Node"))
+}
+
+///|
+test "case-of-case deforestation eliminates intermediate user-defined Maybe constructors" {
+  let src = (
+    #|f = \ b -> case (case b of { True -> Just 21#; False -> Nothing }) of { Just val -> + val 5#; Nothing -> 0# }
+    #|main = f True
+  )
+  let stats = MidStats::new()
+  let prog = optimize(parse(src), stats)
+  assert_true(stats.streams_fused >= 1)
+  let text = prog.to_string()
+  assert_false(text.contains("Just"))
+  assert_false(text.contains("Nothing"))
+}
+
+///|
+test "lambda applied to user ADT constructor directly fuses into pattern body" {
+  let src = (
+    #|main = (\ t -> case t of { Pair a b -> + a b }) (Pair 17# 25#)
+  )
+  let stats = MidStats::new()
+  let prog = optimize(parse(src), stats)
+  assert_true(stats.streams_fused >= 1 || stats.known_calls_inlined >= 1)
+  let text = prog.to_string()
+  assert_false(text.contains("Pair 17# 25#"))
+}

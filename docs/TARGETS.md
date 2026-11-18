@@ -331,3 +331,121 @@ Coronet provides native GPU execution engines supporting zero-copy execution and
 - **Location**: `runtime/hip/coronet_hip.cpp`
 - **Features**: AMD Instinct and Radeon support via `hipLaunchKernelGGL`, wavefront-64 alignment, and lock-free interaction net reduction.
 
+---
+
+## 7. Array Storage Architectures: Linked List vs. Radix Tree & Affine Reuse
+
+### 7.1 Interaction Net Complexity: Linked List vs. Radix/Binary Trie
+
+Coronet lowers GHC's primitive array and byte-array operations (`newByteArray#`, `readByteArray#`, `writeByteArray#`, `readIntArray#`, `writeIntArray#`) to interaction nets. The representation of the underlying memory block determines the asymptotic runtime complexity (interactions, `ITRS`) and memory consumption (`NODES`).
+
+#### 1. Baseline: O(N) Linked List Array
+
+In the naive linked-list encoding (`src/lower_hvm2/lower_adt.mbt`), an array of size $N$ is represented as a right-associated nested pair:
+$$\text{arr} = (x_0\ (x_1\ (x_2\ \dots\ (x_{N-1}\ *)\dots)))$$
+
+##### Indexing & Read Cost (`readIntArray arr idx`)
+To read element at index $k \in [0, N-1]$, the evaluator recurses down the spine:
+- For each prefix step $j < k$:
+  * $1 \times \text{SWI}$ (numeric switch on index: $k - j > 0$, branch to `read_at_next`)
+  * $1 \times \text{CALL}$ (invoke `@read_at_next`)
+  * $1 \times \text{ANNI}$ (CON-CON annihilation deconstructing cell $(x_j\ \text{tail})$)
+  * Allocates $2 \times \text{CON}$ nodes to construct return wrapper $((x_j\ \text{new\_tail})\ \text{val})$
+  * Allocates $4 \times \text{CON}$ nodes to build the recursive call spine
+- At target step $k$ (index is $0$):
+  * $1 \times \text{SWI}$ + $1 \times \text{CALL}$ (`read_at_0`) + $1 \times \text{ANNI}$
+  * $1 \times \text{DUP}$ node allocated to duplicate $x_k$ into returned value and spine rebuild
+- Unwinding: $k$ frames link and reconstruct the prefix spine.
+
+$$\text{ITRS}_{\text{list\_read}}(k) \approx 7k + 5, \quad \mathbb{E}[\text{ITRS}_{\text{list\_read}}] = 3.5N + 1.5 = \mathcal{O}(N)$$
+$$\text{Alloc}_{\text{list\_read}}(k) = 2k + 3 = \mathcal{O}(k) \text{ nodes allocated per read}$$
+
+##### Mutation & Write Cost (`writeIntArray arr idx val`)
+To write $val$ at index $k$:
+- Traverses $k$ cells with $\text{SWI} + \text{CALL} + \text{ANNI}$, allocating replacement pairs $(x_j\ \text{new\_tail})$.
+- At step $k$, replaces $(x_k\ \text{rest})$ with $(val\ \text{rest})$.
+
+$$\text{ITRS}_{\text{list\_write}}(k) \approx 6k + 4 = \mathcal{O}(k)$$
+$$\text{Alloc}_{\text{list\_write}}(k) = k + 1 \text{ new nodes per write}$$
+
+##### Cumulative Initialization / Traversal
+Initializing or sequentially modifying an array of size $N$:
+$$\sum_{k=0}^{N-1} \text{ITRS}_{\text{list\_write}}(k) = \sum_{k=0}^{N-1} (6k + 4) = 3N^2 + N = \boldsymbol{\mathcal{O}(N^2)}$$
+$$\sum_{k=0}^{N-1} \text{Alloc}_{\text{list\_write}}(k) = \frac{N(N+1)}{2} = \boldsymbol{\mathcal{O}(N^2) \text{ nodes}}$$
+
+For $N = 10{,}000$, a linked list requires $\approx \mathbf{3 \times 10^8}$ (300 million) interactions and $\mathbf{5 \times 10^7}$ node allocations, causing catastrophic node exhaustion (OOM) and cache degradation.
+
+---
+
+#### 2. Advanced: Balanced Radix / Binary Tree Array
+
+In the Balanced Radix Tree (or Binary Trie) design, an array of capacity $N = 2^D$ has depth $D = \lceil \log_2 N \rceil$:
+- **Inner node:** `Branch(left, right) = (left right)`
+- **Leaf node:** `Leaf(val) = val`
+- **Key navigation:** The index $k$ is navigated bit-by-bit from MSB to LSB ($b_{D-1} \dots b_0$).
+
+##### Indexing & Read Cost (`readTree arr idx`)
+At each level $i \in [0, D-1]$:
+- Test bit $b_i = (k \gg i) \ \& \ 1$ via bitwise operation or numeric switch.
+- Match `Branch(left, right)`: routes reader down child $b_i$, leaving the sibling subtree unvisited on the heap.
+- At depth $D$, projects the target leaf element.
+
+$$\text{ITRS}_{\text{tree\_read}}(N) \approx 6 \log_2 N + 3 = \boldsymbol{\mathcal{O}(\log N)}$$
+$$\text{Alloc}_{\text{tree\_read}}(N) = \log_2 N = \boldsymbol{\mathcal{O}(\log N) \text{ nodes}}$$
+
+##### Mutation & Write Cost (`writeTree arr idx val`)
+- Follows path of length $D = \log_2 N$.
+- Replaces target leaf with $val$.
+- Path-copying rebuilds only the $D$ ancestors along the search trajectory; all $N - 1 - D$ sibling subtrees remain untouched via structural sharing.
+
+$$\text{ITRS}_{\text{tree\_write}}(N) \approx 7 \log_2 N + 4 = \boldsymbol{\mathcal{O}(\log N)}$$
+$$\text{Alloc}_{\text{tree\_write}}(N) = \log_2 N = \boldsymbol{\mathcal{O}(\log N) \text{ nodes}}$$
+
+##### Cumulative Initialization / Traversal
+$$\sum_{k=0}^{N-1} \text{ITRS}_{\text{tree\_write}}(k) = \boldsymbol{\mathcal{O}(N \log N)}, \quad \sum_{k=0}^{N-1} \text{Alloc}_{\text{tree\_write}}(k) = \boldsymbol{\mathcal{O}(N \log N)}$$
+
+##### Comparative Benchmark Projection ($N = 10{,}000$, $D \approx 14$)
+
+| Metric | Linked List $\mathcal{O}(N)$ | Binary Trie $\mathcal{O}(\log N)$ | Improvement Factor |
+|---|---|---|---|
+| Single Read ITRS (avg) | 35,000 | 87 | **402x faster** |
+| Single Write ITRS (avg) | 30,000 | 102 | **294x faster** |
+| Single Read Nodes Alloc | 10,000 | 14 | **714x memory reduction** |
+| Cumulative N-Write ITRS | $3.0 \times 10^8$ | $1.02 \times 10^6$ | **294x faster** |
+| Cumulative N-Write Nodes | $5.0 \times 10^7$ | $1.4 \times 10^5$ | **357x memory reduction** |
+
+---
+
+### 7.2 Formal Evaluation of Affine Uniqueness Preservation
+
+#### 1. Invariants of Lafont's Interaction Combinators
+Interaction combinator graph reduction guarantees referential transparency and determinism through strict topological invariants:
+1. **Degree-2 Port Invariant:** Every wire in a closed net possesses exactly two endpoints $(p_1, p_2)$. No wire is left dangling (degree 0 or 1), and no wire branches without an explicit duplicator (degree $\ge 3$).
+2. **Confluence of Linear Reduction:** When two active redexes interact, their rewrite preserves the degree-2 invariant. If an agent has a unique reader, reduction rewrites the active pair in-place without copying.
+3. **Completeness of Recursive Erasure (`ERAS`):** An erasure agent `ERA` (`*`) interacting with any constructor cell decomposes the cell and propagates `*` to all auxiliary ports:
+   $$* \sim (a\ b) \Longrightarrow * \sim a \quad \text{and} \quad * \sim b$$
+
+#### 2. Affine In-place Reuse Mechanics
+In Coronet, when a data structure (e.g. array `arr`) is updated in functional source code:
+- **Case 1: Linearly Referenced (Count = 2 in net scope: 1 definition, 1 use)**
+  The wire connecting `arr` enters the update net directly.
+  * No `DUP` node is synthesized on the wire.
+  * The update net annihilates the spine nodes along the access path via $\text{ANNI}$ (CON-CON annihilation).
+  * The freed memory slots are reclaimed or overwritten directly by the replacement nodes.
+  * **Result:** In-place modification without allocating duplicate copies of untouched subtrees.
+- **Case 2: Shared / Non-Linear (Count > 2: 1 definition, $k > 1$ uses)**
+  Coronet's `linearize_net` synthesizes a balanced binary tree of `DUP` nodes (`make_dup_tree`).
+  * The update net encounters a `DUP` node on `arr`.
+  * The interaction net rule $\text{COMM}$ triggers: the DUP duplicates the spine, creating a private copy for the writer while leaving the other reader's reference intact.
+  * **Result:** Automatic copy-on-write persistence without manual cloning routines.
+
+#### 3. Freedom from Garbage and Dangling Wires
+Why are affine nodes in Coronet guaranteed never to trigger leaks or dangling wires?
+- **Total Linearization at Compilation (`linearize_net`):**
+  * `count == 1` (variable declared/bound but never referenced in the body): Replaced unconditionally with `Era` (`*`). Under evaluation, this triggers the `ERAS` rule, which recursively walks the unused subgraph and zeroes every node.
+  * `count == 2` (variable used exactly once): Formally linear. Exactly one writer and one reader.
+  * `count > 2`: Formally cloned via `DUP`.
+- **Exclusion of Dangling Ports:** Because every case alternative and function binder must account for all constructor fields (either consuming them, passing them, or having `linearize_net` bind unused variables to `*`), no port is ever left disconnected in the emitted HVM net.
+- **Cycle-Free Erasure:** Since pure interaction nets are directed acyclic port graphs (cycles only exist via top-level definition `REF` expansion), recursive erasure cannot enter an infinite loop; it terminates in finite steps proportional to the size of the discarded term.
+
+

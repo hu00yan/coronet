@@ -22,6 +22,7 @@ struct CliArgs {
   report_gaps : Bool
   dump_ast : Bool
   no_mid : Bool
+  pgo_file : String?
 }
 
 ///|
@@ -50,10 +51,13 @@ fn print_usage() -> Unit {
     #|  -o, --output <file>          Output destination file (default: stdout / execute)
     #|  --no-lto                     Keep all linked top-level bindings
     #|  --no-prune                   Keep definitions @main cannot reach, unmerged
+    #|  --pgo <file>                 Feed profile data from hvm_profile.py --json into optimizer
     #|  --mid-stats                  Report what the middle-end removed
     #|  --report-gaps                List references the input never defines
     #|                               (frontend/harness gap inventory)
     #|  -h, --help                   Show this help message and exit
+    #|  --no-mid                     Disable middle-end optimization passes
+    #|  --dump-ast                   Dump optimized Core AST and exit
   )
   println(usage)
 }
@@ -69,6 +73,7 @@ fn parse_cli_args(args : Array[String]) -> CliArgs {
   let mut report_gaps = false
   let mut dump_ast = false
   let mut no_mid = false
+  let mut pgo_file : String? = None
   let mut i = 1
   while i < args.length() {
     let arg = args[i]
@@ -97,6 +102,16 @@ fn parse_cli_args(args : Array[String]) -> CliArgs {
       dump_ast = true
     } else if arg == "--no-mid" {
       no_mid = true
+    } else if arg == "--pgo" {
+      i = i + 1
+      if i >= args.length() {
+        println("Error: --pgo requires a JSON profile filename argument")
+        print_usage()
+        @env.exit(1)
+      }
+      pgo_file = Some(args[i])
+    } else if arg.has_prefix("--pgo=") {
+      pgo_file = Some(arg[6:].to_owned())
     } else if arg == "--target" {
       i = i + 1
       if i >= args.length() {
@@ -151,7 +166,7 @@ fn parse_cli_args(args : Array[String]) -> CliArgs {
     }
   }
 
-  { input_files, target: tgt, output_file, lto, prune, mid_stats, report_gaps, dump_ast, no_mid }
+  { input_files, target: tgt, output_file, lto, prune, mid_stats, report_gaps, dump_ast, no_mid, pgo_file }
 }
 
 ///|
@@ -325,15 +340,30 @@ async fn main {
     @syntax.link_programs(programs)
   }
   let mid_input = @syntax.strip_crash_messages(linked)
+  let pgo_map : Map[String, Int]? = match cli.pgo_file {
+    Some(path) => {
+      if !(@fs.exists(path)) {
+        println("Error: PGO profile file '\{path}' not found.")
+        @env.exit(1)
+      }
+      let content = @fs.read_text(path)
+      let parsed = @mid.parse_pgo_profile(content)
+      Some(parsed)
+    }
+    None => None
+  }
   let mid_stats = @mid.MidStats::new()
   let program = if cli.no_mid {
     mid_input
-  } else if cli.mid_stats {
-    let optimized = @mid.optimize(mid_input, mid_stats)
-    println("middle-end: \{mid_stats}")
-    optimized
   } else {
-    @mid.optimize(mid_input, mid_stats)
+    let optimized = match pgo_map {
+      Some(m) => @mid.optimize(mid_input, mid_stats, pgo=m)
+      None => @mid.optimize(mid_input, mid_stats)
+    }
+    if cli.mid_stats {
+      println("middle-end: \{mid_stats}")
+    }
+    optimized
   }
 
   if cli.dump_ast {

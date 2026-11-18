@@ -20,9 +20,20 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 # Resolve HVM3 binary
 HVM3_BIN="${HVM3_BIN:-}"
 if [[ -z "$HVM3_BIN" || ! -x "$HVM3_BIN" ]]; then
-  CANDIDATE="$(find "$REPO_ROOT/vendor/HVM3/dist-newstyle" -type f -name "hvm" -perm +111 2>/dev/null | head -n 1)"
-  if [[ -n "$CANDIDATE" && -x "$CANDIDATE" ]]; then
-    HVM3_BIN="$CANDIDATE"
+  COMMON_DIR="$(git rev-parse --git-common-dir 2>/dev/null || true)"
+  PARENT_REPO="$(cd "$COMMON_DIR/.." 2>/dev/null && pwd || true)"
+  SEARCH_DIRS=()
+  if [[ -d "$REPO_ROOT/vendor/HVM3/dist-newstyle" ]]; then
+    SEARCH_DIRS+=("$REPO_ROOT/vendor/HVM3/dist-newstyle")
+  fi
+  if [[ -n "$PARENT_REPO" && -d "$PARENT_REPO/vendor/HVM3/dist-newstyle" ]]; then
+    SEARCH_DIRS+=("$PARENT_REPO/vendor/HVM3/dist-newstyle")
+  fi
+  if [[ ${#SEARCH_DIRS[@]} -gt 0 ]]; then
+    CANDIDATE="$(find "${SEARCH_DIRS[@]}" -type f -name "hvm" -perm +111 2>/dev/null | head -n 1 || true)"
+    if [[ -n "$CANDIDATE" && -x "$CANDIDATE" ]]; then
+      HVM3_BIN="$CANDIDATE"
+    fi
   fi
 fi
 

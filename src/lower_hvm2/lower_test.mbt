@@ -561,3 +561,55 @@ test "lower bit and atomic primops" {
   assert_true(hvm.contains("@ctz"))
   assert_true(hvm.contains("@main"))
 }
+
+test "lower balanced binary trie array indexing on non-zero offsets" {
+  let src =
+    #| computeNonZero
+    #|   = \ x ->
+    #|       runRW# (\ s0 ->
+    #|       case newByteArray# 64# s0 of {
+    #|         (# s1, mba #) -> case writeIntArray# mba 5# x s1 of { s2 ->
+    #|         case writeIntArray# mba 12# (*# x 2#) s2 of { s3 ->
+    #|         case readIntArray# mba 5# s3 of {
+    #|         (# s4, v5 #) -> case readIntArray# mba 12# s4 of {
+    #|         (# s5, v12 #) -> +# v5 v12
+    #|       }
+    #|       }
+    #|       }
+    #|       }
+    #|       })
+    #| main = computeNonZero 10#
+  let hvm = @lower_hvm2.lower_core(src).unwrap()
+  assert_true(hvm.contains("@tree_write"))
+  assert_true(hvm.contains("@tree_read"))
+  assert_true(hvm.contains("@z15"))
+  assert_true(hvm.contains("@new_array"))
+  assert_true(hvm.contains("@writeIntArray"))
+  assert_true(hvm.contains("@readIntArray"))
+}
+
+test "lower pure indexWord8Array and coronet_str bit trie" {
+  let src =
+    #| readStr
+    #|   = \ idx ->
+    #|       indexWord8Array# coronet_str idx
+    #| main = readStr 40#
+  let hvm = @lower_hvm2.lower_core(src).unwrap()
+  assert_true(hvm.contains("@tree_get"))
+  assert_true(hvm.contains("@coronet_str"))
+  assert_true(hvm.contains("@indexWord8Array"))
+}
+
+test "affine in-place reuse eliminates redundant intermediate binder redexes" {
+  let src =
+    #| testAffine
+    #|   = \ pair ->
+    #|       case pair of ds {
+    #|         (# a, b #) -> +# a b
+    #|       }
+    #| main = testAffine (# 10#, 20# #)
+  let hvm = @lower_hvm2.lower_core(src).unwrap()
+  // Since `ds` is unused in the body, no intermediate redex for `ds` is allocated
+  assert_false(hvm.contains("ds ~"))
+  assert_true(hvm.contains("@main"))
+}

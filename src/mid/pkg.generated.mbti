@@ -22,6 +22,8 @@ pub fn free_names(@syntax.Expr) -> Array[String]
 
 pub fn inline_known_calls(@syntax.Expr, MidStats) -> @syntax.Expr
 
+pub fn inline_known_calls_pgo(@syntax.Expr, MidStats, Map[String, @syntax.Expr], PgoContext) -> @syntax.Expr
+
 pub fn inline_trivial_lets(@syntax.Expr, MidStats) -> @syntax.Expr
 
 pub fn merge_alpha_duplicate_defs(String) -> String
@@ -30,7 +32,9 @@ pub fn merge_alt_bodies(@syntax.Expr, MidStats, Array[Int32]) -> @syntax.Expr
 
 pub fn merge_top_bindings(@syntax.Program, MidStats) -> @syntax.Program
 
-pub fn optimize(@syntax.Program, MidStats) -> @syntax.Program
+pub fn optimize(@syntax.Program, MidStats, pgo? : Map[String, Int32]) -> @syntax.Program
+
+pub fn parse_pgo_profile(String) -> Map[String, Int32]
 
 pub fn prune_book_text(String, Array[String]) -> String
 
@@ -51,6 +55,8 @@ pub fn simplify_unboxed(@syntax.Expr, MidStats, Array[String]) -> @syntax.Expr
 pub fn sink_dominator_dups(@syntax.Expr, MidStats) -> @syntax.Expr
 
 pub fn symbolic_supercompile(@syntax.Expr, MidStats, Array[String]) -> @syntax.Expr
+
+pub fn symbolic_supercompile_pgo(@syntax.Expr, MidStats, Array[String], Map[String, @syntax.Expr], PgoContext) -> @syntax.Expr
 
 pub fn thread_caf_sharing(@syntax.Program, MidStats) -> @syntax.Program
 
@@ -80,6 +86,14 @@ pub(all) struct MidStats {
 }
 pub fn MidStats::new() -> Self
 pub impl Show for MidStats
+
+pub(all) struct PgoContext {
+  counts : Map[String, Int32]
+  hot_defs : Map[String, Bool]
+}
+pub fn PgoContext::get_count(Self, String) -> Int32
+pub fn PgoContext::is_hot(Self, String) -> Bool
+pub fn PgoContext::new(Map[String, Int32]?) -> Self
 
 // Type aliases
 

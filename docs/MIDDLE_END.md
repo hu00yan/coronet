@@ -118,16 +118,32 @@ The following middle-end passes directly reduce HVM interaction counts and net n
    Unwraps redundant unboxed constructor wrappers `case (I# x) of { I# y -> body }` to `body[y := x]`, eliminates identity case evaluations `case x of { I# y -> I# y }` to `x`, collapses redundant re-boxing `I# (case e of { I# y -> y })` to `e`, and floats let-bindings out of case scrutinees to expose constructors to case matching.
 
 4. **Core Inlining and Known-Call Specialization (`inline_known_calls`)**:
-   Eliminates direct beta redexes `(\x -> body) arg` at compile time and inlines small single-use let-bound functions, bypassing HVM lambda and application node interaction cycles.
+   Eliminates direct beta redexes `(\x -> body) arg` at compile time and inlines small single-use let-bound functions, bypassing HVM lambda and application node interaction cycles. When PGO profile data is supplied (`--pgo <profile.json>`), definitions marked hot (top 20% by interaction count or iterations >= 100) bypass standard size thresholds (`expr_size <= 6` relaxed up to `<= 50`), and hot non-recursive functions are aggressively inlined into callers.
 
 5. **DUP Minimization / Push-Down (`push_let_into_case` and `sink_dominator_dups`)**:
    Pushes compound let-bindings into the single `case` branch that consumes them. Because the binding is not kept outside the case, the lowerer avoids emitting DUP fan-out nodes across all case alternatives. Dominator DUP sinking (`sink_dominator_dups`) handles multi-use bindings by pushing them into their strict dominator branch.
 
-6. **Stream Fusion / Deforestation (`deforest_streams`)**:
-   Fuses producer-consumer chains on intermediate data structures (e.g. `case (case scrut of alts1) of alts2`), completely bypassing intermediate constructor allocations (`Cons`/`Nil`, etc.). Also fuses stream pipelines such as `map f (map g xs)` into `map (\x -> f (g x)) xs` and `map f (Cons x xs)` into `Cons (f x) (map f xs)`.
+6. **Stream Fusion and Deep Deforestation (`deforest_streams`)**:
+   Fuses producer-consumer chains on intermediate data structures, completely eliminating intermediate constructor node allocations across all user-defined ADTs (`Tree`, `Leaf`/`Node`, `Maybe`, `Either`, `Pair`, custom records, etc.) as well as built-in lists:
+   - Case-of-case distributor: `case (case inner of alts1) of alts2` fuses inner constructor branches directly into matching outer alternatives via `try_fuse_case_constr`, eliminating the intermediate constructor allocation and outer pattern match in interaction nets.
+   - Let-bound constructor consumption: `let x = Constr c args in case x of ...` directly binds pattern variables to `args` without allocating the constructor net.
+   - Let-scrutinee constructor chains: `case (let v = val in Constr c args) of ...` floats the let and evaluates the branch directly.
+   - Lambda-consumed constructors: `(\p -> case p of ...) (Constr c args)` unwraps the constructor arguments directly into pattern bodies.
+   - Stream pipeline fusion: `map f (map g xs)` into `map (\x -> f (g x)) xs` and `map f (Cons x xs)` into `Cons (f x) (map f xs)`.
 
 7. **Supercompilation / Symbolic Driving (`symbolic_supercompile`)**:
-   Applies symbolic driving with pattern constraint propagation. Inside a case branch `Data(c, vars)`, the scrutinee is known to equal `Constr(c, vars)`, so nested cases inspecting the same variable are resolved at compile time without a second runtime dispatch. Flattens nested function applications on known constructors into single-step rules.
+   Applies symbolic driving with pattern constraint propagation. Inside a case branch `Data(c, vars)`, the scrutinee is known to equal `Constr(c, vars)`, so nested cases inspecting the same variable are resolved at compile time without a second runtime dispatch. Flattens nested function applications on known constructors into single-step rules. With PGO guidance, hot branches are driven more aggressively, and hot recursive steps on known constructors or literals (`App(Var(f), Constr(...))` or `App(Var(f), LitInt(...))`) are unrolled at compile time to eliminate recursive interaction net expansion.
+
+## Profile-Guided Optimization (PGO) Closed Loop
+
+Coronet implements a target-neutral profile-guided optimization closed loop:
+
+1. **Profiling**: `scripts/hvm_profile.py <prog.hvm> --json > profile.json` samples execution on HVM2, emitting `{ "profile": [ { "def": "<name>", "count": <itrs> }, ... ] }`.
+2. **CLI Integration**: `coronet <input.core> --target hvm2 --pgo profile.json [--mid-stats]`.
+3. **Weight Threading**: `@mid.optimize(program, stats, pgo=pgo_map)` passes `PgoContext` into the pipeline.
+4. **Optimizations Triggered by PGO**:
+   - `inline_known_calls`: Hot functions are inlined into callers regardless of standard size constraints, turning inter-net function dispatches into in-place net reductions.
+   - `symbolic_supercompile`: Hot recursive functions applied to constructors or literals are unrolled 1-step at compile time, eliminating recursion entry overhead on hot paths. Hot case branches undergo deeper symbolic driving rounds.
 
 ## Open issues
 

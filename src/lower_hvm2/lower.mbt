@@ -164,7 +164,57 @@ fn make_dup_tree(vars : Array[String]) -> Tree {
   }
 }
 
+fn replace_var_tree(tree : Tree, from : String, to : String) -> Tree {
+  match tree {
+    Var(name) => if name == from { Var(to) } else { tree }
+    Con(a, b) => Con(replace_var_tree(a, from, to), replace_var_tree(b, from, to))
+    Dup(a, b) => Dup(replace_var_tree(a, from, to), replace_var_tree(b, from, to))
+    Opr(a, b) => Opr(replace_var_tree(a, from, to), replace_var_tree(b, from, to))
+    Swi(a, b) => Swi(replace_var_tree(a, from, to), replace_var_tree(b, from, to))
+    _ => tree
+  }
+}
+
+fn simplify_alias_redexes(net : Net) -> Net {
+  let mut root = net.root
+  let mut redexes = net.redexes
+  let mut changed = true
+  while changed {
+    changed = false
+    let mut alias_idx = -1
+    let mut from_var = ""
+    let mut to_var = ""
+    for i = 0; i < redexes.length(); i = i + 1 {
+      match (redexes[i].fst, redexes[i].snd) {
+        (Var(a), Var(b)) if a != b => {
+          alias_idx = i
+          from_var = a
+          to_var = b
+          break
+        }
+        _ => ()
+      }
+    }
+    if alias_idx >= 0 {
+      changed = true
+      root = replace_var_tree(root, from_var, to_var)
+      let next_redexes : Array[Redex] = []
+      for i = 0; i < redexes.length(); i = i + 1 {
+        if i != alias_idx {
+          next_redexes.push({
+            fst: replace_var_tree(redexes[i].fst, from_var, to_var),
+            snd: replace_var_tree(redexes[i].snd, from_var, to_var),
+          })
+        }
+      }
+      redexes = next_redexes
+    }
+  }
+  Net::{ root, redexes }
+}
+
 fn linearize_net(net : Net) -> Net {
+  let net = simplify_alias_redexes(net)
   let counts : Array[(String, Int)] = []
   count_vars_tree(net.root, counts)
   for r in net.redexes {
