@@ -1,6 +1,6 @@
 import {
-  "coronet/src/syntax" @syntax,
-  "coronet/src/mid" @mid,
+  "hu00yan/coronet/src/syntax" @syntax,
+  "hu00yan/coronet/src/mid" @mid,
   "moonbitlang/core/async",
   "moonbitlang/core/async/fs" @fs,
   "moonbitlang/core/env" @env,

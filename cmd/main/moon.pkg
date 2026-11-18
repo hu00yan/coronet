@@ -7,10 +7,10 @@ options(
 )
 
 import {
-  "coronet/src/syntax" @syntax,
-  "coronet/src/mid" @mid,
-  "coronet/src/lower_hvm2" @lower_hvm2,
-  "coronet/src/lower_hvm3" @lower_hvm3,
+  "hu00yan/coronet/src/syntax" @syntax,
+  "hu00yan/coronet/src/mid" @mid,
+  "hu00yan/coronet/src/lower_hvm2" @lower_hvm2,
+  "hu00yan/coronet/src/lower_hvm3" @lower_hvm3,
   "moonbitlang/core/async",
   "moonbitlang/core/async/fs" @fs,
   "moonbitlang/core/async/process" @process,

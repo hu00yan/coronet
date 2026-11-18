@@ -1,8 +1,8 @@
 // Generated using `moon info`, DON'T EDIT IT
-package "coronet/src/lower_hvm3"
+package "hu00yan/coronet/src/lower_hvm3"
 
 import {
-  "coronet/src/syntax",
+  "hu00yan/coronet/src/syntax",
 }
 
 // Values
