@@ -924,10 +924,10 @@ test "parse hex literals, float patterns, and large 32-bit unsigned words" {
   assert_eq(e_high_bit, @syntax.Expr::LitInt(-2147483648))
 
   let e_float1 = @syntax.parse_expr("1.5##").unwrap()
-  assert_eq(e_float1, @syntax.Expr::LitInt(1))
+  assert_eq(e_float1, @syntax.Expr::LitFloat(1.5))
 
   let e_float2 = @syntax.parse_expr("0.0##").unwrap()
-  assert_eq(e_float2, @syntax.Expr::LitInt(0))
+  assert_eq(e_float2, @syntax.Expr::LitFloat(0.0))
 
   let e_min64 = @syntax.parse_expr("-9223372036854775808#").unwrap()
   assert_eq(e_min64, @syntax.Expr::LitInt(-2147483648))

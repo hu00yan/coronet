@@ -227,7 +227,19 @@ pub fn canonical_body(body : String) -> String {
   let mut i = 0
   while i < body.length() {
     let c = body[i]
-    if c == '@' {
+    if c == '[' {
+      // Preserve bracketed operators (cell-op SYMs like [N]/[R]/[W] and
+      // HVM primitives like [+] / [R]) verbatim so they are not alpha-renamed.
+      let mut end = i + 1
+      while end < body.length() && body[end] != ']' {
+        end = end + 1
+      }
+      if end < body.length() {
+        end = end + 1
+      }
+      buf.write_string(body[i:end].to_owned())
+      i = end
+    } else if c == '@' {
       let mut end = i + 1
       while end < body.length() && is_name_char(body[end]) {
         end = end + 1
@@ -367,18 +379,6 @@ pub fn merge_alpha_duplicate_defs(text : String) -> String {
     None => return text
   }
 
-  // The first definition of a name is the one an alpha-merge may redirect refs
-  // to; a name defined twice keeps both blocks, so a rename never changes which
-  // body the runtime loads last.
-  let duplicated_names : Array[String] = []
-  for i, name in names {
-    for j = i + 1; j < names.length(); j = j + 1 {
-      if names[j] == name && !duplicated_names.contains(name) {
-        duplicated_names.push(name)
-      }
-    }
-  }
-
   let kept_alive : Array[Bool] = []
   for _ in names {
     kept_alive.push(true)
@@ -390,7 +390,7 @@ pub fn merge_alpha_duplicate_defs(text : String) -> String {
     let owners : Array[String] = []
     let round_renames : Array[(String, String)] = []
     for i, name in names {
-      if !kept_alive[i] || duplicated_names.contains(name) {
+      if !kept_alive[i] {
         continue
       }
       let key = canonical_body(def_value(rename_refs(bodies[i], renames)))

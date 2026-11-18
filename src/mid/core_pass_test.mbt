@@ -128,7 +128,7 @@ test "case binder survives each mid pass" {
 fn has_case_binder(e : @syntax.Expr, name : String) -> Bool {
   match e {
     Var(_) => false
-    LitInt(_) | LitChar(_) | LitString(_) => false
+    LitInt(_) | LitFloat(_) | LitChar(_) | LitString(_) => false
     App(f, a) => has_case_binder(f, name) || has_case_binder(a, name)
     Lam(_, body) => has_case_binder(body, name)
     Let(bind, body) => {
@@ -165,4 +165,175 @@ fn has_case_binder(e : @syntax.Expr, name : String) -> Bool {
       hit
     }
   }
+}
+
+///|
+test "eta reduction removes an identity wrapper" {
+  let prog = optimized(
+    #|f = \ x -> g x
+    #|g = \ y -> y
+    #|main = f 1#
+  )
+  let text = prog.to_string()
+  assert_false(text.contains("\\x -> g x"))
+  assert_true(text.contains("f = g") || text.contains("main = g 1#"))
+}
+
+///|
+test "eta reduction refuses when the parameter is free in the function" {
+  let prog = optimized(
+    #|f = \ x -> (\ y -> + x y) x
+    #|main = f 1#
+  )
+  assert_true(prog.to_string().contains("+ x"))
+}
+
+///|
+test "constant folding evaluates literal arithmetic and bitwise primops" {
+  let stats = MidStats::new()
+  let src =
+    #|main = + 10# 20#
+  let prog = optimize(parse(src), stats)
+  assert_eq(stats.constants_folded, 1)
+  assert_true(prog.to_string().contains("30#"))
+}
+
+///|
+test "constant folding folds comparison and bitwise operators" {
+  let stats = MidStats::new()
+  let src =
+    #|main = & (== 5# 5#) 1#
+  let prog = optimize(parse(src), stats)
+  assert_eq(stats.constants_folded, 2)
+  assert_true(prog.to_string().contains("1#"))
+}
+
+///|
+test "dead constructor alternative pruning drops unreachable branches" {
+  let stats = MidStats::new()
+  let src =
+    #|f = \ x -> case 1# of { 1# -> x; 2# -> + x 8#; 3# -> + x 9# }
+    #|main = f 70#
+  let prog = optimize(parse(src), stats)
+  assert_true(stats.dead_alts_pruned >= 1 || stats.cases_reduced >= 1)
+  let text = prog.to_string()
+  assert_false(text.contains("8#"))
+  assert_false(text.contains("9#"))
+}
+
+///|
+test "unboxed constructor simplification unwraps unboxed data constructor" {
+  let stats = MidStats::new()
+  let src =
+    #|f = \ x -> case I# x of { I# y -> + y 1# }
+    #|main = f 10#
+  let prog = optimize(parse(src), stats)
+  assert_true(stats.unboxed_simplified >= 1 || stats.cases_reduced >= 1)
+  let text = prog.to_string()
+  assert_false(text.contains("case"))
+}
+
+///|
+test "unboxed constructor simplification eliminates identity case" {
+  let stats = MidStats::new()
+  let src =
+    #|f = \ x -> case x of { I# y -> I# y }
+    #|main = f (I# 5#)
+  let prog = optimize(parse(src), stats)
+  assert_true(stats.unboxed_simplified >= 1)
+  let text = prog.to_string()
+  assert_false(text.contains("case"))
+}
+
+///|
+test "let push-down pushes compound let into the only case branch that uses it" {
+  let stats = MidStats::new()
+  let src =
+    #|f = \ b y -> let expensive = + (+ (+ y 1#) 2#) (+ (+ y 3#) 4#) in case b of { True -> expensive; False -> 0# }
+    #|main = f True 5#
+  let prog = optimize(parse(src), stats)
+  assert_true(stats.lets_pushed_down >= 1 || stats.dups_sunk >= 1)
+  let text = prog.to_string()
+  assert_false(text.has_prefix("let expensive ="))
+}
+
+///|
+test "known-call specialization and beta-reduction inlines applied lambda" {
+  let stats = MidStats::new()
+  let src =
+    #|main = (\ x -> + x 5#) 10#
+  let prog = optimize(parse(src), stats)
+  assert_true(stats.known_calls_inlined >= 1)
+  let text = prog.to_string()
+  assert_true(text.contains("15#"))
+}
+
+///|
+test "known-call inlining inlines small let-bound function used once" {
+  let stats = MidStats::new()
+  let src =
+    #|main = let inc = \ x -> + x 1# in inc 99#
+  let prog = optimize(parse(src), stats)
+  assert_true(stats.known_calls_inlined >= 1)
+  let text = prog.to_string()
+  assert_true(text.contains("100#"))
+}
+
+///|
+test "stream deforestation fuses producer-consumer case chains" {
+  let stats = MidStats::new()
+  let src =
+    #|f = \ x -> case (case x of { True -> Cons 1# Nil; False -> Nil }) of { Cons h t -> h; Nil -> 0# }
+    #|main = f True
+  let prog = optimize(parse(src), stats)
+  assert_true(stats.streams_fused >= 1)
+  let text = prog.to_string()
+  assert_false(text.contains("case (case"))
+}
+
+///|
+test "stream deforestation fuses map-map composition" {
+  let stats = MidStats::new()
+  let src =
+    #|f = \ xs -> map (\ a -> + a 1#) (map (\ b -> * b 2#) xs)
+    #|main = f Nil
+  let prog = optimize(parse(src), stats)
+  assert_true(stats.streams_fused >= 1)
+  let text = prog.to_string()
+  let mut map_count = 0
+  let needle = "map "
+  let mut from = 0
+  while from + needle.length() <= text.length() {
+    if text[from:from + needle.length()] == needle {
+      map_count = map_count + 1
+      from = from + needle.length()
+    } else {
+      from = from + 1
+    }
+  }
+  assert_true(map_count <= 1)
+}
+
+///|
+test "dominator DUP sinking pushes multi-use binding into dominating branch" {
+  let stats = MidStats::new()
+  let src =
+    #|f = \ b y -> let compound = + (+ y 1#) (+ y 2#) in case b of { True -> + compound compound; False -> 0# }
+    #|main = f True 5#
+  let prog = optimize(parse(src), stats)
+  assert_true(stats.dups_sunk >= 1)
+  let text = prog.to_string()
+  assert_false(text.has_prefix("let compound ="))
+}
+
+///|
+test "symbolic supercompilation propagates pattern constraint to eliminate nested case" {
+  let stats = MidStats::new()
+  let src =
+    #|f = \ x -> case x of { Cons h t -> case x of { Cons a b -> + a 1#; Nil -> 0# }; Nil -> 0# }
+    #|main = f (Cons 10# Nil)
+  let prog = optimize(parse(src), stats)
+  assert_true(stats.supercompiled >= 1 || stats.cases_reduced >= 1)
+  let text = prog.to_string()
+  assert_false(text.contains("Cons a b"))
 }

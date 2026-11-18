@@ -1400,7 +1400,7 @@ fn Parser::parse_atom(self : Parser) -> Result[Expr, String] {
     }
     Token::FloatLit(d) => {
       let _ = self.next()
-      Ok(Expr::LitInt(d.to_int()))
+      Ok(Expr::LitFloat(d))
     }
     Token::CharLit(c) => {
       let _ = self.next()

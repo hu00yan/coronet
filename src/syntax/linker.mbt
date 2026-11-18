@@ -1,28 +1,34 @@
 ///| Multi-Module Linker for CoreLite AST.
 
-fn collect_free_vars_in_expr(expr : Expr, bound : Array[String], free : Array[String]) -> Unit {
+fn collect_free_vars_fast(
+  expr : Expr,
+  bound : Array[String],
+  free_map : Map[String, Bool],
+  free : Array[String]
+) -> Unit {
   match expr {
     Var(name) => {
-      if !bound.contains(name) && !free.contains(name) {
+      if !bound.contains(name) && !free_map.contains(name) {
+        free_map[name] = true
         free.push(name)
       }
     }
-    LitInt(_) | LitChar(_) | LitString(_) => ()
+    LitInt(_) | LitFloat(_) | LitChar(_) | LitString(_) => ()
     App(f, a) => {
-      collect_free_vars_in_expr(f, bound, free)
-      collect_free_vars_in_expr(a, bound, free)
+      collect_free_vars_fast(f, bound, free_map, free)
+      collect_free_vars_fast(a, bound, free_map, free)
     }
     Lam(p, body) => {
       bound.push(p)
-      collect_free_vars_in_expr(body, bound, free)
+      collect_free_vars_fast(body, bound, free_map, free)
       let _ = bound.pop()
     }
     Let(bind, body) => {
       match bind {
         NonRec(name, val) => {
-          collect_free_vars_in_expr(val, bound, free)
+          collect_free_vars_fast(val, bound, free_map, free)
           bound.push(name)
-          collect_free_vars_in_expr(body, bound, free)
+          collect_free_vars_fast(body, bound, free_map, free)
           let _ = bound.pop()
         }
         Rec(pairs) => {
@@ -30,9 +36,9 @@ fn collect_free_vars_in_expr(expr : Expr, bound : Array[String], free : Array[St
             bound.push(pair.0)
           }
           for pair in pairs {
-            collect_free_vars_in_expr(pair.1, bound, free)
+            collect_free_vars_fast(pair.1, bound, free_map, free)
           }
-          collect_free_vars_in_expr(body, bound, free)
+          collect_free_vars_fast(body, bound, free_map, free)
           for _ in 0..<pairs.length() {
             let _ = bound.pop()
           }
@@ -40,7 +46,7 @@ fn collect_free_vars_in_expr(expr : Expr, bound : Array[String], free : Array[St
       }
     }
     Case(scrut, binder, alts) => {
-      collect_free_vars_in_expr(scrut, bound, free)
+      collect_free_vars_fast(scrut, bound, free_map, free)
       for alt in alts {
         let added_binders : Array[String] = []
         if binder.length() > 0 {
@@ -60,34 +66,37 @@ fn collect_free_vars_in_expr(expr : Expr, bound : Array[String], free : Array[St
           }
           _ => ()
         }
-        collect_free_vars_in_expr(alt.expr, bound, free)
+        collect_free_vars_fast(alt.expr, bound, free_map, free)
         for _ in 0..<added_binders.length() {
           let _ = bound.pop()
         }
       }
     }
     Constr(name, args) => {
-      // A GHC top-level function keeps its module prefix through the frontend
-      // (`Data.Map.Internal.balanceR` -> `Data_Map_Internal_balanceR`), so the
-      // name starts with a capital letter and the parser classifies it as a
-      // constructor. If the program defines that name, it is a function and
-      // this is a real edge; if not, it is a constructor and the edge is
-      // dropped by the `defined_names` filter. Skipping this edge pruned whole
-      // library modules out of real projects.
-      if !bound.contains(name) && !free.contains(name) {
+      if !bound.contains(name) && !free_map.contains(name) {
+        free_map[name] = true
         free.push(name)
       }
       for a in args {
-        collect_free_vars_in_expr(a, bound, free)
+        collect_free_vars_fast(a, bound, free_map, free)
       }
     }
   }
+}
+
+pub fn collect_free_vars_in_expr(expr : Expr, bound : Array[String], free : Array[String]) -> Unit {
+  let free_map : Map[String, Bool] = Map([])
+  for f in free {
+    free_map[f] = true
+  }
+  collect_free_vars_fast(expr, bound, free_map, free)
 }
 
 ///| Link multiple CoreLite programs into a single unified Program.
 ///| Resolves imported / qualified symbols across modules (e.g. Math_fib -> fib,
 ///| Data_ListOps_myMap -> myMap) and creates alias bindings.
 pub fn link_programs(programs : Array[Program]) -> Program {
+  let seen_map : Map[String, Bool] = Map([])
   let seen_names : Array[String] = []
   let unified_binds : Array[Bind] = []
 
@@ -96,16 +105,18 @@ pub fn link_programs(programs : Array[Program]) -> Program {
     for bind in prog.binds {
       match bind {
         NonRec(name, expr) => {
-          if seen_names.contains(name) {
+          if seen_map.contains(name) {
             continue
           }
+          seen_map[name] = true
           seen_names.push(name)
           unified_binds.push(NonRec(name, expr))
         }
         Rec(pairs) => {
           let new_pairs : Array[(String, Expr)] = []
           for pair in pairs {
-            if !seen_names.contains(pair.0) {
+            if !seen_map.contains(pair.0) {
+              seen_map[pair.0] = true
               seen_names.push(pair.0)
               new_pairs.push(pair)
             }
@@ -119,25 +130,35 @@ pub fn link_programs(programs : Array[Program]) -> Program {
   }
 
   // 2. Collect all free variables referenced in all bindings
+  let free_map : Map[String, Bool] = Map([])
   let free_vars : Array[String] = []
   for bind in unified_binds {
     match bind {
-      NonRec(_, expr) => collect_free_vars_in_expr(expr, [], free_vars)
+      NonRec(_, expr) => collect_free_vars_fast(expr, [], free_map, free_vars)
       Rec(pairs) => {
         let bound : Array[String] = []
         for pair in pairs { bound.push(pair.0) }
-        for pair in pairs { collect_free_vars_in_expr(pair.1, bound, free_vars) }
+        for pair in pairs { collect_free_vars_fast(pair.1, bound, free_map, free_vars) }
       }
     }
   }
 
   // 3. Resolve cross-module qualified names
+  let unqual_to_qual : Map[String, String] = Map([])
+  for def_name in seen_names {
+    let unqual = get_unqualified_name(def_name)
+    if unqual != def_name && !unqual_to_qual.contains(unqual) {
+      unqual_to_qual[unqual] = def_name
+    }
+  }
+
   // Case A: Free variable is qualified (e.g. Math_Fib_fib or Math.Fib.fib)
   // and an unqualified symbol (fib) is defined.
   for fv in free_vars {
-    if !seen_names.contains(fv) {
+    if !seen_map.contains(fv) {
       let unqual = get_unqualified_name(fv)
-      if seen_names.contains(unqual) && unqual != fv {
+      if seen_map.contains(unqual) && unqual != fv {
+        seen_map[fv] = true
         seen_names.push(fv)
         unified_binds.push(Bind::NonRec(fv, Expr::Var(unqual)))
       }
@@ -147,16 +168,10 @@ pub fn link_programs(programs : Array[Program]) -> Program {
   // Case B: Free variable is unqualified (e.g. fib)
   // and a defined symbol is qualified (e.g. Math_Fib_fib).
   for fv in free_vars {
-    if !seen_names.contains(fv) {
-      let mut matched : String? = None
-      for def_name in seen_names {
-        if get_unqualified_name(def_name) == fv && def_name != fv {
-          matched = Some(def_name)
-          break
-        }
-      }
-      match matched {
+    if !seen_map.contains(fv) {
+      match unqual_to_qual.get(fv) {
         Some(target) => {
+          seen_map[fv] = true
           seen_names.push(fv)
           unified_binds.push(Bind::NonRec(fv, Expr::Var(target)))
         }
@@ -168,7 +183,7 @@ pub fn link_programs(programs : Array[Program]) -> Program {
   // Case C: GHC unique suffix match (e.g. fv is Data_ListOps_$wmySum or $wmySum,
   // and defined symbol has a GHC unique suffix like Data_ListOps_$wmySum_sKG).
   for fv in free_vars {
-    if !seen_names.contains(fv) {
+    if !seen_map.contains(fv) {
       let mut matched : String? = None
       let fv_prefix = fv + "_"
       let unqual_prefix = get_unqualified_name(fv) + "_"
@@ -180,6 +195,7 @@ pub fn link_programs(programs : Array[Program]) -> Program {
       }
       match matched {
         Some(target) => {
+          seen_map[fv] = true
           seen_names.push(fv)
           unified_binds.push(Bind::NonRec(fv, Expr::Var(target)))
         }
@@ -189,7 +205,7 @@ pub fn link_programs(programs : Array[Program]) -> Program {
   }
 
   // 4. Ensure entry point 'main = result' if result exists and main does not
-  if !seen_names.contains("main") && seen_names.contains("result") {
+  if !seen_map.contains("main") && seen_map.contains("result") {
     unified_binds.push(Bind::NonRec("main", Expr::Var("result")))
   }
 
@@ -201,24 +217,27 @@ pub fn link_programs(programs : Array[Program]) -> Program {
 ///| If no roots are specified or found, returns the program unmodified.
 pub fn prune_unreachable(prog : Program, extra_roots : Array[String]) -> Program {
   let all = prog.all_bindings()
-  let defined_names : Array[String] = []
+  let defined_map : Map[String, Expr] = Map([])
   for p in all {
-    defined_names.push(p.0)
+    defined_map[p.0] = p.1
   }
 
   // 1. Establish roots
   let roots : Array[String] = []
+  let roots_map : Map[String, Bool] = Map([])
   for r in extra_roots {
-    if defined_names.contains(r) && !roots.contains(r) {
+    if defined_map.contains(r) && !roots_map.contains(r) {
       roots.push(r)
+      roots_map[r] = true
     }
   }
 
   // Well-known entry points
   let default_entry_points = ["main", "result", "Main_main", ":Main.main", "_start", "coronet_main"]
   for ep in default_entry_points {
-    if defined_names.contains(ep) && !roots.contains(ep) {
+    if defined_map.contains(ep) && !roots_map.contains(ep) {
       roots.push(ep)
+      roots_map[ep] = true
     }
   }
 
@@ -228,10 +247,10 @@ pub fn prune_unreachable(prog : Program, extra_roots : Array[String]) -> Program
   }
 
   // 2. Reachability analysis (Transitive Closure via BFS)
-  let reachable : Array[String] = []
+  let reachable_map : Map[String, Bool] = Map([])
   let queue : Array[String] = []
   for r in roots {
-    reachable.push(r)
+    reachable_map[r] = true
     queue.push(r)
   }
 
@@ -239,13 +258,14 @@ pub fn prune_unreachable(prog : Program, extra_roots : Array[String]) -> Program
   while head < queue.length() {
     let curr = queue[head]
     head = head + 1
-    match prog.lookup(curr) {
+    match defined_map.get(curr) {
       Some(expr) => {
         let fvs : Array[String] = []
-        collect_free_vars_in_expr(expr, [], fvs)
+        let fv_map : Map[String, Bool] = Map([])
+        collect_free_vars_fast(expr, [], fv_map, fvs)
         for fv in fvs {
-          if defined_names.contains(fv) && !reachable.contains(fv) {
-            reachable.push(fv)
+          if defined_map.contains(fv) && !reachable_map.contains(fv) {
+            reachable_map[fv] = true
             queue.push(fv)
           }
         }
@@ -259,14 +279,14 @@ pub fn prune_unreachable(prog : Program, extra_roots : Array[String]) -> Program
   for b in prog.binds {
     match b {
       NonRec(n, e) => {
-        if reachable.contains(n) {
+        if reachable_map.contains(n) {
           new_binds.push(NonRec(n, e))
         }
       }
       Rec(pairs) => {
         let kept_pairs : Array[(String, Expr)] = []
         for pair in pairs {
-          if reachable.contains(pair.0) {
+          if reachable_map.contains(pair.0) {
             kept_pairs.push(pair)
           }
         }

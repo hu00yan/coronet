@@ -94,6 +94,9 @@ pub fn is_unboxed_ctor(name : String) -> Bool {
 ///| Sanitize CoreLite identifier into valid HVM3 identifier name
 pub fn sanitize_name(raw_name : String) -> String {
   let name = normalize_ctor_name(raw_name)
+  if @syntax.canonical_prim_alias(name) is Some(target_alias) && target_alias != name {
+    return sanitize_name(target_alias)
+  }
   match name {
     "+" | "+#" | "plusWord#" | "plusWord32#" => "add"
     "-" | "-#" | "minusWord#" => "sub"
@@ -580,10 +583,22 @@ fn left_apply(head : String, args : Array[String]) -> String {
   res
 }
 
+fn float_text(d : Double) -> String {
+  let s = d.to_string()
+  if s.contains(".") || s.contains("e") || s.contains("E") || s.contains("inf") || s.contains("NaN") {
+    s
+  } else {
+    s + ".0"
+  }
+}
+
 ///| Lower a CoreLite expression into an HVM3 term string
 fn lower_expr_ctx(expr : @syntax.Expr, ctx : LowerContext) -> String {
   match expr {
     Var(name) => {
+      if @syntax.canonical_prim_alias(name) is Some(target_alias) && target_alias != name {
+        return lower_expr_ctx(Var(target_alias), ctx)
+      }
       let (is_op, op_sym) = is_binop(name)
       if is_op {
         return "(λ&_a (λ&_b (" + op_sym + " _a _b)))"
@@ -598,7 +613,7 @@ fn lower_expr_ctx(expr : @syntax.Expr, ctx : LowerContext) -> String {
         return "(λ&e *)"
       }
       if name == "raiseIO#" {
-        return "(λ&e (λ&s *))"
+        return "@raiseIO_"
       }
       if name == "realWorld#" || name == "void#" {
         return "0"
@@ -648,8 +663,22 @@ fn lower_expr_ctx(expr : @syntax.Expr, ctx : LowerContext) -> String {
         name == "writeTVar#" ||
         name == "readTVarIO#" ||
         name == "atomically#" ||
+        name == "retry#" ||
         name == "catchRetry#" ||
         name == "catchSTM#" ||
+        name == "newMVar#" ||
+        name == "takeMVar#" ||
+        name == "tryTakeMVar#" ||
+        name == "putMVar#" ||
+        name == "tryPutMVar#" ||
+        name == "readMVar#" ||
+        name == "tryReadMVar#" ||
+        name == "isEmptyMVar#" ||
+        name == "fork#" ||
+        name == "forkOn#" ||
+        name == "yield#" ||
+        name == "myThreadId#" ||
+        name == "killThread#" ||
         name == "plusAddr#" ||
         name == "eqAddr#" ||
         name == "readWord8OffAddr#" ||
@@ -658,7 +687,49 @@ fn lower_expr_ctx(expr : @syntax.Expr, ctx : LowerContext) -> String {
         name == "wordToWord8#" ||
         name == "unpackCString#" ||
         name == "unpackCStringUtf8#" ||
-        name == "compare" {
+        name == "compare" ||
+        name == "indexWord8OffAddr" ||
+        name == "plusWord2" ||
+        name == "timesWord2" ||
+        name == "quotRemWord2" ||
+        name == "addIntC" ||
+        name == "subIntC" ||
+        name == "mulIntMayOflo" ||
+        name == "popCnt" ||
+        name == "cloneArray" ||
+        name == "freezeArray" ||
+        name == "thawArray" ||
+        name == "shrinkArray" ||
+        name == "isPinned" ||
+        name == "waitState" ||
+        name == "sparkInfo" ||
+        name == "threadLabel" ||
+        name == "threadStatus" ||
+        name == "copyAddrToAddr" ||
+        name == "copyAddrToByteArray" ||
+        name == "copyByteArrayToAddr" ||
+        name == "setAddrRange" ||
+        name == "compareByteArrays" ||
+        name == "opaque" ||
+        name == "prim_max" ||
+        name == "prim_min" ||
+        name == "fmadd" ||
+        name == "fmsub" ||
+        name == "fnmadd" ||
+        name == "fnmsub" ||
+        name == "prim_pow" ||
+        name == "decodeFloat_Int" ||
+        name == "clz" ||
+        name == "ctz" ||
+        name == "byteSwap" ||
+        name == "bitReverse" ||
+        name == "pdep" ||
+        name == "pext" ||
+        name == "casArray" ||
+        name == "casAddr" ||
+        name == "exchangeAddr" ||
+        name == "fetchOpIntArray" ||
+        name == "fetchOpWordAddr" {
         return "@" + sanitize_name(name)
       }
       if name == "quotRemInt#" {
@@ -790,6 +861,7 @@ fn lower_expr_ctx(expr : @syntax.Expr, ctx : LowerContext) -> String {
         n.to_string()
       }
     }
+    LitFloat(d) => float_text(d)
     LitChar(c) => c.to_int().to_string()
     LitString(s) => lower_lit_string(s)
 
@@ -843,12 +915,19 @@ fn lower_expr_ctx(expr : @syntax.Expr, ctx : LowerContext) -> String {
       let (head, args) = expr.unwind_app()
       match head {
         Var(op_name) => {
+          if @syntax.canonical_prim_alias(op_name) is Some(target_alias) && target_alias != op_name {
+            let mut rewritten : @syntax.Expr = Var(target_alias)
+            for arg in args {
+              rewritten = App(rewritten, arg)
+            }
+            return lower_expr_ctx(rewritten, ctx)
+          }
           // `error msg` is the crash value; its message is never needed and may
           // reference string constants from modules the project did not compile.
           if (op_name == "error" || op_name == "errorWithoutStackTrace" ||
             op_name == "undefined" || op_name == "patError" ||
             op_name == "patError#" || op_name == "absentError" ||
-            op_name == "raise#" || op_name == "raiseIO#") && args.length() > 0 {
+            op_name == "raise#") && args.length() > 0 {
             return "*"
           }
           if (op_name == "C" || op_name == "C_hash" || op_name == "C#") && args.length() >= 2 {
@@ -1124,8 +1203,7 @@ fn lower_expr_ctx(expr : @syntax.Expr, ctx : LowerContext) -> String {
             op_name == "absentError" ||
             op_name == "raise#" ||
             op_name == "patError" ||
-            op_name == "patError#" ||
-            op_name == "raiseIO#" {
+            op_name == "patError#" {
             return "*"
           }
           if op_name == "touch#" {
@@ -1639,7 +1717,7 @@ fn collect_free_vars(
         }
       }
     }
-    LitInt(_) | LitChar(_) | LitString(_) => ()
+    LitInt(_) | LitFloat(_) | LitChar(_) | LitString(_) => ()
     Constr(_, args) =>
       for arg in args {
         collect_free_vars(arg, bound, globals, acc)
@@ -1706,7 +1784,7 @@ fn substitute_var(
 ) -> @syntax.Expr {
   match expr {
     Var(name) => if name == target { replacement } else { expr }
-    LitInt(_) | LitChar(_) | LitString(_) => expr
+    LitInt(_) | LitFloat(_) | LitChar(_) | LitString(_) => expr
     Constr(name, args) => {
       let new_args : Array[@syntax.Expr] = []
       for a in args {
@@ -1837,7 +1915,7 @@ fn lift_expr_rec(
       }
       Constr(name, new_args)
     }
-    Var(_) | LitInt(_) | LitChar(_) | LitString(_) => expr
+    Var(_) | LitInt(_) | LitFloat(_) | LitChar(_) | LitString(_) => expr
   }
 }
 
@@ -1888,7 +1966,7 @@ fn lift_program_rec(prog : @syntax.Program) -> @syntax.Program {
 fn collect_var_refs(expr : @syntax.Expr, acc : Array[String]) -> Unit {
   match expr {
     Var(name) => if !array_contains(acc, name) { acc.push(name) }
-    LitInt(_) | LitChar(_) | LitString(_) => ()
+    LitInt(_) | LitFloat(_) | LitChar(_) | LitString(_) => ()
     Constr(_, args) =>
       for a in args {
         collect_var_refs(a, acc)
@@ -1919,6 +1997,9 @@ fn collect_var_refs(expr : @syntax.Expr, acc : Array[String]) -> Unit {
 
 ///| Check if a name is a known primitive or builtin operation
 fn is_known_builtin(name : String) -> Bool {
+  if @syntax.canonical_prim_alias(name) is Some(_) {
+    return true
+  }
   let (is_op, _) = is_binop(name)
   if is_op {
     return true
@@ -1959,6 +2040,37 @@ fn is_known_builtin(name : String) -> Bool {
     "newArray#" | "readArray#" | "writeArray#" | "indexArray#" | "sizeofArray#" | "sizeofMutableArray#" | "sameMutableArray#" | "sameMutableByteArray#" | "byteArrayContents#" => true
     "newSmallArray#" | "readSmallArray#" | "writeSmallArray#" | "indexSmallArray#" | "sizeofSmallArray#" | "sizeofSmallMutableArray#" => true
     "newMutVar#" | "readMutVar#" | "writeMutVar#" | "casMutVar#" | "atomicModifyMutVar2#" => true
+    "word2Double#" | "word2Float#" => true
+    "fabsDouble#" | "fabsFloat#" => true
+    "sqrtDouble#" | "sqrtFloat#" => true
+    "maxDouble#" | "maxFloat#" | "minDouble#" | "minFloat#" => true
+    "fmaddDouble#" | "fmaddFloat#" | "fmsubDouble#" | "fmsubFloat#" | "fnmaddDouble#" | "fnmaddFloat#" | "fnmsubDouble#" | "fnmsubFloat#" => true
+    "**##" | "powerFloat#" => true
+    "decodeDouble_2Int#" | "decodeDouble_Int64#" | "decodeFloat_Int#" => true
+    "sinDouble#" | "sinFloat#" | "cosDouble#" | "cosFloat#" | "tanDouble#" | "tanFloat#" => true
+    "asinDouble#" | "asinFloat#" | "acosDouble#" | "acosFloat#" | "atanDouble#" | "atanFloat#" => true
+    "sinhDouble#" | "sinhFloat#" | "coshDouble#" | "coshFloat#" | "tanhDouble#" | "tanhFloat#" => true
+    "asinhDouble#" | "asinhFloat#" | "acoshDouble#" | "acoshFloat#" | "atanhDouble#" | "atanhFloat#" => true
+    "expDouble#" | "expFloat#" | "logDouble#" | "logFloat#" | "expm1Double#" | "expm1Float#" | "log1pDouble#" | "log1pFloat#" => true
+    "clz#" | "clz8#" | "clz16#" | "clz32#" | "clz64#" => true
+    "ctz#" | "ctz8#" | "ctz16#" | "ctz32#" | "ctz64#" => true
+    "byteSwap#" | "byteSwap16#" | "byteSwap32#" | "byteSwap64#" => true
+    "bitReverse#" | "bitReverse8#" | "bitReverse16#" | "bitReverse32#" | "bitReverse64#" => true
+    "pdep#" | "pdep8#" | "pdep16#" | "pdep32#" | "pdep64#" => true
+    "pext#" | "pext8#" | "pext16#" | "pext32#" | "pext64#" => true
+    "casArray#" | "casSmallArray#" | "casIntArray#" | "casInt8Array#" | "casInt16Array#" | "casInt32Array#" | "casInt64Array#" => true
+    "atomicCasAddrAddr#" | "atomicCasWord16Addr#" | "atomicCasWord32Addr#" | "atomicCasWord64Addr#" | "atomicCasWord8Addr#" | "atomicCasWordAddr#" => true
+    "atomicExchangeAddrAddr#" | "atomicExchangeWordAddr#" => true
+    "atomicModifyMutVar_#" | "atomicSwapMutVar#" => true
+    "atomicReadIntArray#" | "atomicWriteIntArray#" | "atomicReadWordAddr#" | "atomicWriteWordAddr#" => true
+    "fetchAddIntArray#" | "fetchSubIntArray#" | "fetchAndIntArray#" | "fetchOrIntArray#" | "fetchXorIntArray#" | "fetchNandIntArray#" => true
+    "fetchAddWordAddr#" | "fetchSubWordAddr#" | "fetchAndWordAddr#" | "fetchOrWordAddr#" | "fetchXorWordAddr#" | "fetchNandWordAddr#" => true
+    "addrToAny#" | "anyToAddr#" | "makeStableName#" | "makeStablePtr#" | "deRefStablePtr#" | "eqStablePtr#" | "delay#" => true
+    "getMaskingState#" | "maskAsyncExceptions#" | "maskUninterruptible#" | "unmaskAsyncExceptions#" | "prompt#" | "control0#" | "newPromptTag#" => true
+    "prefetchAddr0#" | "prefetchAddr1#" | "prefetchAddr2#" | "prefetchAddr3#" |
+    "prefetchByteArray0#" | "prefetchByteArray1#" | "prefetchByteArray2#" | "prefetchByteArray3#" |
+    "prefetchMutableByteArray0#" | "prefetchMutableByteArray1#" | "prefetchMutableByteArray2#" | "prefetchMutableByteArray3#" |
+    "prefetchValue0#" | "prefetchValue1#" | "prefetchValue2#" | "prefetchValue3#" => true
     "newTVar#" | "readTVar#" | "writeTVar#" | "readTVarIO#" | "atomically#" | "retry#" | "catchRetry#" | "catchSTM#" => true
     "newMVar#" | "takeMVar#" | "tryTakeMVar#" | "putMVar#" | "tryPutMVar#" | "readMVar#" | "tryReadMVar#" | "isEmptyMVar#" => true
     "fork#" | "forkOn#" | "killThread#" | "yield#" | "myThreadId#" | "labelThread#" | "isCurrentThreadBound#" | "noDuplicate#" | "spark#" | "seq#" | "keepAlive#" => true
@@ -2017,7 +2129,7 @@ fn collect_expr_free_vars(
         free_vars.push(name)
       }
     }
-    LitInt(_) | LitChar(_) | LitString(_) => ()
+    LitInt(_) | LitFloat(_) | LitChar(_) | LitString(_) => ()
     Constr(_, args) => {
       for a in args {
         collect_expr_free_vars(a, bound, free_vars)
@@ -2273,51 +2385,70 @@ pub fn lower_program(raw_program : @syntax.Program) -> String {
   let lines : Array[String] = []
 
   // 1. Emit error stubs & Scott constructor definitions
+  // Data declarations are preamble: the pruner keeps them even when the
+  // surrounding definitions are unreachable.
+  lines.push("data CoronetList { #CoronetNil #CoronetCons{id val tail} }")
+  lines.push("data CoronetState { #CoronetState{next entries flag exc} }")
   lines.push("@overflowError = *")
   lines.push("@divZeroError = *")
   lines.push("@absentError = *")
   lines.push("@patError = (λ&e *)")
   lines.push("@raise_ = (λ&e *)")
-  lines.push("@raiseIO_ = (λ&e (λ&s *))")
   lines.push("@_fNumWord32__c = (λ&op op)")
   lines.push("@slt = (λ&x (λ&y ( ! &sx = (>> x 31); ( ! &sy = (>> y 31); (~ (!= sx sy) { 0: (< x y) 1+p: sx }) ) )))")
   lines.push("@sdiv = (λ&x (λ&y ( ! &sx = (>> x 31); ( ! &sy = (>> y 31); ( ! &ax = (~ sx { 0: x 1+p: (- 0 x) }); ( ! &ay = (~ sy { 0: y 1+p: (- 0 y) }); ( ! &q = (/ ax ay); (~ (^ sx sy) { 0: q 1+p: (- 0 q) }) ) ) ) ) )))")
   lines.push("@srem = (λ&x (λ&y ( ! &sx = (>> x 31); ( ! &sy = (>> y 31); ( ! &ax = (~ sx { 0: x 1+p: (- 0 x) }); ( ! &ay = (~ sy { 0: y 1+p: (- 0 y) }); ( ! &r = (% ax ay); (~ sx { 0: r 1+p: (- 0 r) }) ) ) ) ) )))")
   lines.push("@sra = (λ&x (λ&y ( ! &sx = (>> x 31); (~ sx { 0: (>> x y) 1+p: (| (>> x y) (^ 4294967295 (>> 4294967295 y))) }) )))")
-  lines.push("@runRW_ = (λ&f (f (λ&i 0)))")
-  lines.push("@newByteArray_ = (λ&size (λ&s ((@Pair (λ&i 0)) 0)))")
+  lines.push("@state_empty = #CoronetState{0 #CoronetNil 0 0}")
+  lines.push("@runRW_ = (λ&f (f @state_empty))")
+  // Persistent cell map. A write replaces the first matching entry or prepends
+  // one, so the list stays proportional to live cells. The state is a native
+  // HVM3 constructor; no runtime cells and no closure-chain growth.
+  lines.push("@cell_get = (λ&ents (λ&id (~ents { #CoronetNil: 0 #CoronetCons{eid eval tail}: ( ! &{id1 id2} = id; (~ (== eid id1) { 0: (@cell_get tail id2) 1+p: eval })) })))")
+  lines.push("@cell_put = (λ&ents (λ&id (λ&val (~ents { #CoronetNil: #CoronetCons{id val #CoronetNil} #CoronetCons{eid old tail}: ( ! &{eid1 eid_rest} = eid; ( ! &{eid2 eid3} = eid_rest; ( ! &{tail1 tail2} = tail; ( ! &{val1 val2} = val; ( ! &{id1 id2} = id; (~ (== eid1 id1) { 0: #CoronetCons{eid2 old (@cell_put tail1 id2 val1)} 1+p: #CoronetCons{eid3 val2 tail2} })) ) ) )) }))))")
+  lines.push("@state_get = (λ&s (λ&id (~s { #CoronetState{next entries flag exc}: ( ! &{e1 e2} = entries; (@Pair #CoronetState{next e1 flag exc} (@cell_get e2 id)) ) })))")
+  lines.push("@state_put = (λ&s (λ&id (λ&val (~s { #CoronetState{next entries flag exc}: ( ! &{e1 e2} = entries; #CoronetState{next (@cell_put e2 id val) flag exc} ) }))))")
+  lines.push("@state_flag = (λ&s (~s { #CoronetState{_next _entries flag _exc}: flag }))")
+  lines.push("@state_exc = (λ&s (~s { #CoronetState{_next _entries _flag exc}: exc }))")
+  lines.push("@newMutVar_ = (λ&val (λ&s (~s { #CoronetState{next entries flag exc}: ( ! &{id next_inc} = next; ( ! &{id1 id2} = id; (@Pair #CoronetState{(+ next_inc 1) (#CoronetCons{id1 val entries}) flag exc} id2) ) ) })))")
+  lines.push("@readMutVar_ = (λ&var (λ&s (@state_get s var)))")
+  lines.push("@writeMutVar_ = (λ&var (λ&val (λ&s (@state_put s var val))))")
+  lines.push("@alloc_base = (λ&size (λ&s (~s { #CoronetState{next entries flag exc}: ( ! &{base next2} = next; (@Pair #CoronetState{(+ next2 size) entries flag exc} base) ) })))")
+  lines.push("@newByteArray_ = (λ&size (λ&s (@alloc_base size s)))")
   lines.push("@sizeofByteArray_ = (λ&ba 64)")
   lines.push("@sizeofMutableByteArray_ = (λ&mba (λ&s ((@Pair s) 64)))")
-  lines.push("@writeIntArray_ = (λ&arr (λ&idx (λ&val (λ&s (λ&i (~ (== i idx) { 0: (s i) 1+_: val }))))))")
-  lines.push("@writeByteArray_ = (λ&arr (λ&idx (λ&val (λ&s (λ&i (~ (== i idx) { 0: (s i) 1+_: val }))))))")
-  lines.push("@writeWord8Array_ = (λ&arr (λ&idx (λ&val (λ&s (λ&i (~ (== i idx) { 0: (s i) 1+_: val }))))))")
-  lines.push("@readIntArray_ = (λ&arr (λ&idx (λ&s ((@Pair s) (s idx)))))")
-  lines.push("@readByteArray_ = (λ&arr (λ&idx (λ&s ((@Pair s) (s idx)))))")
-  lines.push("@readWord8Array_ = (λ&arr (λ&idx (λ&s ((@Pair s) (s idx)))))")
+  lines.push("@writeIntArray_ = (λ&arr (λ&idx (λ&val (λ&s (@state_put s (+ arr idx) val)))))")
+  lines.push("@writeByteArray_ = (λ&arr (λ&idx (λ&val (λ&s (@state_put s (+ arr idx) val)))))")
+  lines.push("@writeWord8Array_ = (λ&arr (λ&idx (λ&val (λ&s (@state_put s (+ arr idx) val)))))")
+  lines.push("@readIntArray_ = (λ&arr (λ&idx (λ&s (@state_get s (+ arr idx)))))")
+  lines.push("@readByteArray_ = (λ&arr (λ&idx (λ&s (@state_get s (+ arr idx)))))")
+  lines.push("@readWord8Array_ = (λ&arr (λ&idx (λ&s (@state_get s (+ arr idx)))))")
   lines.push("@indexIntArray_ = (λ&ba (λ&idx (ba idx)))")
   lines.push("@indexWord8Array_ = (λ&ba (λ&idx (ba idx)))")
   lines.push("@copyByteArray_ = (λ&src (λ&soff (λ&dst (λ&doff (λ&len (λ&s (λ&i (~ (& (>= i doff) (< i (+ doff len))) { 0: (s i) 1+_: (src (+ soff (- i doff))) }))))))))")
   lines.push("@setByteArray_ = (λ&mba (λ&off (λ&len (λ&val (λ&s (λ&i (~ (& (>= i off) (< i (+ off len))) { 0: (s i) 1+_: val })))))))")
-  lines.push("@newMutVar_ = (λ&val (λ&s ((@Pair (λ&i (~ (== i 0) { 0: (s i) 1+_: val }))) 0)))")
-  lines.push("@readMutVar_ = (λ&var (λ&s ((@Pair s) (s var))))")
-  lines.push("@writeMutVar_ = (λ&var (λ&val (λ&s (λ&i (~ (== i var) { 0: (s i) 1+_: val })))))")
   lines.push("@newTVar_ = @newMutVar_")
   lines.push("@readTVar_ = @readMutVar_")
   lines.push("@writeTVar_ = @writeMutVar_")
   lines.push("@readTVarIO_ = @readMutVar_")
   lines.push("@atomically_ = (λ&action (λ&s (action s)))")
-  lines.push("@retry_ = (λ&s 0)")
-  lines.push("@catchRetry_ = (λ&action (λ&handler (λ&s (action s))))")
-  lines.push("@catchSTM_ = (λ&action (λ&handler (λ&s (action s))))")
-  lines.push("@newMVar_ = (λ&s ((@Pair 0) 0))")
-  lines.push("@takeMVar_ = (λ&mv (λ&s ((@Pair s) 0)))")
-  lines.push("@tryTakeMVar_ = (λ&mv (λ&s (((@Tuple3 s) 1) 0)))")
-  lines.push("@putMVar_ = (λ&mv (λ&val (λ&s ((@Pair s) 0))))")
-  lines.push("@tryPutMVar_ = (λ&mv (λ&val (λ&s ((@Pair s) 1))))")
-  lines.push("@readMVar_ = (λ&mv (λ&s ((@Pair s) 0)))")
-  lines.push("@tryReadMVar_ = (λ&mv (λ&s (((@Tuple3 s) 1) 0)))")
-  lines.push("@isEmptyMVar_ = (λ&mv (λ&s ((@Pair s) 0)))")
-  lines.push("@fork_ = (λ&act (λ&s ((@Pair s) 1)))")
+  lines.push("@retry_ = (λ&s (~s { #CoronetState{next entries _flag exc}: (@Pair #CoronetState{next entries 1 exc} 0) }))")
+  lines.push("@catchRetry_ = (λ&action (λ&handler (λ&s ( ! &r = (action s); (r (λ&s_after (λ&val ( ! &f = (@state_flag s_after); (~ f { 0: (@Pair s_after val) 1+p: (handler s) })))))) )))")
+  lines.push("@stm_dispatch = (λ&f (λ&s_after (λ&val (λ&handler (λ&s0 (~ f { 0: (@Pair s_after val) 1+p: (@stm_nonzero (- f 1) s_after val handler s0) }))))))")
+  lines.push("@stm_nonzero = (λ&p (λ&s_after (λ&val (λ&handler (λ&s0 (~ p { 0: (@Pair s0 0) 1+p: (handler (@state_exc s_after) s0) }))))))")
+  lines.push("@catchSTM_k = (λ&r (λ&handler (λ&s (r (λ&s_after (λ&val ( ! &f = (@state_flag s_after); (@stm_dispatch f s_after val handler s) )))))))")
+  lines.push("@catchSTM_ = (λ&action (λ&handler (λ&s ( ! &state_pair = (action s); (@catchSTM_k state_pair handler s) ))))")
+  lines.push("@raiseIO_ = (λ&e (λ&s (~s { #CoronetState{next entries _flag _exc}: (@Pair #CoronetState{next entries 2 e} e) })))")
+  lines.push("@newMVar_ = (λ&val (λ&s (@newMutVar_ (@Pair 1 val) s)))")
+  lines.push("@takeMVar_ = (λ&mv (λ&s ( ! &g = (@state_get s mv); (g (λ&s1 (λ&box (box (λ&_full (λ&val ( ! &s2 = (@state_put s1 mv (@Pair 0 0)); (@Pair s2 val) ))))))) )))")
+  lines.push("@tryTakeMVar_ = (λ&mv (λ&s ( ! &g = (@state_get s mv); (g (λ&s1 (λ&box (box (λ&_full (λ&val ( ! &s2 = (@state_put s1 mv (@Pair 0 0)); (@Tuple3 s2 1 val) ))))))) )))")
+  lines.push("@putMVar_ = (λ&mv (λ&val (λ&s (@state_put s mv (@Pair 1 val)))))")
+  lines.push("@tryPutMVar_ = (λ&mv (λ&val (λ&s ( ! &s2 = (@state_put s mv (@Pair 1 val)); (@Pair s2 1) ))))")
+  lines.push("@readMVar_ = (λ&mv (λ&s ( ! &g = (@state_get s mv); (g (λ&s1 (λ&box (box (λ&_full (λ&val (@Pair s1 val))))))) )))")
+  lines.push("@tryReadMVar_ = (λ&mv (λ&s ( ! &g = (@state_get s mv); (g (λ&s1 (λ&box (box (λ&_full (λ&val (@Tuple3 s1 1 val))))))) )))")
+  lines.push("@isEmptyMVar_ = (λ&mv (λ&s (@Pair s 0)))")
+  lines.push("@fork_ = (λ&act (λ&s (~s { #CoronetState{next entries flag exc}: ( ! &{tid next_inc} = next; ( ! child_next = (+ next_inc 1); ( ! &{child_next2 parent_inc} = child_next; ( ! &{ents_c ents_p} = entries; ( ! &{flag_c flag_p} = flag; ( ! &{exc_c exc_p} = exc; ( !! child = (act #CoronetState{child_next2 ents_c flag_c exc_c}); (@Pair #CoronetState{(+ parent_inc 1) ents_p flag_p exc_p} tid) ) ) ) ) ) ) ) }))) ")
+  lines.push("@forkOn_ = @fork_")
   lines.push("@killThread_ = (λ&tid (λ&s s))")
   lines.push("@yield_ = (λ&s s)")
   lines.push("@myThreadId_ = (λ&s ((@Pair s) 0))")
@@ -2340,6 +2471,67 @@ pub fn lower_program(raw_program : @syntax.Program) -> String {
   lines.push("@touch_ = (λ&ptr (λ&s s))")
   lines.push("@word8ToWord_ = (λ&x x)")
   lines.push("@wordToWord8_ = (λ&x x)")
+  lines.push("@indexWord8OffAddr = (λ&addr (λ&off ((λ&p (p (λ&a (λ&b b)))) (((@readWord8OffAddr_ addr) off) 0))))")
+  lines.push("@plusWord2 = (λ&a (λ&b ( ! &{a1 a2} = a; ( ! &{s1 s2} = (+ a1 b); ((@Pair s1) (< s2 a2)) ))))")
+  lines.push("@timesWord2 = (λ&a (λ&b ( ! &{a1 a2} = a; ( ! &{b1 b2} = b; ((@Pair ((@mulH_ a1) b1)) (* a2 b2)) ))))")
+  lines.push("@quotRemWord2 = (λ&_hi (λ&a (λ&b ((@Pair ((@sdiv a) b)) ((@srem a) b)))))")
+  lines.push("@addIntC = (λ&a (λ&b ( ! &{a1 a2} = a; ( ! &{s1 s2} = (+ a1 b); ((@Pair s1) (< s2 a2)) ))))")
+  lines.push("@subIntC = (λ&a (λ&b ( ! &{a1 a2} = a; ( ! &{b1 b2} = b; ((@Pair (- a1 b1)) (< a2 b2)) ))))")
+  lines.push("@mulIntMayOflo = (λ&a (λ&b (!= ((@mulH_ a) b) 0)))")
+  lines.push("@popCnt_loop = (λ&n (λ&acc (~ n { 0: acc 1+p: ( ! &{p1 p2} = p; ( ! &p3 = (+ p1 1); (@popCnt_loop (& p3 p2) (+ acc 1)) ) ) })))")
+  lines.push("@popCnt = (λ&n (@popCnt_loop n 0))")
+  lines.push("@cloneArray = (λ&arr (λ&s ((@Pair s) arr)))")
+  lines.push("@freezeArray = @cloneArray")
+  lines.push("@thawArray = @cloneArray")
+  lines.push("@shrinkArray = (λ&arr (λ&n (λ&s s)))")
+  lines.push("@isPinned = (λ&x 0)")
+  lines.push("@waitState = (λ&s s)")
+  lines.push("@sparkInfo = (λ&s ( ! &{s1 s2} = s; ((@Pair s1) 0) ))")
+  lines.push("@threadLabel = (λ&tid (λ&label (λ&s s)))")
+  lines.push("@threadStatus = (λ&tid 0)")
+  lines.push("@copyAddrToAddr = (λ&src (λ&dst (λ&len (λ&s s))))")
+  lines.push("@copyAddrToByteArray = (λ&src (λ&ba (λ&off (λ&len (λ&s s)))))")
+  lines.push("@copyByteArrayToAddr = (λ&ba (λ&off (λ&dst (λ&len (λ&s s)))))")
+  lines.push("@setAddrRange = (λ&addr (λ&len (λ&val (λ&s s))))")
+  lines.push("@compareByteArrays = (λ&a (λ&b 0))")
+  lines.push("@opaque = (λ&x x)")
+  lines.push("@prim_max = (λ&a (λ&b ( ! &{a1 a2} = a; ( ! &{b1 b2} = b; (~ ((@slt b1) a1) { 0: b2 1+_: a2 }) ))))")
+  lines.push("@prim_min = (λ&a (λ&b ( ! &{a1 a2} = a; ( ! &{b1 b2} = b; (~ ((@slt a1) b1) { 0: b2 1+_: a2 }) ))))")
+  lines.push("@fmadd = (λ&a (λ&b (λ&c (+ (* a b) c))))")
+  lines.push("@fmsub = (λ&a (λ&b (λ&c (- (* a b) c))))")
+  lines.push("@fnmadd = (λ&a (λ&b (λ&c (- c (* a b)))))")
+  lines.push("@fnmsub = (λ&a (λ&b (λ&c (- 0 (+ (* a b) c)))))")
+  lines.push("@prim_pow_loop = (λ&b (λ&e (λ&acc (~ e { 0: acc 1+p: ( ! &{b1 b2} = b; (@prim_pow_loop b1 p (* acc b2)) ) }))))")
+  lines.push("@prim_pow = (λ&b (λ&e (@prim_pow_loop b e 1)))")
+  lines.push("@decodeFloat_Int = (λ&f ((@Pair f) 0))")
+  lines.push("@prim_sin = (λ&x x)")
+  lines.push("@prim_cos = (λ&x x)")
+  lines.push("@prim_tan = (λ&x x)")
+  lines.push("@prim_asin = (λ&x x)")
+  lines.push("@prim_acos = (λ&x x)")
+  lines.push("@prim_atan = (λ&x x)")
+  lines.push("@prim_sinh = (λ&x x)")
+  lines.push("@prim_cosh = (λ&x x)")
+  lines.push("@prim_tanh = (λ&x x)")
+  lines.push("@prim_asinh = (λ&x x)")
+  lines.push("@prim_acosh = (λ&x x)")
+  lines.push("@prim_atanh = (λ&x x)")
+  lines.push("@prim_exp = (λ&x x)")
+  lines.push("@prim_log = (λ&x x)")
+  lines.push("@prim_expm1 = (λ&x x)")
+  lines.push("@prim_log1p = (λ&x x)")
+  lines.push("@clz_loop = (λ&n (λ&cnt (~ n { 0: cnt 1+p: (@clz_loop (>> n 1) (- cnt 1)) })))")
+  lines.push("@clz = (λ&n (@clz_loop n 32))")
+  lines.push("@ctz = (λ&n ( ! &{n1 n2} = n; ( ! &neg = (- 0 n1); ( ! &lsb = (& n2 neg); (@popCnt (- lsb 1)) ) )))")
+  lines.push("@byteSwap = (λ&n ( ! &b0 = (& (>> n 24) 255); ( ! &b1 = (& (>> n 8) 65280); ( ! &b2 = (& (<< n 8) 16711680); ( ! &b3 = (<< n 24); (| (| b0 b1) (| b2 b3)) ) ) ) ))")
+  lines.push("@bitReverse = (λ&x x)")
+  lines.push("@pdep = (λ&src (λ&mask src))")
+  lines.push("@pext = (λ&src (λ&mask src))")
+  lines.push("@casArray = (λ&arr (λ&idx (λ&old_v (λ&new_v (λ&s ( ! &got = (@state_get s arr); (got (λ&s1 (λ&actual ( ! &s2 = (@state_put s1 arr new_v); ((@Pair s2) actual) )))) ))))))")
+  lines.push("@casAddr = (λ&addr (λ&old_v (λ&new_v (λ&s ((@Pair s) old_v)))))")
+  lines.push("@exchangeAddr = (λ&addr (λ&new_v (λ&s ((@Pair s) new_v))))")
+  lines.push("@fetchOpIntArray = (λ&arr (λ&idx (λ&val (λ&s ( ! &got = (@state_get s arr); (got (λ&s1 (λ&old ( ! &{old1 old2} = old; ( ! &s2 = (@state_put s1 arr (+ old1 val)); ((@Pair s2) old2) ) )))) )))))")
+  lines.push("@fetchOpWordAddr = (λ&addr (λ&val (λ&s ((@Pair s) val))))")
   lines.push("@unpackCString_ = (λ&addr (addr (λ&str_fn (λ&list (λ&curr_off list)))))")
   lines.push("@unpackCStringUtf8_ = (λ&addr (addr (λ&str_fn (λ&list (λ&curr_off list)))))")
   if has_compare {

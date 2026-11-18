@@ -27,6 +27,7 @@ pub(all) enum Bind {
 pub(all) enum Expr {
   Var(String)
   LitInt(Int)
+  LitFloat(Double)
   LitChar(Char)
   LitString(String)
   App(Expr, Expr)
@@ -98,6 +99,7 @@ pub impl Show for Expr with output(self, logger) {
   match self {
     Var(x) => logger.write_string(x)
     LitInt(n) => logger.write_string("\{n}#")
+    LitFloat(d) => logger.write_string("\{d}##")
     LitChar(c) => logger.write_string("'\{c}'")
     LitString(s) => logger.write_string("\"\{s}\"")
     App(f, arg) => {

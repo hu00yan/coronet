@@ -311,7 +311,7 @@ pub fn collect_adts_from_expr(
       }
       collect_adts_from_expr(body, families, used_ctors)
     }
-    Var(_) | LitInt(_) | LitChar(_) | LitString(_) => ()
+    Var(_) | LitInt(_) | LitFloat(_) | LitChar(_) | LitString(_) => ()
   }
 }
 
@@ -341,7 +341,7 @@ pub fn discover_adts(prog : Program) -> Array[AdtFamily] {
 pub fn substitute_var(expr : Expr, target : String, replacement : Expr) -> Expr {
   match expr {
     Var(name) => if name == target { replacement } else { expr }
-    LitInt(_) | LitChar(_) | LitString(_) => expr
+    LitInt(_) | LitFloat(_) | LitChar(_) | LitString(_) => expr
     Constr(name, args) => {
       let new_args : Array[Expr] = []
       for a in args {
@@ -437,7 +437,7 @@ fn collect_free_vars_rec(
         }
       }
     }
-    LitInt(_) | LitChar(_) | LitString(_) => ()
+    LitInt(_) | LitFloat(_) | LitChar(_) | LitString(_) => ()
     Constr(_, args) =>
       for a in args {
         collect_free_vars_rec(a, bound, globals, acc)
@@ -547,7 +547,7 @@ fn lift_expr_rec_impl(
       }
       Constr(name, new_args)
     }
-    Var(_) | LitInt(_) | LitChar(_) | LitString(_) => expr
+    Var(_) | LitInt(_) | LitFloat(_) | LitChar(_) | LitString(_) => expr
   }
 }
 
@@ -594,8 +594,281 @@ pub fn lift_program_rec(prog : Program) -> Program {
   Program::new(final_binds)
 }
 
+///| Canonicalize a GHC primop to an existing lowering target.
+///|
+///| GHC names the same operation once per width (plusInt8#/plusInt16#/...);
+///| the interaction-net runtime carries one scalar domain, so the width
+///| variants map to the same net. Width-sensitive operations that need a
+///| truncation (narrowing, popcount, carry tuples) are called out below and
+///| have their own definitions in each backend.
+///|
+///| Returning `Some` means the program can link even if the exact width is not
+///| represented in the runtime. Returning `None` leaves the name to the normal
+///| identifier sanitizer.
+pub fn canonical_prim_alias(name : String) -> String? {
+  match name {
+    "plusWord2#" => Some("plusWord2")
+    "timesWord2#" => Some("timesWord2")
+    "timesInt2#" => Some("timesWord2")
+    "quotRemWord2#" => Some("quotRemWord2")
+    "addIntC#" => Some("addIntC")
+    "subIntC#" => Some("subIntC")
+    "addWordC#" => Some("addIntC")
+    "subWordC#" => Some("subIntC")
+    "mulIntMayOflo#" => Some("mulIntMayOflo")
+    "popCnt8#" | "popCnt16#" | "popCnt32#" | "popCnt64#" | "popCnt#" => Some("popCnt")
+    "compareByteArrays#" => Some("compareByteArrays")
+    "copyAddrToAddr#" | "copyAddrToAddrNonOverlapping#" => Some("copyAddrToAddr")
+    "copyAddrToByteArray#" => Some("copyAddrToByteArray")
+    "copyByteArrayToAddr#" | "copyMutableByteArrayToAddr#" => Some("copyByteArrayToAddr")
+    "setAddrRange#" => Some("setAddrRange")
+    "cloneArray#" | "cloneMutableArray#" | "cloneSmallArray#" | "cloneSmallMutableArray#" => Some("cloneArray")
+    "freezeArray#" | "freezeSmallArray#" => Some("freezeArray")
+    "thawArray#" | "thawSmallArray#" => Some("thawArray")
+    "shrinkSmallMutableArray#" | "shrinkMutableByteArray#" | "resizeMutableByteArray#" => Some("shrinkArray")
+    "unsafeFreezeArray#" | "unsafeThawArray#" | "unsafeFreezeSmallArray#" | "unsafeThawSmallArray#" => Some("word8ToWord#")
+    "unsafeFreezeByteArray#" | "unsafeThawByteArray#" | "mutableByteArrayContents#" | "byteArrayContents#" => Some("word8ToWord#")
+    "isMutableByteArrayPinned#" | "isByteArrayPinned#" | "isByteArrayWeaklyPinned#" | "isMutableByteArrayWeaklyPinned#" => Some("isPinned")
+    "waitRead#" | "waitWrite#" => Some("waitState")
+    "getSpark#" | "numSparks#" => Some("sparkInfo")
+    "threadLabel#" => Some("threadLabel")
+    "threadStatus#" => Some("threadStatus")
+    "raiseDivZero#" | "raiseOverflow#" | "raiseUnderflow#" => Some("raise#")
+    "mkApUpd0#" | "newBCO#" => Some("opaque#")
+    "stableNameToInt#" => Some("word8ToWord#")
+    "castWord64ToDouble#" | "castDoubleToWord64#" | "castWord32ToFloat#" | "castFloatToWord32#" => Some("word8ToWord#")
+    "minusAddr#" => Some("-#")
+    "remAddr#" => Some("%#")
+    "neAddr#" => Some("/=#")
+    "ltAddr#" => Some("<#")
+    "leAddr#" => Some("<=#")
+    "gtAddr#" => Some(">#")
+    "geAddr#" => Some(">=#")
+    "addr2Int#" | "int2Addr#" => Some("word8ToWord#")
+    "int2Float#" | "int2Double#" | "double2Float#" | "float2Double#" | "double2Int#" | "float2Int#" => Some("I_hash")
+    "gtChar#" => Some(">#")
+    "geChar#" => Some(">=#")
+    "eqChar#" => Some("==#")
+    "neChar#" => Some("/=#")
+    "ltChar#" => Some("<#")
+    "leChar#" => Some("<=#")
+    "ord#" | "chr#" => Some("word8ToWord#")
+    "int8ToWord8#" | "word8ToInt8#" | "int16ToWord16#" | "word16ToInt16#" |
+    "int32ToWord32#" | "word32ToInt32#" | "int64ToWord64#" | "word64ToInt64#" |
+    "int8ToInt#" | "int16ToInt#" | "int32ToInt#" | "int64ToInt#" |
+    "intToInt8#" | "intToInt16#" | "intToInt32#" | "intToInt64#" |
+    "word8ToWord#" | "word16ToWord#" | "word32ToWord#" | "word64ToWord#" |
+    "wordToWord8#" | "wordToWord16#" | "wordToWord32#" | "wordToWord64#" => Some("word8ToWord#")
+    "getSizeofSmallMutableArray#" | "getSizeofMutableByteArray#" => Some("sizeofByteArray#")
+    "sameMutableArray#" | "sameMutableByteArray#" => Some("==#")
+    "copyMutableByteArrayNonOverlapping#" => Some("copyByteArray#")
+    // Realistic float & double primitives
+    "word2Double#" | "word2Float#" => Some("word8ToWord#")
+    "fabsDouble#" | "fabsFloat#" => Some("abs24")
+    "sqrtDouble#" | "sqrtFloat#" => Some("isqrt")
+    "maxDouble#" | "maxFloat#" => Some("prim_max")
+    "minDouble#" | "minFloat#" => Some("prim_min")
+    "fmaddDouble#" | "fmaddFloat#" => Some("fmadd")
+    "fmsubDouble#" | "fmsubFloat#" => Some("fmsub")
+    "fnmaddDouble#" | "fnmaddFloat#" => Some("fnmadd")
+    "fnmsubDouble#" | "fnmsubFloat#" => Some("fnmsub")
+    "**##" | "powerFloat#" => Some("prim_pow")
+    "decodeDouble_2Int#" | "decodeDouble_Int64#" | "decodeFloat_Int#" => Some("decodeFloat_Int")
+    "sinDouble#" | "sinFloat#" => Some("prim_sin")
+    "cosDouble#" | "cosFloat#" => Some("prim_cos")
+    "tanDouble#" | "tanFloat#" => Some("prim_tan")
+    "asinDouble#" | "asinFloat#" => Some("prim_asin")
+    "acosDouble#" | "acosFloat#" => Some("prim_acos")
+    "atanDouble#" | "atanFloat#" => Some("prim_atan")
+    "sinhDouble#" | "sinhFloat#" => Some("prim_sinh")
+    "coshDouble#" | "coshFloat#" => Some("prim_cosh")
+    "tanhDouble#" | "tanhFloat#" => Some("prim_tanh")
+    "asinhDouble#" | "asinhFloat#" => Some("prim_asinh")
+    "acoshDouble#" | "acoshFloat#" => Some("prim_acosh")
+    "atanhDouble#" | "atanhFloat#" => Some("prim_atanh")
+    "expDouble#" | "expFloat#" => Some("prim_exp")
+    "logDouble#" | "logFloat#" => Some("prim_log")
+    "expm1Double#" | "expm1Float#" => Some("prim_expm1")
+    "log1pDouble#" | "log1pFloat#" => Some("prim_log1p")
+    // Bit manipulation operations
+    "clz8#" | "clz16#" | "clz32#" | "clz64#" | "clz#" => Some("clz")
+    "ctz8#" | "ctz16#" | "ctz32#" | "ctz64#" | "ctz#" => Some("ctz")
+    "byteSwap16#" | "byteSwap32#" | "byteSwap64#" | "byteSwap#" => Some("byteSwap")
+    "bitReverse8#" | "bitReverse16#" | "bitReverse32#" | "bitReverse64#" | "bitReverse#" => Some("bitReverse")
+    "pdep8#" | "pdep16#" | "pdep32#" | "pdep64#" | "pdep#" => Some("pdep")
+    "pext8#" | "pext16#" | "pext32#" | "pext64#" | "pext#" => Some("pext")
+    // Misc memory, prefetch, and concurrency runtime primitives
+    "addrToAny#" | "anyToAddr#" => Some("word8ToWord#")
+    "makeStableName#" | "makeStablePtr#" => Some("word8ToWord#")
+    "deRefStablePtr#" => Some("word8ToWord#")
+    "eqStablePtr#" => Some("==#")
+    "delay#" => Some("waitState")
+    "getMaskingState#" => Some("isPinned")
+    "maskAsyncExceptions#" | "maskUninterruptible#" | "unmaskAsyncExceptions#" => Some("opaque#")
+    "prompt#" | "control0#" | "newPromptTag#" => Some("opaque#")
+    "prefetchAddr0#" | "prefetchAddr1#" | "prefetchAddr2#" | "prefetchAddr3#" |
+    "prefetchByteArray0#" | "prefetchByteArray1#" | "prefetchByteArray2#" | "prefetchByteArray3#" |
+    "prefetchMutableByteArray0#" | "prefetchMutableByteArray1#" | "prefetchMutableByteArray2#" | "prefetchMutableByteArray3#" |
+    "prefetchValue0#" | "prefetchValue1#" | "prefetchValue2#" | "prefetchValue3#" => Some("touch#")
+    // Atomic operations
+    "casArray#" | "casSmallArray#" | "casIntArray#" | "casInt8Array#" | "casInt16Array#" | "casInt32Array#" | "casInt64Array#" => Some("casArray")
+    "atomicCasAddrAddr#" | "atomicCasWord16Addr#" | "atomicCasWord32Addr#" | "atomicCasWord64Addr#" | "atomicCasWord8Addr#" | "atomicCasWordAddr#" => Some("casAddr")
+    "atomicExchangeAddrAddr#" | "atomicExchangeWordAddr#" => Some("exchangeAddr")
+    "atomicModifyMutVar_#" | "atomicSwapMutVar#" => Some("atomicModifyMutVar2#")
+    "atomicReadIntArray#" => Some("readIntArray#")
+    "atomicWriteIntArray#" => Some("writeIntArray#")
+    "atomicReadWordAddr#" => Some("readWord8OffAddr#")
+    "atomicWriteWordAddr#" => Some("writeWord8OffAddr#")
+    "fetchAddIntArray#" | "fetchSubIntArray#" | "fetchAndIntArray#" | "fetchOrIntArray#" | "fetchXorIntArray#" | "fetchNandIntArray#" => Some("fetchOpIntArray")
+    "fetchAddWordAddr#" | "fetchSubWordAddr#" | "fetchAndWordAddr#" | "fetchOrWordAddr#" | "fetchXorWordAddr#" | "fetchNandWordAddr#" => Some("fetchOpWordAddr")
+    _ => {
+      if name.has_prefix("quotRem") && name.has_suffix("#") {
+        return Some("quotRemInt#")
+      }
+      if name.has_prefix("plus") && name.has_suffix("#") {
+        return Some("+#")
+      }
+      if (name.has_prefix("minus") || name.has_prefix("sub")) && name.has_suffix("#") {
+        return Some("-#")
+      }
+      if name.has_prefix("times") && name.has_suffix("#") {
+        return Some("*#")
+      }
+      if name.has_prefix("quot") && name.has_suffix("#") {
+        return Some("quotInt#")
+      }
+      if name.has_prefix("rem") && name.has_suffix("#") {
+        return Some("remInt#")
+      }
+      if name.has_prefix("negateInt") && name.has_suffix("#") {
+        return Some("negateInt#")
+      }
+      // Only typed comparison families. A bare prefix check would capture
+      // `newMutVar#`, `newArray#`, `negateInt#`, and `getSizeof...#`.
+      let is_typed_cmp = name.has_prefix("eqWord") || name.has_prefix("eqInt") ||
+        name.has_prefix("eqChar") || name.has_prefix("eqFloat") || name.has_prefix("eqDouble") ||
+        name.has_prefix("neWord") || name.has_prefix("neInt") || name.has_prefix("neChar") ||
+        name.has_prefix("neFloat") || name.has_prefix("neDouble")
+      if is_typed_cmp && name.has_suffix("#") {
+        return Some(if name.has_prefix("eq") { "==#" } else { "/=#" })
+      }
+      let is_lt_cmp = name.has_prefix("ltWord") || name.has_prefix("ltInt") ||
+        name.has_prefix("ltChar") || name.has_prefix("ltFloat") || name.has_prefix("ltDouble")
+      if is_lt_cmp && name.has_suffix("#") {
+        return Some("<#")
+      }
+      let is_le_cmp = name.has_prefix("leWord") || name.has_prefix("leInt") ||
+        name.has_prefix("leChar") || name.has_prefix("leFloat") || name.has_prefix("leDouble")
+      if is_le_cmp && name.has_suffix("#") {
+        return Some("<=#")
+      }
+      let is_gt_cmp = name.has_prefix("gtWord") || name.has_prefix("gtInt") ||
+        name.has_prefix("gtChar") || name.has_prefix("gtFloat") || name.has_prefix("gtDouble")
+      if is_gt_cmp && name.has_suffix("#") {
+        return Some(">#")
+      }
+      let is_ge_cmp = name.has_prefix("geWord") || name.has_prefix("geInt") ||
+        name.has_prefix("geChar") || name.has_prefix("geFloat") || name.has_prefix("geDouble")
+      if is_ge_cmp && name.has_suffix("#") {
+        return Some(">=#")
+      }
+      if (name.has_prefix("andWord") || name.has_prefix("and64") || name.has_prefix("andI")) && name.has_suffix("#") {
+        return Some("and#")
+      }
+      if (name.has_prefix("orWord") || name.has_prefix("or64") || name.has_prefix("orI")) && name.has_suffix("#") {
+        return Some("or#")
+      }
+      if (name.has_prefix("xorWord") || name.has_prefix("xor64") || name.has_prefix("xorI")) && name.has_suffix("#") {
+        return Some("xor#")
+      }
+      if (name.has_prefix("notWord") || name.has_prefix("not64") || name.has_prefix("notI")) && name.has_suffix("#") {
+        return Some("not#")
+      }
+      if (name.has_prefix("uncheckedIShiftRA") || name.has_prefix("uncheckedShiftRA")) && name.has_suffix("#") {
+        return Some("uncheckedIShiftRA#")
+      }
+      if (name.has_prefix("uncheckedIShiftL") || name.has_prefix("uncheckedShiftL")) && name.has_suffix("#") {
+        return Some("uncheckedShiftL#")
+      }
+      if (name.has_prefix("uncheckedIShiftRL") || name.has_prefix("uncheckedShiftRL")) && name.has_suffix("#") {
+        return Some("uncheckedShiftRL#")
+      }
+      if name.has_suffix("OffAddr#") {
+        if name.has_prefix("index") {
+          return Some("indexWord8OffAddr")
+        }
+        if name.has_prefix("read") {
+          return Some("readWord8OffAddr#")
+        }
+        if name.has_prefix("write") {
+          return Some("writeWord8OffAddr#")
+        }
+      }
+      if name.has_suffix("Array#") || name.has_suffix("SmallArray#") || name.has_suffix("MutableArray#") {
+        if name.has_prefix("index") {
+          return Some("indexWord8Array#")
+        }
+        if name.has_prefix("read") {
+          return Some("readByteArray#")
+        }
+        if name.has_prefix("write") {
+          return Some("writeByteArray#")
+        }
+        if name.has_prefix("new") {
+          return Some("newByteArray#")
+        }
+        if name.has_prefix("sizeof") || name.has_prefix("getSizeof") {
+          return Some("sizeofByteArray#")
+        }
+        if name.has_prefix("copy") {
+          return Some("copyByteArray#")
+        }
+      }
+      if name.has_suffix("Addr#") {
+        if name.has_prefix("plus") {
+          return Some("plusAddr#")
+        }
+        if name.has_prefix("minus") {
+          return Some("minusAddr#")
+        }
+        if name.has_prefix("rem") {
+          return Some("remAddr#")
+        }
+        if name.has_prefix("eq") {
+          return Some("eqAddr#")
+        }
+        if name.has_prefix("ne") {
+          return Some("neAddr#")
+        }
+        if name.has_prefix("lt") {
+          return Some("ltAddr#")
+        }
+        if name.has_prefix("le") {
+          return Some("leAddr#")
+        }
+        if name.has_prefix("gt") {
+          return Some("gtAddr#")
+        }
+        if name.has_prefix("ge") {
+          return Some("geAddr#")
+        }
+        if name.has_prefix("addr2Int") {
+          return Some("addr2Int#")
+        }
+        if name.has_prefix("int2Addr") {
+          return Some("int2Addr#")
+        }
+      }
+      None
+    }
+  }
+}
+
 ///| Check if a name is a known primitive or builtin operation
 pub fn is_known_builtin(name : String) -> Bool {
+  if canonical_prim_alias(name) is Some(_) {
+    return true
+  }
   let (is_op, _) = is_binop(name)
   if is_op {
     return true
@@ -651,6 +924,8 @@ pub fn is_known_builtin(name : String) -> Bool {
     "sizeofByteArray#" | "sizeofMutableByteArray#" | "indexWord8Array#" | "readWord8Array#" | "writeWord8Array#" | "indexIntArray#" | "copyByteArray#" | "setByteArray#" => true
     "newMutVar#" | "readMutVar#" | "writeMutVar#" => true
     "newTVar#" | "readTVar#" | "writeTVar#" | "readTVarIO#" | "atomically#" | "retry#" | "catchRetry#" | "catchSTM#" => true
+    "newMVar#" | "takeMVar#" | "tryTakeMVar#" | "putMVar#" | "tryPutMVar#" | "readMVar#" | "tryReadMVar#" | "isEmptyMVar#" => true
+    "fork#" | "forkOn#" | "killThread#" | "yield#" | "myThreadId#" | "labelThread#" | "isCurrentThreadBound#" | "noDuplicate#" | "spark#" | "seq#" | "keepAlive#" => true
     "plusAddr#" | "eqAddr#" | "readWord8OffAddr#" | "touch#" | "word8ToWord#" | "wordToWord8#" | "compare" => true
     "unpackCString#" | "unpackCStringUtf8#" | "Addr#" => true
     "raise#" | "raiseIO#" | "patError" | "patError#" | "absentError" => true
@@ -706,7 +981,7 @@ pub fn is_known_symbol(
 fn is_crash_prim_name(name : String) -> Bool {
   match name {
     "error" | "errorWithoutStackTrace" | "undefined" | "patError" | "patError#" |
-    "absentError" | "raise#" | "raiseIO#" => true
+    "absentError" | "raise#" => true
     _ => false
   }
 }
@@ -802,7 +1077,7 @@ fn collect_expr_free_vars_rec(
         free_vars.push(name)
       }
     }
-    LitInt(_) | LitChar(_) | LitString(_) => ()
+    LitInt(_) | LitFloat(_) | LitChar(_) | LitString(_) => ()
     Constr(_, args) =>
       for a in args {
         collect_expr_free_vars_rec(a, bound, free_vars)
@@ -860,7 +1135,7 @@ fn collect_expr_free_vars_rec(
 fn collect_var_refs_rec(expr : Expr, acc : Array[String]) -> Unit {
   match expr {
     Var(name) => if !acc.contains(name) { acc.push(name) }
-    LitInt(_) | LitChar(_) | LitString(_) => ()
+    LitInt(_) | LitFloat(_) | LitChar(_) | LitString(_) => ()
     Constr(_, args) =>
       for a in args {
         collect_var_refs_rec(a, acc)

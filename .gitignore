@@ -14,3 +14,8 @@ vendor/HVM2/hvm
 vendor/HVM3/dist/
 vendor/HVM3/dist-newstyle/
 vendor/HVM3/hvm
+.mimosa/
+__pycache__/
+.build-logs/
+*.snap.new
+

@@ -686,10 +686,10 @@ test "lower 02_io_state byte array primops fixture" {
   let prog = @syntax.parse_program(src).unwrap()
   let hvm3_code = @lower_hvm3.lower(prog)
 
-  assert_true(hvm3_code.contains("@runRW_ = (λ&f (f (λ&i 0)))"))
-  assert_true(hvm3_code.contains("@newByteArray_ = (λ&size (λ&s ((@Pair (λ&i 0)) 0)))"))
-  assert_true(hvm3_code.contains("@writeIntArray_ = (λ&arr (λ&idx (λ&val (λ&s (λ&i (~ (== i idx) { 0: (s i) 1+_: val }))))))"))
-  assert_true(hvm3_code.contains("@readIntArray_ = (λ&arr (λ&idx (λ&s ((@Pair s) (s idx)))))"))
+  assert_true(hvm3_code.contains("@runRW_ = (λ&f (f @state_empty))"))
+  assert_true(hvm3_code.contains("@newByteArray_ = (λ&size (λ&s (@alloc_base size s)))"))
+  assert_true(hvm3_code.contains("@writeIntArray_ = (λ&arr (λ&idx (λ&val (λ&s (@state_put s (+ arr idx) val)))))"))
+  assert_true(hvm3_code.contains("@readIntArray_ = (λ&arr (λ&idx (λ&s (@state_get s (+ arr idx)))))"))
   assert_true(hvm3_code.contains("@main = @result"))
 }
 
@@ -727,5 +727,40 @@ test "lower compare and Ordering constructors" {
   assert_true(hvm3_code.contains("@EQ = (λ&c0 (λ&c1 (λ&c2 c1)))"))
   assert_true(hvm3_code.contains("@GT = (λ&c0 (λ&c1 (λ&c2 c2)))"))
   assert_true(hvm3_code.contains("@main = @result"))
+}
+
+test "lower newly expanded realistic float/double and bit primops hvm3" {
+  let src =
+    #|calc
+    #|  = \ a b c ->
+    #|      case a of { D# x ->
+    #|      case b of { D# y ->
+    #|      case c of { D# z ->
+    #|        D# (fmaddDouble# x y (sqrtDouble# z))
+    #|      }
+    #|      }
+    #|      }
+    #|main = calc (D# 2.0) (D# 3.0) (D# 16.0)
+  let prog = @syntax.parse_program(src).unwrap()
+  let hvm = @lower_hvm3.lower(prog)
+  assert_true(hvm.contains("@fmadd"))
+  assert_true(hvm.contains("@main"))
+}
+
+test "lower bit and atomic primops hvm3" {
+  let src =
+    #|bitOps
+    #|  = \ x y ->
+    #|      case x of { I# a ->
+    #|      case y of { I# b ->
+    #|        I# (+# (clz# a) (ctz# b))
+    #|      }
+    #|      }
+    #|main = bitOps (I# 16#) (I# 8#)
+  let prog = @syntax.parse_program(src).unwrap()
+  let hvm = @lower_hvm3.lower(prog)
+  assert_true(hvm.contains("@clz"))
+  assert_true(hvm.contains("@ctz"))
+  assert_true(hvm.contains("@main"))
 }
 

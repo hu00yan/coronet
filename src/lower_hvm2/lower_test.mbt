@@ -521,3 +521,43 @@ test "lower multi-literal switch" {
   let hvm = @lower_hvm2.lower_core(src).unwrap()
   println("HVM MULTI-LIT:\n\{hvm}")
 }
+
+test "float literal text" {
+  assert_eq(@lower_hvm2.float_text(1.5), "1.5")
+  assert_eq(@lower_hvm2.float_text(2.0), "2.0")
+  assert_true(@lower_hvm2.lower_expr(@syntax.Expr::LitFloat(1.5)).contains("float_ratio"))
+}
+
+test "lower newly expanded realistic float/double and bit primops" {
+  let src =
+    #| calc
+    #|   = \ a b c ->
+    #|       case a of { D# x ->
+    #|       case b of { D# y ->
+    #|       case c of { D# z ->
+    #|         D# (fmaddDouble# x y (sqrtDouble# z))
+    #|       }
+    #|       }
+    #|       }
+    #| main = calc (D# 2.0) (D# 3.0) (D# 16.0)
+  let hvm = @lower_hvm2.lower_core(src).unwrap()
+  assert_true(hvm.contains("@fmadd"))
+  assert_true(hvm.contains("@isqrt"))
+  assert_true(hvm.contains("@main"))
+}
+
+test "lower bit and atomic primops" {
+  let src =
+    #| bitOps
+    #|   = \ x y ->
+    #|       case x of { I# a ->
+    #|       case y of { I# b ->
+    #|         I# (+# (clz# a) (ctz# b))
+    #|       }
+    #|       }
+    #| main = bitOps (I# 16#) (I# 8#)
+  let hvm = @lower_hvm2.lower_core(src).unwrap()
+  assert_true(hvm.contains("@clz"))
+  assert_true(hvm.contains("@ctz"))
+  assert_true(hvm.contains("@main"))
+}

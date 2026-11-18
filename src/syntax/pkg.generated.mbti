@@ -6,11 +6,17 @@ import {
 }
 
 // Values
+pub fn canonical_prim_alias(String) -> String?
+
 pub fn collect_adts_from_expr(Expr, Array[AdtFamily], Array[String]) -> Unit
+
+pub fn collect_free_vars_in_expr(Expr, Array[String], Array[String]) -> Unit
 
 pub fn dce_program(Program) -> Program
 
 pub fn discover_adts(Program) -> Array[AdtFamily]
+
+pub fn expr_free_vars(Expr) -> Array[String]
 
 pub fn find_family(Array[AdtFamily], String) -> AdtFamily?
 
@@ -47,6 +53,8 @@ pub fn parse_program(String) -> Result[Program, String]
 pub fn prune_unreachable(Program, Array[String]) -> Program
 
 pub fn sort_ctors(Array[CtorDef]) -> Unit
+
+pub fn strip_crash_messages(Program) -> Program
 
 pub fn substitute_var(Expr, String, Expr) -> Expr
 
@@ -106,6 +114,7 @@ pub fn CtorDef::to_repr(Self) -> @debug.Repr
 pub(all) enum Expr {
   Var(String)
   LitInt(Int32)
+  LitFloat(Double)
   LitChar(Char)
   LitString(String)
   App(Expr, Expr)

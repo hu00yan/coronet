@@ -8,7 +8,11 @@ import {
 // Values
 pub fn builtin_prim_name(String) -> String
 
+pub fn float_text(Double) -> String
+
 pub fn is_builtin_prim(String) -> Bool
+
+pub fn is_crash_prim(String) -> Bool
 
 pub fn is_inlined_binop(String) -> Bool
 

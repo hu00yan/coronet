@@ -24,19 +24,30 @@ import tempfile
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 CACHE = ROOT / "_build" / "primops.txt"
 
-#: Source files whose string literals name the builtins the lowerers understand.
+#: Source files whose string literals name the builtins each lowerer understands.
+SHARED_TABLE = ROOT / "src" / "syntax" / "transform.mbt"
+BACKENDS = {
+    "hvm2": [
+        ROOT / "src" / "lower_hvm2" / "lower_prim.mbt",
+        ROOT / "src" / "lower_hvm2" / "lower_adt.mbt",
+        ROOT / "src" / "lower_hvm2" / "prelude.mbt",
+        ROOT / "src" / "lower_hvm2" / "lower.mbt",
+    ],
+    "hvm3": [
+        ROOT / "src" / "lower_hvm3" / "lower.mbt",
+    ],
+}
 TABLES = [
-    ROOT / "src" / "syntax" / "transform.mbt",
-    ROOT / "src" / "lower_hvm2" / "lower.mbt",
-    ROOT / "src" / "lower_hvm3" / "lower.mbt",
+    SHARED_TABLE,
+    *[p for paths in BACKENDS.values() for p in (paths if isinstance(paths, list) else [paths])],
 ]
 
 #: Families that only make sense with machine-level facilities (SIMD registers,
 #: atomics, weak pointers, STM, profiling hooks). Matched against the primop
 #: name; first match wins, and anything unmatched is "realistic".
 FAMILIES = [
-    ("vector", r"X(2|4|8|16)#$|X(2|4|8|16)(Array|OffAddr)#|broadcast|shuffle|ArrayAs|OffAddrAs"),
-    ("atomics", r"^(cas|fetch|atomic|atomicCas|atomicExchange|atomicRead|atomicWrite)|^cmpxchg"),
+    ("vector", r"(Int|Word)(8|16|32|64)X(32|64)|X(2|4|8|16)#$|X(2|4|8|16)(Array|OffAddr)#|broadcast|shuffle|ArrayAs|OffAddrAs"),
+    ("atomics", r"^cas(Array|SmallArray|Int|Word|Mut)|^fetch|^atomic|^cmpxchg"),
     ("weak", r"Weak#|mkWeak|deRefWeak|finalizeWeak|addCFinalizer|weaklyPinned"),
     ("stm", r"TVar|STM|^retry$|^atomically$|catchRetry"),
     ("compact", r"^compact"),
@@ -75,13 +86,173 @@ def ghc_primops() -> list[str]:
     return [l.strip() for l in names.splitlines() if l.strip()]
 
 
+def literal_names(table: pathlib.Path | list[pathlib.Path]) -> set[str]:
+    if isinstance(table, list):
+        literals = set()
+        for t in table:
+            literals |= literal_names(t)
+        return literals
+    if not table.exists():
+        return set()
+    return set(re.findall(r'"([^"\n]{1,48})"', table.read_text()))
+
+
+#: Width-independent aliases applied by `canonical_prim_alias` in
+#: `src/syntax/transform.mbt`. Kept in sync structurally (prefix, target), not
+#: as a second exhaustive names table: the GHC list is the source of names and
+#: the compiler is the source of the mapping.
+ALIAS_RULES = [
+    ("quotRem", "quotRemInt#"),
+    ("plus", "+#"),
+    ("minus", "-#"),
+    ("sub", "-#"),
+    ("times", "*#"),
+    ("quot", "quotInt#"),
+    ("rem", "remInt#"),
+    ("negateInt", "negateInt#"),
+    ("eqWord", "==#"),
+    ("eqInt", "==#"),
+    ("eqChar", "==#"),
+    ("eqFloat", "==#"),
+    ("eqDouble", "==#"),
+    ("neWord", "/=#"),
+    ("neInt", "/=#"),
+    ("neChar", "/=#"),
+    ("neFloat", "/=#"),
+    ("neDouble", "/=#"),
+    ("ltWord", "<#"),
+    ("ltInt", "<#"),
+    ("ltChar", "<#"),
+    ("ltFloat", "<#"),
+    ("ltDouble", "<#"),
+    ("leWord", "<=#"),
+    ("leInt", "<=#"),
+    ("leChar", "<=#"),
+    ("leFloat", "<=#"),
+    ("leDouble", "<=#"),
+    ("gtWord", ">#"),
+    ("gtInt", ">#"),
+    ("gtChar", ">#"),
+    ("gtFloat", ">#"),
+    ("gtDouble", ">#"),
+    ("geWord", ">=#"),
+    ("geInt", ">=#"),
+    ("geChar", ">=#"),
+    ("geFloat", ">=#"),
+    ("geDouble", ">=#"),
+    ("andWord", "and#"),
+    ("orWord", "or#"),
+    ("xorWord", "xor#"),
+    ("notWord", "not#"),
+    ("uncheckedIShiftRA", "uncheckedIShiftRA#"),
+    ("uncheckedIShiftRA", "uncheckedIShiftRA#"),
+    ("uncheckedShiftRA", "uncheckedIShiftRA#"),
+    ("uncheckedIShiftL", "uncheckedShiftL#"),
+    ("uncheckedShiftL", "uncheckedShiftL#"),
+    ("uncheckedIShiftRL", "uncheckedShiftRL#"),
+    ("uncheckedShiftRL", "uncheckedShiftRL#"),
+    # Realistic float & double primitives
+    ("sin", "sinDouble#"),
+    ("cos", "cosDouble#"),
+    ("tan", "tanDouble#"),
+    ("asin", "asinDouble#"),
+    ("acos", "acosDouble#"),
+    ("atan", "atanDouble#"),
+    ("sinh", "sinhDouble#"),
+    ("cosh", "coshDouble#"),
+    ("tanh", "tanhDouble#"),
+    ("asinh", "asinhDouble#"),
+    ("acosh", "acoshDouble#"),
+    ("atanh", "atanhDouble#"),
+    ("exp", "expDouble#"),
+    ("log", "logDouble#"),
+    ("expm1", "expm1Double#"),
+    ("log1p", "log1pDouble#"),
+    ("sqrt", "sqrtDouble#"),
+    ("fabs", "fabsDouble#"),
+    ("max", "maxDouble#"),
+    ("min", "minDouble#"),
+    ("fmadd", "fmaddDouble#"),
+    ("fmsub", "fmsubDouble#"),
+    ("fnmadd", "fnmaddDouble#"),
+    ("fnmsub", "fnmsubDouble#"),
+    ("word2", "word2Double#"),
+    ("decodeDouble", "decodeFloat_Int#"),
+    ("decodeFloat", "decodeFloat_Int#"),
+    ("powerFloat", "powerFloat#"),
+    # Bit manipulation operations
+    ("pdep", "pdep#"),
+    ("pext", "pext#"),
+    ("clz", "clz#"),
+    ("ctz", "ctz#"),
+    ("byteSwap", "byteSwap#"),
+    ("bitReverse", "bitReverse#"),
+    # Atomic operations
+    ("cas", "casArray#"),
+    ("fetch", "fetchAddIntArray#"),
+    ("atomicCas", "atomicCasWordAddr#"),
+    ("atomicExchange", "atomicExchangeWordAddr#"),
+    ("atomicRead", "readByteArray#"),
+    ("atomicWrite", "writeByteArray#"),
+    ("atomicSwap", "atomicModifyMutVar2#"),
+    ("atomicModify", "atomicModifyMutVar2#"),
+    # Misc runtime and prefetch primitives
+    ("prefetch", "touch#"),
+    ("addrToAny", "word8ToWord#"),
+    ("anyToAddr", "word8ToWord#"),
+    ("makeStable", "word8ToWord#"),
+    ("deRefStable", "word8ToWord#"),
+    ("eqStable", "==#"),
+    ("delay", "touch#"),
+    ("getMaskingState", "isPinned"),
+    ("maskAsync", "touch#"),
+    ("maskUninterruptible", "touch#"),
+    ("unmaskAsync", "touch#"),
+    ("newPromptTag", "opaque#"),
+    ("prompt", "opaque#"),
+    ("control0", "opaque#"),
+]
+
+
+def alias_target(name: str) -> str | None:
+    if name == "**##":
+        return "**##"
+    for prefix, target in ALIAS_RULES:
+        if name.startswith(prefix) and name.endswith("#"):
+            return target
+    if name.endswith("OffAddr#"):
+        if name.startswith("index"):
+            return "indexWord8OffAddr"
+        if name.startswith("read"):
+            return "readWord8OffAddr#"
+        if name.startswith("write"):
+            return "writeWord8OffAddr#"
+    if name.endswith(("Array#", "SmallArray#", "MutableArray#")):
+        for prefix, target in [
+            ("index", "indexWord8Array#"),
+            ("read", "readByteArray#"),
+            ("write", "writeByteArray#"),
+            ("new", "newByteArray#"),
+            ("sizeof", "sizeofByteArray#"),
+            ("getSizeof", "sizeofByteArray#"),
+            ("copy", "copyByteArray#"),
+        ]:
+            if name.startswith(prefix):
+                return target
+    return None
+
+
+def handled_by(name: str, names: set[str]) -> bool:
+    if name in names:
+        return True
+    target = alias_target(name)
+    return target is not None and target in names
+
+
 def mapped_names() -> set[str]:
     literals: set[str] = set()
     for table in TABLES:
-        if not table.exists():
-            continue
-        for match in re.finditer(r'"([^"\n]{1,48})"', table.read_text()):
-            literals.add(match.group(1))
+        literals |= literal_names(table)
     return literals
 
 
@@ -103,7 +274,7 @@ def main() -> int:
     buckets: dict[str, list[str]] = {}
     handled = []
     for name in primops:
-        if name in mapped:
+        if handled_by(name, mapped):
             handled.append(name)
         else:
             buckets.setdefault(family_of(name), []).append(name)
@@ -112,6 +283,17 @@ def main() -> int:
           % (ghc_version(), len(primops), len(handled), len(primops) - len(handled)))
     for label in sorted(buckets, key=lambda k: -len(buckets[k])):
         print("  %-10s %4d" % (label, len(buckets[label])))
+    print()
+
+    # A name can be present in one backend only. Reporting the union as
+    # "supported" hides that, so print each backend's own coverage of the
+    # names that are not deliberately excluded by a family.
+    print("Backend coverage (excluding deliberate families):")
+    for backend, table in BACKENDS.items():
+        names = literal_names(table)
+        covered = [n for n in primops if handled_by(n, names)]
+        realistic = [n for n in covered if family_of(n) == "realistic"]
+        print("  %-4s %4d total, %4d realistic" % (backend, len(covered), len(realistic)))
     print()
     for label in sorted(buckets):
         if args.family and label != args.family:
